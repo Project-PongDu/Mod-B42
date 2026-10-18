@@ -588,10 +588,10 @@ end
 local function chuteSweepOrphanRigs()
     local ok, cell = pcall(getCell)
     if not ok or not cell then return end
-    local vehicles = cell:getVehicles()
-    if not vehicles then return end
-    for i = vehicles:size() - 1, 0, -1 do
-        local v = vehicles:get(i)
+    -- B42: getVehicles() 는 Set 이라 get(int) 가 없다 (server.lua 동일 주석 참조)
+    local okV, vehicles = pcall(function() return cell:getVehicles():toArray() end)
+    if not okV or not vehicles then return end
+    for _, v in ipairs(vehicles) do
         if v then
             local okS, sn = pcall(function() return v:getScriptName() end)
             if okS and sn == CHUTE_RIG_SCRIPT and not chuteIsTrackedRig(v:getId()) then

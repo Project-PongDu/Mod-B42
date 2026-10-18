@@ -329,11 +329,11 @@ end
 
 local function wreckVehiclesAround(cell, cx, cy, r)
     if not cell then return end
-    local vehicles = cell:getVehicles()
-    if not vehicles then return end
+    -- B42: getVehicles() 는 Set 이라 get(int) 가 없다 (2132행 주석 참조)
+    local okV, vehicles = pcall(function() return cell:getVehicles():toArray() end)
+    if not okV or not vehicles then return end
     local wrecked, damaged, glass, doors = 0, 0, 0, 0
-    for i = 0, vehicles:size() - 1 do
-        local v = vehicles:get(i)
+    for _, v in ipairs(vehicles) do
         if v and not v:isRemovedFromWorld() then
             local dist = math.sqrt(math.pow(v:getX() - cx, 2) + math.pow(v:getY() - cy, 2))
             if dist < r then
@@ -2129,11 +2129,14 @@ end
 local function sweepOrphanFireSupportVehicles()
     local ok, cell = pcall(getCell)
     if not ok or not cell then return end
-    local vehicles = cell:getVehicles()
-    if not vehicles then return end
+    -- B42: IsoCell.getVehicles() 는 Set<BaseVehicle> 이라 get(int) 가 없다.
+    -- toArray() 로 자바 배열을 받으면 KahluaArrayConverter 가 1-based Lua
+    -- 테이블로 바꿔주므로 ipairs 로 돌 수 있다. 사본이라 순회 중 제거해도
+    -- ConcurrentModificationException 이 나지 않는다.
+    local okV, vehicles = pcall(function() return cell:getVehicles():toArray() end)
+    if not okV or not vehicles then return end
 
-    for i = vehicles:size() - 1, 0, -1 do
-        local v = vehicles:get(i)
+    for _, v in ipairs(vehicles) do
         if v then
             local okS, scriptName = pcall(function() return v:getScriptName() end)
             if okS and (scriptName == "Base.PongDuHeli" or scriptName == "Base.PongDuDrone") then
