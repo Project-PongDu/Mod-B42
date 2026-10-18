@@ -1,0 +1,364 @@
+module Base
+{
+
+    /* Syringe_* 4종(전투자극제/광범위 항생제/모르핀/응급 재생) 주사 시 공통 재생.
+       23a2cddc59fe561bba91dd21a3759f1ee96207c0 에서 에셋만 추가되고 등록은 안 돼 있던 것.
+       syringe.lua PongDuSyringeAction:start()에서 재생. */
+    sound pongdu_syringe_inject
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/SFX_Inject.wav,
+        }
+    }
+
+    sound serum_inject
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/serum_inject.ogg,
+        }
+    }
+
+    /* Zomboxivir 앰퓰 섭취(OnEat) 시 CustomEatSound. zRe Vaccin("They Knew") 모드에서
+       사운드 파일과 함께 이식. */
+    sound BreakAmpule
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/BreakAmpule.ogg,
+        }
+    }
+
+    /* 차량 보급 사운드 3종. 원래 vehicle_airdrop.wav 한 파일(헬기 -> 낙하산 펼침 -> 무음 -> 착지,
+       10.6초)이었던 것을 구간별로 잘랐다.
+         vehicle_airdrop.wav        0.00~5.09초  헬기 접근. 키트 개봉 50% 시점 (VehicleDropCraftSound.lua)
+         vehicle_airdrop_chute.wav  5.09~7.00초  낙하산 펼침. 차량이 상공에 나타나는 순간 (VehicleDropChute.lua)
+         vehicle_airdrop_land.wav   9.64~10.64초 착지. 차량이 바닥에 닿는 순간 (VehicleDropChute.lua)
+       헬기->펼침 경계는 로터 박동 사이 가장 조용한 지점. 펼침 앞부분 약 0.2초에 로터 박동 잔향이 섞여 있다.
+       펼침/착지는 utils/fx playAt/broadcast로 거리 감쇠 재생 + 주변 플레이어 중계. */
+    sound vehicle_call_signal
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/vehicle_airdrop.wav,
+        }
+    }
+
+    sound pongdu_vdrop_chute
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/vehicle_airdrop_chute.wav,
+            volume = 0.5,
+        }
+    }
+
+    sound pongdu_vdrop_land
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/vehicle_airdrop_land.wav,
+            volume = 0.5,
+        }
+    }
+
+    /* 화력지원-헬기 로터음. loop = true 필수: PlaySound()의 loop 인자는
+       무시되므로(SoundManager.java) GameSound 플래그로만 루프가 성립한다.
+       재생/정지는 firesupport.lua가 emitter 핸들로 관리. */
+    sound pongdu_heli
+    {
+        category = Object,
+        loop = true,
+        clip
+        {
+            file = media/sound/heli.wav,
+            volume = 0.5,
+        }
+    }
+
+    /* 화력지원-헬기 기관총음. 발당 트리거 대신 발동~종료 구간 내내 루프.
+       iv(0.1~0.2초)가 원본 sfx 길이보다 짧을 때 발당 재생이 emitter를
+       스틸하며 씹히는 문제를 피하기 위함. */
+    sound pongdu_heli_lmg
+    {
+        category = Object,
+        loop = true,
+        clip
+        {
+            file = media/sound/LMG.wav,
+            volume = 0.5,
+        }
+    }
+
+    /* 화력지원-드론 모터음. 로터음과 같은 이유로 loop = true 필수.
+       재생/정지와 거리 볼륨 램프는 firesupport.lua가 emitter 핸들로 관리.
+       ※ GameSound 스크립트는 게임 부팅 시에만 로드된다 -- 추가 후 반드시
+         게임을 완전히 재시작해야 인식된다. */
+    sound pongdu_drone
+    {
+        category = Object,
+        loop = true,
+        clip
+        {
+            file = media/sound/drone.wav,
+            volume = 0.5,
+        }
+    }
+
+    /* 화력지원-드론 사격음. 헬기 LMG(pongdu_heli_lmg)와 같은 이유로
+       발당 트리거가 아니라 교전~정리 구간 내내 루프한다 -- iv(0.1초)가
+       원본 sfx 길이보다 짧아 발당 재생 시 emitter 스틸로 씹힌다. */
+    sound pongdu_drone_smg
+    {
+        category = Object,
+        loop = true,
+        clip
+        {
+            file = media/sound/SMG.wav,
+            volume = 0.5,
+        }
+    }
+
+
+    /* 인벤토리 직접 보급 계열(백신/스킬혈청/무기상자/차량키트/인벤세이브권) 공통
+       지급 효과음. rewardManager.lua의 giveSupply()에서 아이템이 실제로 인벤토리에
+       들어간 직후에만 재생한다. getSoundManager():PlaySound()로 클라 로컬 재생이라
+       월드 사운드가 아니고 좀비 어그로도 붙지 않는다.
+       ※ GameSound 스크립트는 게임 부팅 시에만 로드된다 -- 추가 후 반드시
+         게임을 완전히 재시작해야 인식된다. */
+    sound pongdu_supply
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/supply.wav,
+        }
+    }
+
+    /* ── 아래 8종: 에셋은 media/sound/ 에 있었으나 GameSound 등록이 누락돼
+       있던 것들. 미등록 상태에서도 GameSounds.getOrCreateSound() 가
+       category="AUTO" 더미를 자동 생성해 재생 자체는 됐지만, 카테고리가
+       없어 게임 옵션의 볼륨 슬라이더가 적용되지 않았고 서버 콘솔에
+       "no GameSound called ..." 경고가 매번 찍혔다 (알파테스트#2 로그). */
+
+    sound necromance
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/necromance.wav,
+            volume = 0.5,
+        }
+    }
+
+    /* 강령술 - "재활성화 가스 살포" 방식의 살포음. 캐니스터 착탄 -> 밸브 개방
+       -> 고압 분사 -> 잔류 누출이 한 파일(7초)에 이어져 있다. 연출 길이는
+       RiseUp_GasDuration 으로 따로 조절되므로 이 음원과 길이가 달라도 된다.
+       loop = false -- 한 번만 재생된다. 거리 볼륨은 utils/fx 의 playAt 이 관리.
+       pongdu_gas_deploy.wav 는 합성 음원 -- 교체 시 파일명만 유지할 것.
+       SOUND_MS(utils/fx.lua) 항목도 파일 길이와 함께 고쳐야 한다. */
+    sound pongdu_gas_deploy
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/pongdu_gas_deploy.wav,
+            volume = 0.5,
+        }
+    }
+
+    /* 좀비 공습 - 수송기 투하 방식의 엔진음. 헬기 로터음과 같은 이유로 loop = true.
+       재생/정지와 거리 볼륨은 features/zombierain.lua가 emitter 핸들로 관리.
+       airdrop_plane.wav는 합성 임시 음원(6초 무이음 루프) -- 교체 시 파일명만 유지. */
+    sound pongdu_airdrop_plane
+    {
+        category = Object,
+        loop = true,
+        clip
+        {
+            file = media/sound/airdrop_plane.wav,
+            volume = 0.5,
+        }
+    }
+
+    sound zombie_rain
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/zombie_rain.wav,
+            volume = 0.5,
+        }
+    }
+
+    sound alert
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/alert.wav,
+        }
+    }
+
+    sound anomaly
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/anomaly.wav,
+        }
+    }
+
+    sound ding
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/ding.wav,
+        }
+    }
+
+    /* 폭격 착탄음. bombard.lua doExplosion() */
+    sound day_one_kaboom
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/day_one_kaboom.wav,
+            volume = 0.5,
+        }
+    }
+
+    /* 헬기 소탕 완료 무전. firesupport.lua handleHeliClear()
+       PlaySound()의 maxGain은 무시되므로 볼륨은 여기 clip volume으로만 조절된다. */
+    sound area_clear
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/area_clear.wav,
+            volume = 0.5,
+        }
+    }
+
+    /* 저격 총성. firesupport.lua handleSniperFire()
+       PlaySound(name, loop, maxGain)의 maxGain은 SoundManager.java에서 통째로
+       무시되므로(내부에서 emitter.playSound(name)만 호출), 헬기 LMG/드론 SMG와
+       마찬가지로 볼륨은 여기 clip volume으로만 조절된다. */
+    sound AWP_Bang
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/AWP_Bang.wav,
+            volume = 0.5,
+        }
+    }
+
+    /* 랜덤텔포 복귀음. randomteleport.lua rtDoReturn().
+       기존엔 exile_exit(exile 기능용 에셋, GameSound 미등록 -- "AUTO" 더미로
+       재생만 되던 상태)을 그대로 갖다 썼다. 이번에 랜덤텔포 전용으로 새로
+       추가된 anomaly-reversed.wav(anomaly.wav 역재생)로 교체 등록.
+       exile_exit / exile_enter는 이제 아무 데서도 참조하지 않는 고아 에셋이다
+       (exile 기능 자체가 rewardManager.lua에서 더미 처리돼 미사용). */
+    sound anomaly_reversed
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/anomaly-reversed.wav,
+            volume = 0.5,
+        }
+    }
+
+    /*
+        호드 나이트 예약 알림음.
+        발동음이 아니라 후원 접수 시점의 예고음이라 loop = false 1회 재생이다
+        (features/hordenight.lua 의 PongDuHorde/Reserved 수신부).
+    */
+    sound pongdu_heartbeat
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/heartbeat.wav,
+            volume = 1.2,
+        }
+    }
+
+    /*
+        블러드문 발동음.
+        호드 나이트 예약 알림음(pongdu_heartbeat)과 공유하다가 분리했다
+        (features/bloodmoon.lua 의 startLocal, START_SOUND 상수).
+    */
+    sound pongdu_howling
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/howling.wav,
+            volume = 0.8,
+        }
+    }
+
+    /* 
+        호드 나이트 발동 효과음. 
+        예약 알림음(pongdu_heartbeat)과 달리
+        Fire 시점(실제 발동)에 1회 재생
+        (features/hordenight.lua 의 PongDuHorde/Fire 수신부, HORDE_START_SOUND 상수).
+    */
+    sound pongdu_horde_start
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/horde_incoming.wav,
+            volume = 0.8,
+        }
+    }
+
+    /*
+        블러드문 연장음.
+        진행 중에 추가 후원이 들어와 연장될 때만 재생 (features/bloodmoon.lua
+        의 startLocal, wasActive 분기, EXTEND_SOUND 상수). 최초 발동음
+        (pongdu_howling)과 구분해 "이미 진행 중임"을 알리는 용도.
+    */
+    sound pongdu_creepy_forest
+    {
+        category = Object,
+        loop = false,
+        clip
+        {
+            file = media/sound/creepy_forest.wav,
+            volume = 0.8,
+        }
+    }
+
+}

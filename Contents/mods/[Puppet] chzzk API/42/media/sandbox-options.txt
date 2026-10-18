@@ -1,0 +1,1039 @@
+VERSION = 1,
+
+
+
+
+
+/**************************************************
+            PONGDU - MAIN (메인)
+**************************************************/
+
+option PongDu.Donation_ShowPanel = {
+    type = boolean, default = true,
+    page = PongDu_Main, translation = PongDu_Donation_ShowPanel,
+}
+
+option PongDu.Host_SteamID = {
+    type = string, default = ,
+    page = PongDu_Main, translation = PongDu_Host_SteamID,
+}
+
+option PongDu.Host_AllowAdmin = {
+    type = boolean, default = false,
+    page = PongDu_Main, translation = PongDu_Host_AllowAdmin,
+}
+
+option PongDu.Divider_BuffTier = {
+    type = boolean, default = false,
+    page = PongDu_Main, translation = PongDu_Divider_BuffTier,
+}
+
+option PongDu.Tier_buff_roulette = {
+    type = integer, min = 0, max = 1000000, default = 1000,
+    page = PongDu_Main, translation = PongDu_Tier_buff_roulette,
+}
+
+option PongDu.Tier_random_weapon = {
+    type = integer, min = 0, max = 1000000, default = 2000,
+    page = PongDu_Main, translation = PongDu_Tier_random_weapon,
+}
+
+option PongDu.Tier_vaccine = {
+    type = integer, min = 0, max = 1000000, default = 5000,
+    page = PongDu_Main, translation = PongDu_Tier_vaccine,
+}
+
+option PongDu.Tier_vehicle_drop = {
+    type = integer, min = 0, max = 1000000, default = 7000,
+    page = PongDu_Main, translation = PongDu_Tier_vehicle_drop,
+}
+
+option PongDu.Tier_random_skill_potion = {
+    type = integer, min = 0, max = 1000000, default = 20000,
+    page = PongDu_Main, translation = PongDu_Tier_random_skill_potion,
+}
+
+option PongDu.Tier_inv_save_ticket = {
+    type = integer, min = 0, max = 1000000, default = 40000,
+    page = PongDu_Main, translation = PongDu_Tier_inv_save_ticket,
+}
+
+option PongDu.Tier_fire_support = {
+    type = integer, min = 0, max = 1000000, default = 50000,
+    page = PongDu_Main, translation = PongDu_Tier_fire_support,
+}
+
+option PongDu.Tier_food_supply = {
+    type = integer, min = 0, max = 1000000, default = 1500,
+    page = PongDu_Main, translation = PongDu_Tier_food_supply,
+}
+
+option PongDu.Tier_instant_heal = {
+    type = integer, min = 0, max = 1000000, default = 4000,
+    page = PongDu_Main, translation = PongDu_Tier_instant_heal,
+}
+
+option PongDu.Divider_DebuffTier = {
+    type = boolean, default = false,
+    page = PongDu_Main, translation = PongDu_Divider_DebuffTier,
+}
+
+option PongDu.Tier_debuff_roulette = {
+    type = integer, min = 0, max = 1000000, default = 1100,
+    page = PongDu_Main, translation = PongDu_Tier_debuff_roulette,
+}
+
+option PongDu.Tier_zombie_roulette = {
+    type = integer, min = 0, max = 1000000, default = 3000,
+    page = PongDu_Main, translation = PongDu_Tier_zombie_roulette,
+}
+
+option PongDu.Tier_sprinter5 = {
+    type = integer, min = 0, max = 1000000, default = 10000,
+    page = PongDu_Main, translation = PongDu_Tier_sprinter5,
+}
+
+option PongDu.Tier_random_teleport = {
+    type = integer, min = 0, max = 1000000, default = 15000,
+    page = PongDu_Main, translation = PongDu_Tier_random_teleport,
+}
+
+option PongDu.Tier_random_injury = {
+    type = integer, min = 0, max = 1000000, default = 4500,
+    page = PongDu_Main, translation = PongDu_Tier_random_injury,
+}
+
+option PongDu.Tier_mutant_spawn = {
+    type = integer, min = 0, max = 1000000, default = 30000,
+    page = PongDu_Main, translation = PongDu_Tier_mutant_spawn,
+}
+
+option PongDu.Tier_missile = {
+    type = integer, min = 0, max = 1000000, default = 60000,
+    page = PongDu_Main, translation = PongDu_Tier_missile,
+}
+
+option PongDu.Tier_zombie_rain = {
+    type = integer, min = 0, max = 1000000, default = 70000,
+    page = PongDu_Main, translation = PongDu_Tier_zombie_rain,
+}
+
+option PongDu.Tier_rise_up_dead_man = {
+    type = integer, min = 0, max = 1000000, default = 80000,
+    page = PongDu_Main, translation = PongDu_Tier_rise_up_dead_man,
+}
+
+option PongDu.Divider_ServerTier = {
+    type = boolean, default = false,
+    page = PongDu_Main, translation = PongDu_Divider_ServerTier,
+}
+
+option PongDu.Tier_medical_box = {
+    type = integer, min = 0, max = 1000000, default = 5500,
+    page = PongDu_Main, translation = PongDu_Tier_medical_box,
+}
+
+option PongDu.Tier_blood_moon = {
+    type = integer, min = 0, max = 1000000, default = 66600,
+    page = PongDu_Main, translation = PongDu_Tier_blood_moon,
+}
+
+option PongDu.Tier_horde_night = {
+    type = integer, min = 0, max = 1000000, default = 100000,
+    page = PongDu_Main, translation = PongDu_Tier_horde_night,
+}
+
+
+/* PongDu_Dev 스텁 기능 - 근접/원거리 암살자 티어, 정식 구현 전까지 비활성화
+option PongDu.Tier_bandit_melee = {
+    type = integer, min = 0, max = 1000000, default = 0,
+    page = PongDu_Main, translation = PongDu_Tier_bandit_melee,
+}
+
+option PongDu.Tier_bandit_ranged = {
+    type = integer, min = 0, max = 1000000, default = 0,
+    page = PongDu_Main, translation = PongDu_Tier_bandit_ranged,
+}
+*/
+
+
+
+
+
+/**************************************************
+            PONGDU - BUFF (도움 효과)
+**************************************************/
+
+option PongDu.Divider_BuffRoulette = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_Divider_BuffRoulette,
+}
+
+option PongDu.Delay_buff_roulette = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Buff, translation = PongDu_Delay_buff_roulette,
+}
+
+option PongDu.Divider_RandomWeapon = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_Divider_RandomWeapon,
+}
+
+option PongDu.Delay_random_weapon = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Buff, translation = PongDu_Delay_random_weapon,
+}
+
+option PongDu.Divider_Vaccine = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_Divider_Vaccine,
+}
+
+option PongDu.Delay_vaccine = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Buff, translation = PongDu_Delay_vaccine,
+}
+
+option PongDu.Divider_VehicleDrop = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_Divider_VehicleDrop,
+}
+
+option PongDu.Delay_vehicle_drop = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Buff, translation = PongDu_Delay_vehicle_drop,
+}
+
+option PongDu.VehicleDrop_Source = {
+    type = enum, numValues = 4, default = 2,
+    page = PongDu_Buff,
+    translation = PongDu_VehicleDrop_Source,
+    valueTranslation = PongDu_VehicleDrop_Source,
+}
+
+option PongDu.VehicleDrop_Pool = {
+    type = string,
+    default = ,
+    page = PongDu_Buff, translation = PongDu_VehicleDrop_Pool,
+}
+
+option PongDu.VehicleDrop_ExcludePool = {
+    type = string,
+    default = Base.PongDuDrone;Base.PongDuHeli,
+    page = PongDu_Buff, translation = PongDu_VehicleDrop_ExcludePool,
+}
+
+option PongDu.VehicleDrop_BlockModNaturalSpawn = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_VehicleDrop_BlockModNaturalSpawn,
+}
+
+option PongDu.VehicleDrop_MinDistance = {
+    type = integer, min = 0, max = 300, default = 10,
+    page = PongDu_Buff, translation = PongDu_VehicleDrop_MinDistance,
+}
+
+option PongDu.VehicleDrop_MaxDistance = {
+    type = integer, min = 0, max = 300, default = 20,
+    page = PongDu_Buff, translation = PongDu_VehicleDrop_MaxDistance,
+}
+
+option PongDu.VehicleDrop_ChuteDuration = {
+    type = double, min = 0.50, max = 60, default = 4.00,
+    page = PongDu_Buff, translation = PongDu_VehicleDrop_ChuteDuration,
+}
+
+option PongDu.Divider_FoodSupply = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_Divider_FoodSupply,
+}
+
+option PongDu.Delay_food_supply = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Buff, translation = PongDu_Delay_food_supply,
+}
+
+option PongDu.FoodSupply_Item = {
+    type = string,
+    default = Base.Crisps,
+    page = PongDu_Buff, translation = PongDu_FoodSupply_Item,
+}
+
+option PongDu.FoodSupply_Count = {
+    type = integer, min = 1, max = 50, default = 5,
+    page = PongDu_Buff, translation = PongDu_FoodSupply_Count,
+}
+
+option PongDu.Divider_InstantHeal = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_Divider_InstantHeal,
+}
+
+option PongDu.Delay_instant_heal = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Buff, translation = PongDu_Delay_instant_heal,
+}
+
+option PongDu.Heal_CureBiteInfection = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_Heal_CureBiteInfection,
+}
+
+/* 스킬별 강화혈청 획득 등급 제한.
+   1=일반+희귀+특급 / 2=일반+희귀 / 3=일반만 / 4=획득 불가
+   valueTranslation 은 14개 옵션이 PongDu_SerumDrop 하나를 공유한다. */
+
+option PongDu.Divider_RandomSkillPotion = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_Divider_RandomSkillPotion,
+}
+
+option PongDu.Delay_random_skill_potion = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Buff, translation = PongDu_Delay_random_skill_potion,
+}
+
+option PongDu.Serum_Fitness = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_Fitness,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_Strength = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_Strength,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_Sprinting = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_Sprinting,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_Lightfoot = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_Lightfoot,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_Nimble = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_Nimble,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_Sneak = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_Sneak,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_Axe = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_Axe,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_Blunt = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_Blunt,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_SmallBlunt = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_SmallBlunt,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_LongBlade = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_LongBlade,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_SmallBlade = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_SmallBlade,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_Spear = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_Spear,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_Maintenance = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_Maintenance,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Serum_Aiming = {
+    type = enum, numValues = 4, default = 1,
+    page = PongDu_Buff,
+    translation = PongDu_Serum_Aiming,
+    valueTranslation = PongDu_SerumDrop,
+}
+
+option PongDu.Divider_InvSaveTicket = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_Divider_InvSaveTicket,
+}
+
+option PongDu.Delay_inv_save_ticket = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Buff, translation = PongDu_Delay_inv_save_ticket,
+}
+
+option PongDu.Divider_FireSupport = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_Divider_FireSupport,
+}
+
+option PongDu.Delay_fire_support = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Buff, translation = PongDu_Delay_fire_support,
+}
+
+option PongDu.FireSupport_Sniper = {
+    type = boolean, default = true,
+    page = PongDu_Buff, translation = PongDu_FireSupport_Sniper,
+}
+
+option PongDu.FireSupport_Drone = {
+    type = boolean, default = true,
+    page = PongDu_Buff, translation = PongDu_FireSupport_Drone,
+}
+
+option PongDu.FireSupport_Helicopter = {
+    type = boolean, default = true,
+    page = PongDu_Buff, translation = PongDu_FireSupport_Helicopter,
+}
+
+option PongDu.FireSupport_Airborne = {
+    type = boolean, default = false,
+    page = PongDu_Buff, translation = PongDu_FireSupport_Airborne,
+}
+
+option PongDu.Sniper_Radius = {
+    type = integer, min = 10, max = 100, default = 50,
+    page = PongDu_Buff, translation = PongDu_Sniper_Radius,
+}
+
+option PongDu.Sniper_Duration = {
+    type = integer, min = 10, max = 120, default = 30,
+    page = PongDu_Buff, translation = PongDu_Sniper_Duration,
+}
+
+option PongDu.Sniper_Interval = {
+    type = integer, min = 200, max = 10000, default = 2000,
+    page = PongDu_Buff, translation = PongDu_Sniper_Interval,
+}
+
+option PongDu.Sniper_Pierce = {
+    type = boolean, default = true,
+    page = PongDu_Buff, translation = PongDu_Sniper_Pierce,
+}
+
+option PongDu.Sniper_PierceChance = {
+    type = integer, min = 0, max = 100, default = 80,
+    page = PongDu_Buff, translation = PongDu_Sniper_PierceChance,
+}
+
+option PongDu.Heli_Duration = {
+    type = integer, min = 10, max = 120, default = 30,
+    page = PongDu_Buff, translation = PongDu_Heli_Duration,
+}
+
+option PongDu.Heli_Radius = {
+    type = integer, min = 10, max = 60, default = 30,
+    page = PongDu_Buff, translation = PongDu_Heli_Radius,
+}
+
+option PongDu.Heli_Interval = {
+    type = integer, min = 10, max = 2000, default = 150,
+    page = PongDu_Buff, translation = PongDu_Heli_Interval,
+}
+
+option PongDu.Heli_CritChance = {
+    type = integer, min = 0, max = 100, default = 50,
+    page = PongDu_Buff, translation = PongDu_Heli_CritChance,
+}
+
+option PongDu.Drone_Duration = {
+    type = integer, min = 10, max = 120, default = 60,
+    page = PongDu_Buff, translation = PongDu_Drone_Duration,
+}
+
+option PongDu.Drone_DetectRadius = {
+    type = integer, min = 4, max = 40, default = 20,
+    page = PongDu_Buff, translation = PongDu_Drone_DetectRadius,
+}
+
+option PongDu.Drone_Interval = {
+    type = integer, min = 10, max = 2000, default = 50,
+    page = PongDu_Buff, translation = PongDu_Drone_Interval,
+}
+
+option PongDu.Drone_CritChance = {
+    type = integer, min = 0, max = 100, default = 2,
+    page = PongDu_Buff, translation = PongDu_Drone_CritChance,
+}
+
+option PongDu.Drone_KnockdownChance = {
+    type = integer, min = 0, max = 100, default = 30,
+    page = PongDu_Buff, translation = PongDu_Drone_KnockdownChance,
+}
+
+
+
+
+
+/**************************************************
+            PONGDU - DEBUFF (방해 효과)
+**************************************************/
+
+option PongDu.Divider_Roulette = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Divider_Roulette,
+}
+
+option PongDu.Delay_debuff_roulette = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Debuff, translation = PongDu_Delay_debuff_roulette,
+}
+
+option PongDu.Divider_ZombieRoulette = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Divider_ZombieRoulette,
+}
+
+option PongDu.Delay_zombie_roulette = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Debuff, translation = PongDu_Delay_zombie_roulette,
+}
+
+option PongDu.Roulette_MinCount = {
+    type = integer, min = 1, max = 20, default = 2,
+    page = PongDu_Debuff, translation = PongDu_Roulette_MinCount,
+}
+
+option PongDu.Roulette_MaxCount = {
+    type = integer, min = 1, max = 30, default = 6,
+    page = PongDu_Debuff, translation = PongDu_Roulette_MaxCount,
+}
+
+option PongDu.Divider_Sprinter = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Divider_Sprinter,
+}
+
+option PongDu.Delay_sprinter5 = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Debuff, translation = PongDu_Delay_sprinter5,
+}
+
+option PongDu.Sprinter_Count = {
+    type = integer, min = 1, max = 10, default = 2,
+    page = PongDu_Debuff, translation = PongDu_Sprinter_Count,
+}
+
+option PongDu.Divider_RandomInjury = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Divider_RandomInjury,
+}
+
+option PongDu.Delay_random_injury = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Debuff, translation = PongDu_Delay_random_injury,
+}
+
+option PongDu.Injury_Count = {
+    type = integer, min = 1, max = 10, default = 1,
+    page = PongDu_Debuff, translation = PongDu_Injury_Count,
+}
+
+option PongDu.Injury_Infection = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Injury_Infection,
+}
+
+option PongDu.Injury_Scratch = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Injury_Scratch,
+}
+
+option PongDu.Injury_Cut = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Injury_Cut,
+}
+
+option PongDu.Injury_DeepWound = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Injury_DeepWound,
+}
+
+option PongDu.Injury_Glass = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Injury_Glass,
+}
+
+option PongDu.Injury_Bite = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Injury_Bite,
+}
+
+option PongDu.Injury_Burn = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Injury_Burn,
+}
+
+option PongDu.Injury_Bullet = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Injury_Bullet,
+}
+
+option PongDu.Injury_Fracture = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Injury_Fracture,
+}
+
+option PongDu.Divider_RandomTeleport = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Divider_RandomTeleport,
+}
+
+option PongDu.Delay_random_teleport = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Debuff, translation = PongDu_Delay_random_teleport,
+}
+
+option PongDu.RT_Mode = {
+    type = enum, numValues = 3, default = 1,
+    page = PongDu_Debuff,
+    translation = PongDu_RT_Mode,
+    valueTranslation = PongDu_RT_Mode,
+}
+
+option PongDu.RT_MinDist = {
+    type = integer, min = 10, max = 1000, default = 100,
+    page = PongDu_Debuff, translation = PongDu_RT_MinDist,
+}
+
+option PongDu.RT_MaxDist = {
+    type = integer, min = 20, max = 2000, default = 200,
+    page = PongDu_Debuff, translation = PongDu_RT_MaxDist,
+}
+
+option PongDu.RT_SurviveMinutes = {
+    type = integer, min = 1, max = 60, default = 5,
+    page = PongDu_Debuff, translation = PongDu_RT_SurviveMinutes,
+}
+
+option PongDu.Divider_Bombard = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Divider_Bombard,
+}
+
+option PongDu.Delay_missile = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Debuff, translation = PongDu_Delay_missile,
+}
+
+option PongDu.Bombard_Delay = {
+    type = integer, min = 10, max = 300, default = 30,
+    page = PongDu_Debuff, translation = PongDu_Bombard_Delay,
+}
+
+option PongDu.Bombard_Radius = {
+    type = integer, min = 5, max = 60, default = 30,
+    page = PongDu_Debuff, translation = PongDu_Bombard_Radius,
+}
+
+option PongDu.Bombard_Injure = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Bombard_Injure,
+}
+
+option PongDu.Bombard_SafeZoneBlock = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Bombard_SafeZoneBlock,
+}
+
+option PongDu.Bombard_VehicleDamage = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Bombard_VehicleDamage,
+}
+
+option PongDu.Divider_Mutant = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Divider_Mutant,
+}
+
+option PongDu.Delay_mutant_spawn = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Debuff, translation = PongDu_Delay_mutant_spawn,
+}
+
+option PongDu.Mutant_NameTag = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Mutant_NameTag,
+}
+
+option PongDu.Mutant_Screamer = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Screamer,
+}
+
+option PongDu.Mutant_Brute = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Brute,
+}
+
+option PongDu.Mutant_Roach = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Roach,
+}
+
+option PongDu.Mutant_Tracer = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Tracer,
+}
+
+option PongDu.Mutant_Health_Screamer = {
+    type = double, min = 0.50, max = 30, default = 3.00,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Health_Screamer,
+}
+
+option PongDu.Mutant_Health_Brute = {
+    type = double, min = 0.50, max = 30, default = 5.00,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Health_Brute,
+}
+
+option PongDu.Mutant_Health_Roach = {
+    type = double, min = 0.50, max = 30, default = 3.00,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Health_Roach,
+}
+
+option PongDu.Mutant_Health_Tracer = {
+    type = double, min = 0.50, max = 30, default = 3.00,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Health_Tracer,
+}
+
+option PongDu.Divider_RiseUp = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Divider_RiseUp,
+}
+
+option PongDu.Delay_rise_up_dead_man = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Debuff, translation = PongDu_Delay_rise_up_dead_man,
+}
+
+option PongDu.RiseUp_Style = {
+    type = enum, numValues = 2, default = 2,
+    page = PongDu_Debuff,
+    translation = PongDu_RiseUp_Style,
+    valueTranslation = PongDu_RiseUp_Style,
+}
+
+option PongDu.RiseUp_GasDuration = {
+    type = integer, min = 3, max = 15, default = 7,
+    page = PongDu_Debuff, translation = PongDu_RiseUp_GasDuration,
+}
+
+option PongDu.RiseUp_Radius = {
+    type = integer, min = 5, max = 60, default = 30,
+    page = PongDu_Debuff, translation = PongDu_RiseUp_Radius,
+}
+
+option PongDu.RiseUp_ShowRadius = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_RiseUp_ShowRadius,
+}
+
+option PongDu.RiseUp_SafeZoneBlock = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_RiseUp_SafeZoneBlock,
+}
+
+option PongDu.RiseUp_MinCorpses = {
+    type = integer, min = 0, max = 200, default = 10,
+    page = PongDu_Debuff, translation = PongDu_RiseUp_MinCorpses,
+}
+
+option PongDu.RiseUp_MaxRevive = {
+    type = integer, min = 0, max = 500, default = 0,
+    page = PongDu_Debuff, translation = PongDu_RiseUp_MaxRevive,
+}
+
+option PongDu.RiseUp_Priority = {
+    type = enum, numValues = 2, default = 1,
+    page = PongDu_Debuff,
+    translation = PongDu_RiseUp_Priority,
+    valueTranslation = PongDu_RiseUp_Priority,
+}
+
+option PongDu.Divider_Rain = {
+    type = boolean, default = false,
+    page = PongDu_Debuff, translation = PongDu_Divider_Rain,
+}
+
+option PongDu.Delay_zombie_rain = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Debuff, translation = PongDu_Delay_zombie_rain,
+}
+
+option PongDu.Rain_Style = {
+    type = enum, numValues = 2, default = 2,
+    page = PongDu_Debuff,
+    translation = PongDu_Rain_Style,
+    valueTranslation = PongDu_Rain_Style,
+}
+
+option PongDu.Rain_Radius = {
+    type = integer, min = 3, max = 50, default = 20,
+    page = PongDu_Debuff, translation = PongDu_Rain_Radius,
+}
+
+option PongDu.Rain_Duration = {
+    type = integer, min = 5, max = 120, default = 30,
+    page = PongDu_Debuff, translation = PongDu_Rain_Duration,
+}
+
+option PongDu.Rain_Parachute = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Rain_Parachute,
+}
+
+option PongDu.Rain_Count_Normal = {
+    type = integer, min = 0, max = 500, default = 95,
+    page = PongDu_Debuff, translation = PongDu_Rain_Count_Normal,
+}
+
+option PongDu.Rain_Count_Sprinter = {
+    type = integer, min = 0, max = 500, default = 5,
+    page = PongDu_Debuff, translation = PongDu_Rain_Count_Sprinter,
+}
+
+option PongDu.Rain_Count_Screamer = {
+    type = integer, min = 0, max = 500, default = 0,
+    page = PongDu_Debuff, translation = PongDu_Rain_Count_Screamer,
+}
+
+option PongDu.Rain_Count_Brute = {
+    type = integer, min = 0, max = 500, default = 0,
+    page = PongDu_Debuff, translation = PongDu_Rain_Count_Brute,
+}
+
+option PongDu.Rain_Count_Roach = {
+    type = integer, min = 0, max = 500, default = 0,
+    page = PongDu_Debuff, translation = PongDu_Rain_Count_Roach,
+}
+
+option PongDu.Rain_Count_Tracer = {
+    type = integer, min = 0, max = 500, default = 0,
+    page = PongDu_Debuff, translation = PongDu_Rain_Count_Tracer,
+}
+
+option PongDu.Rain_ShowRadius = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Rain_ShowRadius,
+}
+
+option PongDu.Rain_SafeZoneBlock = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Rain_SafeZoneBlock,
+}
+
+
+
+
+
+/**************************************************
+            PONGDU SERVER (서버 전체 대상 후원 효과)
+**************************************************/
+
+option PongDu.Divider_HordeNight = {
+    type = boolean, default = false,
+    page = PongDu_Server, translation = PongDu_Divider_HordeNight,
+}
+
+option PongDu.Delay_horde_night = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Server, translation = PongDu_Delay_horde_night,
+}
+
+option PongDu.Horde_Hour = {
+    type = integer, min = 0, max = 23, default = 22,
+    page = PongDu_Server, translation = PongDu_Horde_Hour,
+}
+
+option PongDu.Horde_Count = {
+    type = integer, min = 1, max = 500, default = 200,
+    page = PongDu_Server, translation = PongDu_Horde_Count,
+}
+
+option PongDu.Horde_DurationMin = {
+    type = integer, min = 10, max = 1440, default = 120,
+    page = PongDu_Server, translation = PongDu_Horde_DurationMin,
+}
+
+option PongDu.Horde_Distance = {
+    type = integer, min = 10, max = 90, default = 55,
+    page = PongDu_Server, translation = PongDu_Horde_Distance,
+}
+
+option PongDu.Horde_ShowIndicator = {
+    type = boolean, default = true,
+    page = PongDu_Server, translation = PongDu_Horde_ShowIndicator,
+}
+
+option PongDu.Divider_BloodMoon = {
+    type = boolean, default = false,
+    page = PongDu_Server, translation = PongDu_Divider_BloodMoon,
+}
+
+option PongDu.Delay_blood_moon = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Server, translation = PongDu_Delay_blood_moon,
+}
+
+option PongDu.BloodMoon_DurationMin = {
+    type = integer, min = 10, max = 1440, default = 120,
+    page = PongDu_Server, translation = PongDu_BloodMoon_DurationMin,
+}
+
+option PongDu.BloodMoon_ConvertZombies = {
+    type = boolean, default = true,
+    page = PongDu_Server, translation = PongDu_BloodMoon_ConvertZombies,
+}
+
+option PongDu.BloodMoon_LightStrength = {
+    type = integer, min = 0, max = 100, default = 100,
+    page = PongDu_Server, translation = PongDu_BloodMoon_LightStrength,
+}
+
+option PongDu.BloodMoon_ShowIndicator = {
+    type = boolean, default = true,
+    page = PongDu_Server, translation = PongDu_BloodMoon_ShowIndicator,
+}
+
+option PongDu.Divider_MedicalBox = {
+    type = boolean, default = false,
+    page = PongDu_Server, translation = PongDu_Divider_MedicalBox,
+}
+
+option PongDu.Delay_medical_box = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Server, translation = PongDu_Delay_medical_box,
+}
+
+/* 상자에서 나올 수 있는 품목(주사기 4종 + 백신). 추첨이 아니라 켜져 있는
+   항목이 상자 하나당 전부 지급되며, 특정 품목을 빼고 싶을 때만 끄면 된다.
+   전부 끄면 상자를 열어도 아무것도 나오지 않는다(로그로 경고).
+   판정은 상자를 여는 시점에 클라가 하므로, 같은 후원으로 받은 상자라도
+   그 사이에 옵션을 바꾸면 플레이어마다 다른 구성이 나올 수 있다. */
+
+option PongDu.MedBox_Allow_Adrenaline = {
+    type = boolean, default = true,
+    page = PongDu_Server, translation = PongDu_MedBox_Allow_Adrenaline,
+}
+
+option PongDu.MedBox_Allow_Doxycycline = {
+    type = boolean, default = true,
+    page = PongDu_Server, translation = PongDu_MedBox_Allow_Doxycycline,
+}
+
+option PongDu.MedBox_Allow_Morphine = {
+    type = boolean, default = true,
+    page = PongDu_Server, translation = PongDu_MedBox_Allow_Morphine,
+}
+
+option PongDu.MedBox_Allow_Emergency = {
+    type = boolean, default = true,
+    page = PongDu_Server, translation = PongDu_MedBox_Allow_Emergency,
+}
+
+option PongDu.MedBox_Allow_Vaccine = {
+    type = boolean, default = true,
+    page = PongDu_Server, translation = PongDu_MedBox_Allow_Vaccine,
+}
+
+
+
+
+/**************************************************
+            PONGDU - DEV (dummy / stub features)
+**************************************************/
+
+option PongDu.Divider_Bandit = {
+    type = boolean, default = false,
+    page = PongDu_Dev, translation = PongDu_Divider_Bandit,
+}
+
+option PongDu.Delay_bandit_melee = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Dev, translation = PongDu_Delay_bandit_melee,
+}
+
+option PongDu.Delay_bandit_ranged = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Dev, translation = PongDu_Delay_bandit_ranged,
+}
+
+option PongDu.Divider_Exile = {
+    type = boolean, default = false,
+    page = PongDu_Dev, translation = PongDu_Divider_Exile,
+}
+
+option PongDu.Delay_exile = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Dev, translation = PongDu_Delay_exile,
+}
+
+option PongDu.Divider_Backroom = {
+    type = boolean, default = false,
+    page = PongDu_Dev, translation = PongDu_Divider_Backroom,
+}
+
+option PongDu.Delay_backroom = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Dev, translation = PongDu_Delay_backroom,
+}
+
+option PongDu.Divider_ReviveTicket = {
+    type = boolean, default = false,
+    page = PongDu_Dev, translation = PongDu_Divider_ReviveTicket,
+}
+
+option PongDu.Delay_revive_ticket = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Dev, translation = PongDu_Delay_revive_ticket,
+}
+
+option PongDu.Divider_SecretPassageKit = {
+    type = boolean, default = false,
+    page = PongDu_Dev, translation = PongDu_Divider_SecretPassageKit,
+}
+
+option PongDu.Delay_secret_passage_kit = {
+    type = integer, min = 0, max = 60, default = 3,
+    page = PongDu_Dev, translation = PongDu_Delay_secret_passage_kit,
+}

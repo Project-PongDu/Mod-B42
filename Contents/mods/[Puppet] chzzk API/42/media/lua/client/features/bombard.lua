@@ -1,0 +1,314 @@
+local _a = _a or {}
+require("ISUI/ISPanel")
+local timerStack = require("utils/timerStack")
+local colorMap = require("utils/colorMap")
+local timerText = require("utils/timerText")
+local deltaTime = require("utils/deltaTime")
+
+-- 대기시간은 ms 단위로 modData.bombRemainMs 에 저장한다 (프레임 독립 감산, utils/deltaTime).
+-- 구버전 세이브의 bombTimer(틱, 1틱=1/60초 가정)는 복구 시 ms로 1회 환산한다.
+local WARN_MS = 8000   -- 폭발 전 경고음 시점 (구 bombTimer == 480틱)
+
+local function migrateLegacy(b)
+    if b.bombTimer ~= nil then
+        if (b.bombTimer or 0) > 0 and not b.bombRemainMs then
+            b.bombRemainMs = b.bombTimer * 1000 / 60
+            print("[PongDuBombard] migrated legacy bombTimer ticks=" .. tostring(b.bombTimer)
+                .. " -> remainMs=" .. tostring(math.floor(b.bombRemainMs)))
+        end
+        b.bombTimer = nil
+    end
+end
+
+-- 틱 1회 감산. 경고음은 WARN_MS 를 "통과"하는 프레임에 1회 (dt가 가변이라 == 비교 불가).
+-- 반환: 0 도달 여부
+local function tickBomb(b)
+    local prev = b.bombRemainMs
+    local now  = prev - deltaTime.ms()
+    b.bombRemainMs = now
+    if prev > WARN_MS and now <= WARN_MS then
+        getSoundManager():PlaySound("explosion", false, 1.0)
+        sendClientCommand("PongDuBombard", "PlayExplosion", {})
+    end
+    if now <= 0 then
+        b.bombRemainMs = 0
+        return true
+    end
+    return false
+end
+
+local BombardTimerDisplay = ISPanel:derive("BombardTimerDisplay")
+
+DOTex = DOTex or {}
+DOTex.tex = nil
+DOTex.alpha = 0
+DOTex.speed = 0.018
+DOTex.screenWidth  = getCore():getScreenWidth()
+DOTex.screenHeight = getCore():getScreenHeight()
+
+DOTex.Blast = function()
+    if not isIngameState() then return end
+    if DOTex.alpha == 0 then return end
+    if not DOTex.tex then return end
+    local a = getSpecificPlayer(0)
+    if a == nil then return end
+    local b = DOTex.speed * getGameSpeed()
+    local c = 1
+    local d = DOTex.alpha
+    if d > 1 then d = 1 end
+    UIManager.DrawTexture(DOTex.tex, 0, 0, DOTex.screenWidth * c, DOTex.screenHeight * c, d)
+    DOTex.alpha = DOTex.alpha - b
+    if DOTex.alpha < 0 then DOTex.alpha = 0 end
+end
+DOTex.SizeChange = function(a, b, c, d)
+    DOTex.screenWidth  = c
+    DOTex.screenHeight = d
+end
+Events.OnPreUIDraw.Add(DOTex.Blast)
+Events.OnResolutionChange.Add(DOTex.SizeChange)
+
+function BombardTimerDisplay:new(a, b)
+    local c = getCore():getScreenWidth()
+    -- y좌표는 timerStack이 등록 순서에 맞춰 잡아준다(register 전까지는 임시값 0).
+    -- 폭/높이는 카운터 패널 공통 규격(utils/timerText)을 따른다.
+    local e = ISPanel:new((c - timerText.PANEL_W) / 2, 0,
+        timerText.PANEL_W, timerText.PANEL_H)
+    setmetatable(e, self)
+    self.__index = self
+    e.player      = a
+    e.maxTime     = b
+    e.currentTime = b
+    e:noBackground()
+    return e
+end
+function BombardTimerDisplay:render()
+    local a = math.floor(self.currentTime / 1000)
+    local b = math.floor(a / 60)
+    local c = a % 60
+    local col = colorMap.get("missile")
+    timerText.draw(self, getText("IGUI_donation_bombard_timer"), b * 60 + c, col)
+end
+function BombardTimerDisplay:update()
+    local a = self.player:getModData()
+    self.currentTime = a.bombRemainMs or 0
+    if self.currentTime <= 0 then
+        timerStack.unregister(self)
+        self:removeFromUIManager()
+    end
+end
+
+-- Show bomb timer UI if there's time remaining.
+function _a.a(a)
+    local b = a:getModData()
+    local c = b.bombRemainMs or 0
+    if c > 0 then
+        local d = BombardTimerDisplay:new(a, c)
+        d:addToUIManager()
+        d:setVisible(true)
+        timerStack.register(d)
+    end
+end
+
+-- Activate the timed bomb on the player.
+-- Blast injury applied LOCALLY on each affected client (donee + nearby players
+-- in range). Only injures a player who is outside; shared so everyone caught in
+-- the blast takes the same damage.
+-- 부상 스위치: PongDu.Bombard_Injure. SandboxVars는 사용 시점에 읽는다.
+local function injureEnabled()
+    return SandboxVars.PongDu.Bombard_Injure
+end
+
+local function applyBlastInjury(p)
+    if not injureEnabled() then return end
+    if not p or not p:isOutside() then return end
+    p:clearVariable("BumpFallType")
+    p:setBumpType("stagger")
+    p:setBumpFall(true)
+    p:setBumpFallType("pushedBehind")
+    local bodyParts = {
+        "Foot_L", "Foot_R",
+        "ForeArm_L", "ForeArm_R",
+        "Groin",
+        "Hand_L", "Hand_R",
+        "LowerLeg_L", "LowerLeg_R",
+        "Torso_Lower", "Torso_Upper",
+        "UpperArm_L", "UpperArm_R",
+        "UpperLeg_L", "UpperLeg_R",
+    }
+    local bd = p:getBodyDamage()
+    local function pickParts(n)
+        local out, seen = {}, {}
+        while #out < n do
+            local name = bodyParts[ZombRand(1, #bodyParts + 1)]
+            if not seen[name] then
+                seen[name] = true
+                out[#out + 1] = name
+            end
+        end
+        return out
+    end
+    local head = bd:getBodyPart(BodyPartType.Head)
+    head:setBurned()
+    head:setAdditionalPain(100)
+    for _, name in ipairs(pickParts(4)) do
+        bd:getBodyPart(BodyPartType[name]):setScratched(true, true)
+    end
+    for _, name in ipairs(pickParts(1)) do
+        bd:getBodyPart(BodyPartType[name]):generateDeepWound()
+    end
+    for _, name in ipairs(pickParts(1)) do
+        bd:getBodyPart(BodyPartType[name]):setCut(true, true)
+    end
+end
+
+-- 반경 내 좀비 킬 (이 클라이언트가 소유한 좀비만).
+-- B41 멀티에서 좀비는 클라이언트 권한이므로, 소유 클라가 정상 킬 시퀀스
+-- (setAttackedBy 포함, ZADie와 동일)로 죽여야 서버/저장에 죽음이 영구 반영된다.
+-- 서버사이드 setHealth/becomeCorpse는 소유 클라의 동기화 패킷에 덮여 무효.
+local function killZombiesAround(cx, cy, radius)
+    local cell = getCell()
+    if not cell then return end
+    local zl = cell:getZombieList()
+    if not zl then return end
+    for i = zl:size() - 1, 0, -1 do
+        local z = zl:get(i)
+        if z and not z:isDead() and not z:isRemoteZombie() and z:isOutside() then
+            local dist = math.sqrt(math.pow(z:getX() - cx, 2) + math.pow(z:getY() - cy, 2))
+            if dist < radius then
+                z:setCrawler(true)
+                z:setHealth(0)
+                -- z:clearAttachedItems()
+                z:changeState(ZombieOnGroundState.instance())
+                z:setAttackedBy(cell:getFakeZombieForHit())
+                z:becomeCorpse()
+            end
+        end
+    end
+end
+
+-- 폭발 처리 공용 함수
+local function doExplosion(a, b, handler, afterExplode)
+    local e = a:getX()
+    local f = a:getY()
+
+    DOTex.tex   = getTexture("media/textures/mask_white.png")
+    DOTex.alpha = 2
+    getSoundManager():PlaySound("day_one_kaboom", false, 1.0)
+
+    -- 폭격 전용 반경 (Bombard_Radius). 부활 반경과는 별개 변수.
+    -- SandboxVars는 파일 로드 시점엔 비어있을 수 있으므로 사용 시점에 읽는다.
+    local radius = SandboxVars.PongDu.Bombard_Radius
+    sendClientCommand("PongDuBombard", "Kaboom", {r = radius})
+
+    killZombiesAround(e, f, radius)
+
+    applyBlastInjury(a)
+    Events.OnTick.Remove(handler)
+    b.timeBombActivated = false
+
+    if afterExplode then afterExplode() end
+end
+
+_a.b = function(a)
+    local b = a:getModData()
+
+    b.bombPending = b.bombPending or 0
+    if b.timeBombActivated then
+        b.bombPending = b.bombPending + 1
+        return
+    end
+
+    local function startBomb()
+        -- 대기시간: Bombard_Delay(초) -> ms. 감산은 실제 경과시간 기준.
+        b.bombTimer         = nil
+        b.bombRemainMs      = SandboxVars.PongDu.Bombard_Delay * 1000
+        b.timeBombActivated = true
+
+        local handler
+        handler = function()
+            if b.bombRemainMs then
+                if tickBomb(b) then
+                    doExplosion(a, b, handler, function()
+                        if (b.bombPending or 0) > 0 then
+                            b.bombPending = b.bombPending - 1
+                            startBomb()
+                        end
+                    end)
+                end
+            end
+        end
+        Events.OnTick.Add(handler)
+        _a.a(a)
+    end
+
+    startBomb()
+end
+
+Events.OnServerCommand.Add(function(a, b, c)
+    if a == "PongDuBombard" then
+        if b == "PlayExplosion" then
+            -- 예고음은 타이머 480틱 조건에서 재생됨
+        elseif b == "NearbyExplosion" then
+            -- 서버가 전 클라에 브로드캐스트 (x/y/r 포함).
+            -- 각 클라는 자기가 소유한 좀비를 반경 내에서 죽이고,
+            -- 자기 캐릭터가 반경 안이면 부상/섬광도 적용한다.
+            local cx = tonumber(c and c.x)
+            local cy = tonumber(c and c.y)
+            local cr = tonumber(c and c.r) or 55
+            local me = getPlayer()
+            if cx and cy then
+                killZombiesAround(cx, cy, cr)
+                if me then
+                    local dist = math.sqrt(math.pow(me:getX() - cx, 2) + math.pow(me:getY() - cy, 2))
+                    if dist < cr then
+                        applyBlastInjury(me)
+                        DOTex.tex   = getTexture("media/textures/mask_white.png")
+                        DOTex.alpha = 2
+                    end
+                end
+            else
+                -- 구버전 서버(좌표 미포함) 호환: 기존 동작 유지
+                applyBlastInjury(me)
+                DOTex.tex   = getTexture("media/textures/mask_white.png")
+                DOTex.alpha = 2
+            end
+        end
+    end
+end)
+
+-- 재접속 복구: OnTick 안에서 플레이어 로드 확인 후 한 번만 실행
+local _recoveryDone = false
+local function onTickRecovery()
+    if _recoveryDone then
+        Events.OnTick.Remove(onTickRecovery)
+        return
+    end
+    local a = getSpecificPlayer(0)
+    if not a then return end
+    local b = a:getModData()
+    migrateLegacy(b)
+    if b.bombRemainMs and b.bombRemainMs > 0 and b.timeBombActivated then
+        _a.a(a)  -- UI 복원
+
+        local handler
+        handler = function()
+            if b.bombRemainMs then
+                if tickBomb(b) then
+                    doExplosion(a, b, handler, function()
+                        if (b.bombPending or 0) > 0 then
+                            b.bombPending = b.bombPending - 1
+                            _a.b(a)
+                        end
+                    end)
+                end
+            end
+        end
+        Events.OnTick.Add(handler)
+    end
+    _recoveryDone = true
+    Events.OnTick.Remove(onTickRecovery)
+end
+Events.OnTick.Add(onTickRecovery)
+
+return _a
+

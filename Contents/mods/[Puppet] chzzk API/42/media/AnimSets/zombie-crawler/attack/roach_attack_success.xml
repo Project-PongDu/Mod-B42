@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 로치 공격 성공부 오버라이드 (바닐라 crawlerattack_success의 x_extends
+     체인을 인라인 전개 + PuppetRoach 게이트). 핵심: 물기 이벤트
+     (PlayerHitReaction=CrawlerBite, AttackCollisionCheck)를 제거해 데미지
+     없는 순수 모션으로 만들고, 넘어뜨리기 효과는 Lua updateRoach가
+     attackFromWindowsLunge()로 처리한다 - 담장 런지(CheckAttack ->
+     attackFromWindowsLunge)와 동일한 효과 경로. 속도 1.20 = 바닐라 0.40 x3. -->
+<animNode>
+	<m_Name>roachattack_success</m_Name>
+	<m_AnimName>Zombie_CrawlLunge_Success</m_AnimName>
+	<m_Priority>5</m_Priority>
+	<m_deferredBoneAxis>Y</m_deferredBoneAxis>
+	<m_Looped>false</m_Looped>
+	<m_SpeedScale>3.0</m_SpeedScale>
+	<m_BlendTime>0.50</m_BlendTime>
+	<m_Conditions>
+		<m_Name>ZombieBiteStarted</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_BoolValue>true</m_BoolValue>
+	</m_Conditions>
+	<m_Conditions>
+		<m_Name>battack</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_BoolValue>true</m_BoolValue>
+	</m_Conditions>
+	<m_Conditions>
+		<m_Name>PuppetRoach</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_BoolValue>true</m_BoolValue>
+	</m_Conditions>
+	<m_Events>
+		<m_EventName>SetVariable</m_EventName>
+		<m_Time>End</m_Time>
+		<m_ParameterValue>ZombieBiteStarted=false</m_ParameterValue>
+	</m_Events>
+</animNode>

@@ -1,0 +1,930 @@
+local _a = {}
+
+local aggro = require("features/aggro")
+local fx    = require("utils/fx")
+local gasCloud = require("utils/gasCloud")
+-- 대기 인디케이터용. 셋 다 leaf 모듈(서로/features 를 require 하지 않음)이라
+-- 순환 의존이 생기지 않는다 -- hordenight/bloodmoon 과 동일한 조합.
+local moodleStack = require("utils/moodleStack")
+local colorMap    = require("utils/colorMap")
+local textOutline = require("utils/textOutline")
+local zone        = require("utils/zone")
+
+-- 라이즈 업 데드 맨: 도네 플레이어 기준 반경 내 모든 시체(IsoDeadBody)를
+-- 좀비로 되살린다.
+--
+-- 반경은 전용 샌드박스 변수 RiseUp_Radius (5~60, 기본 55)를 따른다.
+-- 폭격(Bombard_Radius)과는 별개 변수 — 기본값만 55로 같을 뿐 서로 독립.
+--
+-- 권한 구조는 폭격과 정반대다.
+--   좀비(IsoZombie)  = 클라이언트 권한 -> 폭격 킬은 클라별 분산 처리 (bombard.lua)
+--   시체(IsoDeadBody) = 서버 권한      -> 부활은 서버 핸들러 한 곳에서만 처리
+-- 바닐라도 MP 시체 제거를 서버 커맨드(/removezombies)로 우회하고, 시체는
+-- 청크 데이터 + reanimated.bin 으로 서버에 저장된다. 클라 브로드캐스트로
+-- 각자 reanimateNow() 하면 클라 수만큼 좀비가 중복 생성될 수 있으므로 금지.
+
+local MARKER_DURATION_MS = 3000   -- 반경 표시 유지 시간
+
+-- ── 연출 방식 ─────────────────────────────────────────────────────────────
+-- 부활 로직(반경/최소 시체 수/우선순위/서버 처리)은 방식과 무관하게 완전히
+-- 동일하다. 바뀌는 건 "반경을 뭘로 보여주고 무슨 소리를 내느냐" 뿐이다.
+--   1 = 강령술      : 보라색 원형 마커 + necromance (오컬트 톤, 기존 동작)
+--   2 = 가스 살포   : 바닥 황록 가스 확산 + pongdu_gas_deploy (생화학 톤)
+-- 좀비 공습의 Rain_Style 과 같은 구조다. 새 방식 추가 시: 여기 + STYLE_MAX +
+-- sandbox-options.txt numValues + Sandbox_KO option<N> 을 함께 늘린다.
+local STYLE_NECRO = 1
+local STYLE_GAS   = 2
+local STYLE_MAX   = 2
+
+local function styleNow()
+    local st = SandboxVars.PongDu.RiseUp_Style
+    if type(st) ~= "number" or st < 1 or st > STYLE_MAX then return STYLE_NECRO end
+    return st
+end
+
+-- 도네 발동 진입점. 서버에 좌표/반경만 넘기고 실제 부활은 server.lua 의
+-- DOServer["PongDuRiseUp"]["RiseUp"] 이 수행한다.
+-- SandboxVars는 파일 로드 시점엔 비어있을 수 있으므로 사용 시점에 읽는다.
+--
+-- 효과음/반경 표시는 utils/fx 로 처리한다: 본인은 즉시 로컬 재생/렌더,
+-- 나머지 접속자는 서버 거리컷 브로드캐스트로 같은 소리와 같은 연출을 받는다.
+-- 원형 마커는 샌드박스 RiseUp_ShowRadius 를 따른다 — 꺼져 있으면 반경 0 으로
+-- 나가므로 누구에게도 안 뜬다.
+-- 가스 안개는 예외로 항상 띄운다. 좀비 공습의 수송기 투하 그림자와 같은 취급이다:
+-- "반경을 알려주는 UI"가 아니라 그 방식의 고유 연출이고, 가스 방식엔 애초에 원형
+-- 마커가 없어서 옵션을 껐을 때 남는 게 효과음뿐이 된다. 부활 로직은 서버가
+-- RiseUp_Radius 로 처리하므로 여기서 무엇을 그리든 게임플레이에는 영향이 없다.
+local function doFire(player)
+    if not player then return end
+    local radius = SandboxVars.PongDu.RiseUp_Radius
+    local showRadius = SandboxVars.PongDu.RiseUp_ShowRadius
+    local style = styleNow()
+    local px, py, pz = player:getX(), player:getY(), player:getZ()
+
+    local isGas = (style == STYLE_GAS)
+    local sound = isGas and "pongdu_gas_deploy" or "necromance"
+    -- 가스는 퍼졌다 걷히는 시간이 필요해 마커(3초 고정)보다 길다.
+    local gasMs = SandboxVars.PongDu.RiseUp_GasDuration * 1000
+    local shownR = showRadius and radius or 0
+
+    print("[PongDuRiseUp] fire style=" .. tostring(style) .. " r=" .. tostring(radius)
+        .. " showRadius=" .. tostring(showRadius)
+        .. " marker=" .. tostring((not isGas) and shownR or 0)
+        .. " gasMs=" .. tostring(isGas and gasMs or 0))
+
+    fx.playAt(sound, px, py)
+    fx.broadcast({
+        f = "rise_up_dead_man",
+        x = px, y = py, z = pz,
+        sound = sound,
+        markerRadius = (not isGas) and shownR or 0,
+        markerMs = MARKER_DURATION_MS,
+        -- 가스는 shownR 이 아니라 radius -- 반경 표시 옵션과 무관하게 항상 나간다.
+        gasRadius = isGas and radius or 0,
+        gasMs = gasMs,
+    })
+    sendClientCommand("PongDuRiseUp", "RiseUp", {
+        ["x"] = px,
+        ["y"] = py,
+        ["r"] = radius,
+    })
+
+    -- 도네이터 본인 화면 (부활 시점과 동시). 가스는 옵션 무관 항상, 마커만 옵션 적용.
+    if isGas then
+        gasCloud.spawn(px, py, pz, "rise_up_dead_man", radius, gasMs)
+    elseif showRadius then
+        fx.marker(px, py, pz, "rise_up_dead_man", radius, MARKER_DURATION_MS)
+    end
+end
+
+-- ── 최소 시체 수 게이트 ───────────────────────────────────────────────────
+-- 샌드박스 RiseUp_MinCorpses 이상의 시체가 반경 안에 있을 때만 강령술이 터진다.
+--
+-- ★ 타이밍 설계 (구버전에서 바뀐 부분):
+--   구버전은 rewardManager 의 blocked 훅을 썼다. 그러면 큐박스 카운트다운
+--   자체가 멈춰서, 시체가 없는 동안엔 3초 딜레이가 흐르지도 않고 슬롯만 자물쇠로
+--   잠겨 있다가, 시체가 채워지면 그제서야 남은 딜레이를 마저 세고 터졌다.
+--   "딜레이 후 발동"이라는 후원 규약이 깨지는 순서다.
+--   지금은 반대다. 카운트다운은 시체 유무와 무관하게 정상적으로 끝나고,
+--   그 시점(= rewardManager 가 fn 을 부르는 순간)에 비로소 스캔을 시작한다.
+--     · 하한선을 이미 만족 -> 스캔이 끝나는 즉시(보통 몇 틱) 발동
+--     · 미달              -> 대기 상태로 들어가 계속 재스캔, 채워지는 순간 즉시 발동
+--   즉 큐박스는 카운트다운만 담당하고, 그 뒤의 대기는 무들 인디케이터가 맡는다.
+--   (큐박스에서 강령술 슬롯은 카운트다운이 끝나면 정상적으로 사라진다.)
+--
+-- 왜 클라에서 세는가:
+--   시체는 서버 권위지만 "지금 이 반경에 몇 구 있나"는 클라 셀에도 그대로
+--   존재한다(클라가 시체를 렌더한다). 반경 최대 60타일은 클라 로드 반경 안이라
+--   결과가 어긋날 여지가 없고, 발동 주체가 어차피 클라(sendClientCommand)라서
+--   서버 왕복(비동기 응답 대기)을 붙일 이유가 없다.
+--
+-- 왜 점진 스캔인가:
+--   r=30 기준 61x61x8층 = 29,768 스퀘어다. 매 틱 전수 조사하면 Kahlua Java 호출
+--   오버헤드로 프레임이 갈린다. 그래서 한 틱에 GATE_BUDGET 스퀘어만 처리하고
+--   커서를 남긴 뒤 다음 틱에서 이어서 센다. 하한선을 채우는 순간 조기 종료하므로
+--   통상은 몇 틱 안에 끝나고, 최악(시체가 정말 없을 때)에도 완주까지 60프레임 =
+--   1초 남짓이다. 완주하면 결과를 캐시하고 GATE_COOLDOWN 뒤에 새 스윕을 시작한다.
+--   대기분이 없으면(_pending == 0) 스캔 자체를 아예 돌리지 않아 평시 부하는 0이다.
+local GATE_BUDGET   = 600     -- 틱당 조사할 스퀘어 수
+local GATE_COOLDOWN = 500     -- 스윕 완주 후 다음 스윕까지 대기 (ms)
+-- 발동 직후 재스캔 유예. reanimateNow() 는 서버에서 다음 틱에 처리되고 시체
+-- 제거가 클라까지 동기화되는 데 시간이 걸린다. 곧바로 재스캔하면 이미 부활이
+-- 확정된 시체를 다시 세서, 대기분이 2개 이상일 때 같은 시체 더미로 연달아
+-- 터져버린다. 그 창을 건너뛰기 위한 값.
+local REFIRE_COOLDOWN = 3000
+
+local _pending = 0            -- 카운트다운을 마치고 시체를 기다리는 강령술 수
+
+-- ── 대기분 영속화 ─────────────────────────────────────────────────────────
+-- _pending 은 "큐박스에서는 이미 소진됐지만 아직 발동되지 않은 후원"이다.
+-- 순수 클라 메모리 변수라 재접속하면 통째로 날아간다 -- 후원자는 돈을 냈는데
+-- 스트리머가 잠깐 나갔다 오면 없던 일이 되는 셈이라 반드시 복구돼야 한다.
+--
+-- 블러드문처럼 서버 Sync 를 쓰지 않는 이유:
+--   블러드문은 애초에 서버가 상태를 들고 있는 월드 이벤트라 접속 직후 서버에
+--   물어보면 된다. 강령술 대기는 클라 로컬 스캔 결과라 서버가 알지도 못한다.
+--   그렇다고 이것 때문에 서버에 대기 상태를 새로 들이면, 클라에서만 판정되는
+--   값을 서버가 신뢰해야 하는 구조가 돼서 권위가 꼬인다.
+-- 플레이어 modData 를 쓰지 않는 이유:
+--   캐릭터가 죽으면 modData 가 같이 날아간다. 강령술 대기는 캐릭터가 아니라
+--   후원에 묶인 값이라 사망으로 소멸하면 안 된다.
+--   DonationReceiver 의 PongDuPendingQueue.txt 가 같은 이유로 파일을 쓴다.
+local PENDING_FILE = "PongDuRiseUpPending.txt"
+
+local function savePending()
+    local w = getFileWriter(PENDING_FILE, true, false)
+    if not w then return end
+    w:write(tostring(_pending) .. "\n")
+    w:close()
+end
+
+-- _pending 은 반드시 이걸 통해서만 바꾼다. 직접 대입하면 저장이 누락돼서
+-- 재접속 시 복구가 어긋난다.
+local function setPending(n)
+    if n < 0 then n = 0 end
+    if n == _pending then return end
+    _pending = n
+    savePending()
+end
+
+local _gate = {
+    active  = false,          -- 스윕 진행 중
+    dx = 0, dy = 0, floor = 0,
+    cx = 0, cy = 0, r = 0, r2 = 0,
+    count   = 0,
+    need    = 0,
+    pass    = false,          -- 최근 스윕 결과 (하한선 충족)
+    judged  = false,          -- 스윕을 한 번이라도 완주했는지 (표시 깜빡임 방지)
+    seen    = 0,              -- 최근 스윕이 센 시체 수 (표시용)
+    nextAt  = 0,              -- 다음 스윕 시작 가능 시각
+}
+
+-- 캐시 무효화. 새 요청이 들어왔거나 방금 발동해서 시체 구성이 바뀐 시점에
+-- 부른다. delayMs 를 주면 그만큼 재스캔을 미룬다.
+local function gateInvalidate(delayMs)
+    _gate.active = false
+    _gate.pass   = false
+    _gate.judged = false
+    _gate.seen   = 0
+    _gate.nextAt = getTimestampMs() + (delayMs or 0)
+end
+
+local function gateBeginSweep(player, need)
+    _gate.active = true
+    _gate.cx = math.floor(player:getX())
+    _gate.cy = math.floor(player:getY())
+    _gate.r  = SandboxVars.PongDu.RiseUp_Radius
+    _gate.r2 = _gate.r * _gate.r
+    _gate.dx = -_gate.r
+    _gate.dy = -_gate.r
+    _gate.floor = 0
+    _gate.count = 0
+    _gate.need  = need
+end
+
+-- 커서 한 칸 전진. 전 범위를 다 돌았으면 true.
+local function gateAdvance()
+    _gate.dx = _gate.dx + 1
+    if _gate.dx > _gate.r then
+        _gate.dx = -_gate.r
+        _gate.dy = _gate.dy + 1
+        if _gate.dy > _gate.r then
+            _gate.dy = -_gate.r
+            _gate.floor = _gate.floor + 1
+            if _gate.floor > 7 then return true end
+        end
+    end
+    return false
+end
+
+-- 예산만큼 스캔. 스윕이 끝났으면(하한 충족 또는 완주) true.
+local function gateStep()
+    local cell = getCell()
+    if not cell then return false end
+    local processed = 0
+    while processed < GATE_BUDGET do
+        local dx, dy = _gate.dx, _gate.dy
+        if dx * dx + dy * dy < _gate.r2 then
+            local sq = cell:getGridSquare(_gate.cx + dx, _gate.cy + dy, _gate.floor)
+            if sq then
+                local smo = sq:getStaticMovingObjects()
+                for i = 0, smo:size() - 1 do
+                    if instanceof(smo:get(i), "IsoDeadBody") then
+                        _gate.count = _gate.count + 1
+                    end
+                end
+                -- 하한선을 채우면 나머지는 셀 필요가 없다 (판정은 >= 하나뿐)
+                if _gate.count >= _gate.need then return true end
+            end
+        end
+        if gateAdvance() then return true end
+        processed = processed + 1
+    end
+    return false
+end
+
+-- 한 틱 분량 스캔을 돌린다. 스윕이 완주하면 결과를 _gate.pass/seen 에 남긴다.
+local function gateTick(player, need)
+    local now = getTimestampMs()
+    if not _gate.active then
+        if now < _gate.nextAt then return end
+        gateBeginSweep(player, need)
+    end
+    if gateStep() then
+        _gate.active = false
+        _gate.pass   = (_gate.count >= _gate.need)
+        _gate.judged = true
+        _gate.seen   = _gate.count
+        _gate.nextAt = now + GATE_COOLDOWN
+        if not _gate.pass then
+            print("[PongDu][RiseUp][Gate] below minimum: " .. tostring(_gate.count)
+                .. "/" .. tostring(_gate.need) .. " r=" .. tostring(_gate.r)
+                .. " pending=" .. tostring(_pending))
+        else
+            print("[PongDu][RiseUp][Gate] minimum met: " .. tostring(_gate.count)
+                .. "/" .. tostring(_gate.need))
+        end
+    end
+end
+
+-- 안전지대 보류. 큐박스 단계의 immediate 훅이 이미 한 번 걸러주지만, 카운트다운을
+-- 마친 뒤 시체를 기다리는 동안 플레이어가 세이프하우스로 들어갈 수 있다.
+-- 그 상태로 터지면 SafeZoneBlock 옵션이 무의미해지므로 대기 조건에 포함한다.
+local function zoneHolding(player)
+    if not SandboxVars.PongDu.RiseUp_SafeZoneBlock then return false end
+    return zone.a(player) == true
+end
+
+-- rewardManager 가 카운트다운을 끝내고 부르는 진입점. 여기서 즉시 터뜨리지 않고
+-- 대기분으로 접수한 뒤 스캔을 시작한다 (위 타이밍 설계 주석 참조).
+-- 하한선 옵션이 0이면 게이트가 꺼진 것이므로 예전처럼 그 자리에서 발동한다.
+function _a.a(player)
+    if not player then return end
+    local need = SandboxVars.PongDu.RiseUp_MinCorpses
+    if need <= 0 then
+        doFire(player)
+        return
+    end
+    setPending(_pending + 1)
+    -- 직전 스윕 결과는 카운트다운 이전 상태라 그대로 믿으면 안 된다. 무효화해서
+    -- "지금 이 순간"부터 새로 세게 한다.
+    gateInvalidate(0)
+    print("[PongDu][RiseUp][Gate] queued, need=" .. tostring(need)
+        .. " pending=" .. tostring(_pending))
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
+--  대기 인디케이터 (무들 슬롯)
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 호드 나이트 / 블러드문과 같은 방식으로 바닐라 무들 스택 위에 슬롯 하나를
+-- 끼워넣는다. 밀어내기/슬롯 좌표/등장 슬라이드/해상도 복원은 utils/moodleStack
+-- 담당이고, 여기서는 우선순위와 그리기, 그리고 표시 조건만 정한다.
+--
+-- 퐁듀 인디케이터 우선순위 (작을수록 화면 위):
+--   10 = 호드 나이트   20 = 블러드문   30 = 강령술 대기
+--
+-- ★ 앞의 둘과 결정적으로 다른 점: 이건 서버 브로드캐스트가 없다.
+--   호드나이트/블러드문은 서버가 PongDuHorde/State 같은 커맨드를 전 클라에
+--   뿌려서 접속자 전원이 같은 인디케이터를 본다(월드 이벤트니까 그게 맞다).
+--   강령술 대기는 "이 플레이어의 큐에 강령술이 물려 있고, 이 플레이어 주변
+--   시체가 모자라다"는 순수 개인 상태다. 판정도 클라 로컬 스캔이라 서버가
+--   알지도 못한다. 따라서 커맨드 송수신이 아예 없고, 후원받은 본인 화면에만
+--   뜬다. 옆 스트리머 화면엔 아무것도 안 보인다.
+--
+-- 표시 조건:
+--   _pending > 0 (카운트다운을 마친 강령술이 시체를 기다리는 중) 이고,
+--   스윕을 한 번이라도 완주했고(judged), 그 결과가 미달일 때만 뜬다.
+--   judged 를 보는 이유는 깜빡임 방지다 -- 요청 직후 첫 스윕이 도는 2~5틱 동안
+--   결과가 없는데 띄워버리면, 시체가 충분한 정상 상황에서도 인디케이터가
+--   한 번 번쩍이고 사라진다.
+--   대기분이 발동되거나 옵션이 꺼지면 _pending 이 0이 되고 인디케이터도 사라진다.
+local SLOT_PRIORITY     = 30
+local TEX_PATH          = "media/ui/Moodle_RiseUpWait.png"
+local IND_SIZE_FALLBACK = 32
+local BKG_PATHS         = moodleStack.BKG_BAD
+
+-- 인디케이터를 띄워야 하는 상태인가.
+local function gateWaiting()
+    if _pending <= 0 then return false end
+    if not _gate.judged then return false end
+    return not _gate.pass
+end
+
+-- 배경 심각도 1~4. 하한선에 가까워질수록(=곧 대규모 부활이 터질수록) 높다.
+-- 시체 0마리면 아직 여유 있는 상태라 1단계, 하한선 문턱까지 쌓이면 4단계로
+-- 치솟는다 -- "곧 터진다"는 긴급도를 배경으로 표현한다. 조건이 실제로
+-- 충족되는 순간엔 인디케이터 자체가 사라지므로(gateWaiting() = false),
+-- 4단계는 사실상 "문턱 직전"의 짧은 구간에서만 보인다.
+local function bkgLevel()
+    if _gate.need <= 0 then return 1 end
+    local progress = _gate.seen / _gate.need
+    if progress < 0 then progress = 0 end
+    if progress > 1 then progress = 1 end
+    local n = math.ceil(progress * 4)
+    if n < 1 then n = 1 end
+    if n > 4 then n = 4 end
+    return n
+end
+
+local _osc   = moodleStack.newOscillator()
+local _panel = nil
+
+local RiseUpWaitIndicator = ISPanel:derive("RiseUpWaitIndicator")
+
+-- 위치는 생성 시점에 정하지 않는다. moodleStack.sync() 가 매 틱 갱신한다.
+function RiseUpWaitIndicator:new()
+    local o = ISPanel:new(0, 0, IND_SIZE_FALLBACK, IND_SIZE_FALLBACK)
+    setmetatable(o, self)
+    self.__index = self
+    o:noBackground()
+    o.tex = getTexture(TEX_PATH)
+    o.bkg = {}
+    for i = 1, #BKG_PATHS do
+        o.bkg[i] = getTexture(BKG_PATHS[i])
+    end
+    return o
+end
+
+-- 바닐라 MoodlesUI 는 UIElement.DrawTexture 로 텍스처 네이티브 크기에 그리므로
+-- 상수로 박지 않고 매 프레임 텍스처에서 읽는다(텍스처팩 모드 자동 추종).
+function RiseUpWaitIndicator:iconSize()
+    local t = (self.bkg and self.bkg[bkgLevel()]) or self.tex
+    if t then
+        local w, h = t:getWidth(), t:getHeight()
+        if w and h and w > 0 and h > 0 then return w, h end
+    end
+    return IND_SIZE_FALLBACK, IND_SIZE_FALLBACK
+end
+
+function RiseUpWaitIndicator:render()
+    -- 바닐라와 동일하게 흔들림은 요소 위치가 아니라 "그리는 좌표"에만 먹인다
+    -- (MoodlesUI.render 의 float1 과 같은 역할). 툴팁은 흔들지 않는다.
+    local ox = _osc:offset()
+    local w, h = self:iconSize()
+
+    local bkg = self.bkg and self.bkg[bkgLevel()]
+    if bkg then
+        self:drawTexture(bkg, ox, 0, 1)
+    end
+    if self.tex then
+        self:drawTexture(self.tex, ox, 0, 1)
+    else
+        -- 아이콘 에셋 미배치 폴백. 배경만 뜨면 무슨 무들인지 알 수 없다.
+        local col = colorMap.get("rise_up_dead_man")
+        textOutline.drawCentre(self, "RU", w / 2 + ox, h / 2 - 8,
+            col[1], col[2], col[3], 1, UIFont.Small)
+    end
+
+    -- 진행 카운터 (우하단). 호드나이트가 예약 수를 같은 자리에 찍는 것과 동일.
+    -- 배경 심각도만으론 "몇 구 더 필요한지"를 알 수 없으므로 숫자를 함께 준다.
+    local col = colorMap.get("rise_up_dead_man")
+    textOutline.draw(self, tostring(_gate.seen) .. "/" .. tostring(_gate.need),
+        ox + 2, h - 14, col[1], col[2], col[3], 1, UIFont.Small)
+
+    if self:isMouseOver() then
+        moodleStack.drawTooltip(self,
+            getText("IGUI_donation_riseup_wait"),
+            getText("IGUI_donation_riseup_wait_tip",
+                tostring(_gate.seen), tostring(_gate.need)))
+    end
+end
+
+-- 표시/숨김. moodleStack 이 밀어내기와 좌표를 전부 처리하므로 여기는
+-- "언제 뜨고 언제 사라지는가"만 정한다.
+local function refreshIndicator()
+    local want = gateWaiting()
+    if want then
+        if not _panel then
+            _panel = RiseUpWaitIndicator:new()
+            _panel:addToUIManager()
+            moodleStack.register(_panel, SLOT_PRIORITY)
+            print("[PongDu][RiseUp][Gate] indicator shown " .. tostring(_gate.seen)
+                .. "/" .. tostring(_gate.need))
+        end
+        _panel:setVisible(true)
+    elseif _panel then
+        moodleStack.unregister(_panel)
+        _panel:setVisible(false)
+        _panel:removeFromUIManager()
+        _panel = nil
+        print("[PongDu][RiseUp][Gate] indicator hidden")
+    end
+end
+
+-- ── 접속 시 대기분 복구 ──────────────────────────────────────────────────
+-- 대기 중에 나갔다 들어와도 남은 강령술이 그대로 이어지게 한다.
+-- 복구 직후 gateInvalidate 로 캐시를 비워, 접속 시점의 실제 주변 시체를
+-- 기준으로 새로 스캔하게 만든다(이전 세션의 판정은 좌표가 달라 무의미하다).
+local function loadPending()
+    local r = getFileReader(PENDING_FILE, true)
+    if not r then return end
+    local line = r:readLine()
+    r:close()
+    local n = tonumber(line)
+    if n and n > 0 then
+        _pending = n
+        gateInvalidate(0)
+        print("[PongDu][RiseUp][Gate] restored pending=" .. tostring(_pending))
+    end
+end
+
+Events.OnGameStart.Add(loadPending)
+
+Events.OnTick.Add(function()
+    -- 무들박스 밀림/복귀와 아이콘 슬라이드는 패널이 없어도 계속 돌아야 한다
+    -- (사라진 뒤 다른 무들들이 스르륵 올라오는 구간). 인디케이터가 여럿일 때
+    -- 중복 호출돼도 멱등이다 -- 호드나이트/블러드문도 각자 호출한다.
+    moodleStack.sync()
+    _osc:update(bkgLevel())
+
+    if _pending > 0 then
+        local player = getPlayer()
+        if player then
+            local need = SandboxVars.PongDu.RiseUp_MinCorpses
+            if need <= 0 then
+                -- 대기 중에 관리자가 하한선을 0으로 내린 경우. 조건이 사라졌으니
+                -- 붙잡아둘 이유가 없다 -- 밀린 대기분을 전부 즉시 발동시킨다.
+                print("[PongDu][RiseUp][Gate] minimum disabled, flushing "
+                    .. tostring(_pending))
+                -- 발동 -> 감소 순서를 지킨다. 반대로 하면 도중에 크래시했을 때
+                -- 이미 차감된 후원이 사라진다. 이 순서면 최악의 경우 하나가
+                -- 중복 발동되는데, 후원자 관점에선 유실보다 낫다.
+                while _pending > 0 do
+                    doFire(player)
+                    setPending(_pending - 1)
+                end
+                gateInvalidate(0)
+            elseif not zoneHolding(player) then
+                gateTick(player, need)
+                if _gate.pass then
+                    doFire(player)
+                    setPending(_pending - 1)
+                    -- 방금 부활로 시체가 소모된다. 재스캔을 잠깐 미뤄야 남은
+                    -- 대기분이 같은 시체 더미로 연달아 터지지 않는다.
+                    gateInvalidate(REFIRE_COOLDOWN)
+                end
+            end
+        end
+    end
+
+    refreshIndicator()
+end)
+
+-- ── 부활 좀비 기상 모션 복원 ──────────────────────────────────────────────
+-- 강령술이 fakeDead 경로(옷 유지)를 타면서 부활 좀비의 isReanimatedPlayer가
+-- false가 됐다. 그런데 클라가 "이 좀비 지금 누워있다"를 아는 바닐라 경로
+-- 두 개가 전부 isReanimatedPlayer 게이트다:
+--
+--   NetworkZombieSimulator.ParseZombie:184
+--     if (zombie0.isReanimatedPlayer()) {
+--         zombie0.getStateMachine().changeState(ZombieOnGroundState.instance(), null);
+--     }
+--   NetworkZombieVariables.setBooleanVariables:95
+--     if (zombie0.isReanimatedPlayer()) { zombie0.setOnFloor(...); }  -- 비트는 오지만 버려짐
+--
+-- 그래서 서버는 눕혀놨는데 클라는 선 채로 그린다 -> 기상 모션 소실.
+--
+-- ★★ 핵심 메커니즘 (IsoGameCharacter.actionStateChanged:11272 확증):
+--   B41 좀비의 AI 상태머신은 애니메이터(ActionContext)의 '노예'다.
+--   AnimSet 노드가 전이될 때마다 actionStateChanged가
+--   m_stateUpdateLookup[노드명] 으로 stateMachine.changeState를 다시 건다
+--   (IsoZombie.initializeStates:354 의 "onground"->ZombieOnGroundState 매핑).
+--   즉 Lua에서 changeState(ZombieOnGroundState)를 박아도, 애니메이터가
+--   onground 노드로 실제 전이하지 못하면 다음 AnimSet 전이 한 방에 AI가
+--   서있는 상태로 되돌려진다. 눕히기의 진짜 트리거는 changeState가 아니라
+--   "bonfloor" 애님 변수(setOnFloor, IsoGameCharacter:708 바인딩)이며,
+--   changeState는 그 사이 AI 공백(타겟 획득 차단)을 메우는 보조일 뿐이다.
+--
+-- ★ 밀집 더미 위 발동 시 '즉시 기립' 증상의 로그 확증 (300부활 세션):
+--   getup-ok 346건 중 131건이 laydown 후 1초 미만 — 눕기+기상 모션이
+--   물리적으로 불가능한 시간. anim=lunge 115 / attack 14 = 플레이어가
+--   더미 위에 서 있으면 부활 좀비가 거리 0에서 즉시 타겟을 잡고 lunge로
+--   전이 -> 원샷 laydown이 위 메커니즘으로 무효화된 것.
+--   rescue 117건(700ms)은 "애니메이터가 300마리 부하로 아직 전이 못 함"을
+--   고착으로 오판해 모션 없이 강제 기립시킨 — 즉시 기립의 직접 생산자.
+--
+-- 대응: 원샷 laydown -> "눕히기 강제 유지 루프(enforcement)"로 전환.
+--   laydown 후 ENFORCE_MS 동안 매 스캔마다 애니메이터가 lying 노드에
+--   도달했는지 확인하고, 아니면 setTarget(nil) + setOnFloor(true) +
+--   changeState 를 재적용한다. 애니메이터가 onground에 정착하면 그때부터
+--   updateInternal이 타겟 블록을 스킵하므로 재획득 걱정 없이 손을 뗀다.
+--   rescue는 enforcement 만료 '후'에도 AI=onground+애니=standing 인 진짜
+--   고착에만 발동한다 (기존 700ms -> 사실상 ENFORCE_MS로 지연).
+--
+-- ★★ 전이 아크 소스 확증 (PZ-Library "PZ 41.78.19 Anims"/actiongroups/zombie):
+--   · lunge/transitions.xml : 전이 18개 중 bOnFloor→onground 아크 '없음'
+--     → lunge 중인 좀비는 setOnFloor만으론 절대 안 눕는다. 대신
+--     <isFalse>bHasTarget</isFalse> → idle 아크가 있어 setTarget(nil)이
+--     1틱 안에 lunge를 강제 이탈시킨다 (setTarget(nil)이 필수인 이유).
+--   · idle/otherTransitions.xml : <isTrue>bOnFloor</isTrue> → onground.
+--     원본 주석부터 "This handles zombies being already on the ground,
+--     like newly-reanimated corpses." — 정확히 이 용도의 공식 아크.
+--   · attack, face-target : bOnFloor→onground 직행 아크 보유 — 공격 모션
+--     중이어도 setOnFloor(true)만으로 즉시 눕는다.
+--   · onground/transitions.xml : 소유 좀비(bClient=false)는
+--     reanimateTimer<=0 에서만 getup — 눕은 뒤 기상 모션 보장.
+--     (원격 좀비는 서버 realState 추종 아크 — 우리 개입 불필요)
+--   즉 applyLaydown의 setTarget(nil)→setOnFloor(true) 순서가 어느 노드에서
+--   출발하든 최대 2틱(lunge→idle→onground) 안에 눕는 경로를 보장한다.
+--
+-- 현 구조는 2계층 x 2조건 트리거다 (via= 로그로 어느 경로가 작동했는지 관측):
+--   [계층] zu    : OnZombieUpdate(IsoZombie:2102) — 좀비 자신의 update 페이즈,
+--                  즉 그 프레임 '렌더 전'에 발화. 첫 update에서 눕히면 서있는
+--                  포즈가 화면에 그려질 프레임 자체가 없다. OnTick 스캔(등장 →
+--                  다음 틱 사이 1~수 프레임 서있는 모습 노출)의 잔여 플래시
+--                  ("벌떡 일어났다 다시 눕는" 증상) 제거용. 창 활성 중에만
+--                  동작해 평시 오버헤드 0. 바닐라 전례: YouHaveOneDay.lua가
+--                  같은 이벤트에서 Hit() 등 상태 조작을 수행.
+--   [계층] tick  : OnTick 스캔 — zu가 못 잡은 케이스(창 열리기 전 도착분의
+--                  소급 처리 등) 폴백 + enforcement/고착 감시 구동.
+--   [조건] window   : 서버 RiseUp 핸들러가 부활 완료 직후 브로드캐스트하는
+--                 GetupWindow(x,y,r)를 받아 창을 연다. 창(4초, 좀비 패킷이
+--                 커맨드보다 먼저 온 경우 대비 소급 2초) 안에서 반경 내에
+--                 "처음 관측된" 좀비를 무조건 눕힌다. realState 무의존.
+--   [조건] realState: 관측 초기(4초) 동안 realState가 onground로 확인되면 눕힌다.
+--
+-- 낙하 중 좀비(좀비레인 등, z가 소수이거나 realState=="falling")는 눕히면
+-- 공중에 눕는 연출사고가 나므로 관측 즉시 영구 제외한다.
+--
+-- 서버/네트워크 영향 없음 — 순수 클라 로컬 상태 보정.
+local _seen = {}      -- [onlineID] = 최초 관측 시각(ms)
+local _done = {}      -- [onlineID] = true (눕혔거나 제외 확정 — 더 안 건드림)
+local _laid = {}      -- [onlineID] = {t=최초 laydown 시각, tries=재적용 횟수,
+                      --               laidOk=애니메이터 lying 도달 확인 여부,
+                      --               pinned=밟힘 리셋 우회 플래그 ON 여부}
+local _windows = {}   -- {x, y, r2, arrived, expires} : 서버 GetupWindow 수신분
+local _lastScan = 0
+local SCAN_INTERVAL_MS = 200   -- 평시 스캔 간격 (창 활성 중엔 매 틱)
+local WINDOW_MS        = 4000  -- 창 유지: 서버측 기상 타이머(30~90틱)보다 약간 길게
+local PRE_GRACE_MS     = 2000  -- 좀비 패킷이 커맨드보다 먼저 도착한 경우 소급 폭
+local YOUNG_MS         = 4000  -- 최초 관측 후 이 시간까지만 재평가
+local ANIM_SETTLE_MS   = 400   -- laydown 후 첫 검사까지 유예 (애니 전이 최소 시간)
+local ENFORCE_MS       = 3000  -- 눕히기 강제 유지 기간 — 이 안에선 rescue 금지
+local TRACK_CAP_MS     = 30000 -- 추적 하드캡 (북키핑 정리용 — 조치 없음)
+local UNPIN_FLAG_AT    = 8     -- 기상 타이머가 이 값 이하로 내려오면 밟힘 리셋 우회 시작
+
+-- Kahlua엔 표준 next()가 노출돼 있지 않다 — pairs로 공백 판정.
+local function isEmpty(t)
+    for _ in pairs(t) do return false end
+    return true
+end
+
+-- 만료 창 정리. 반환값: 활성 창 존재 여부.
+-- ★ 창 활성 중엔 스캔을 매 틱으로 돌린다: enforcement 재적용은 애니메이터의
+--   전이 타이밍 싸움이라 200ms 간격으론 진다. 바닐라 ParseZombie가 생성
+--   '직후'(애니메이터 1틱도 돌기 전) 눕히는 것과 같은 이유.
+local function pruneWindows()
+    local now = getTimestampMs()
+    for i = #_windows, 1, -1 do
+        if now > _windows[i].expires then table.remove(_windows, i) end
+    end
+    return #_windows > 0
+end
+
+local function insideWindow(z, firstSeen)
+    for i = 1, #_windows do
+        local w = _windows[i]
+        if firstSeen >= w.arrived - PRE_GRACE_MS then
+            local dx = z:getX() - w.x
+            local dy = z:getY() - w.y
+            if dx * dx + dy * dy <= w.r2 then return true end
+        end
+    end
+    return false
+end
+
+-- 눕히기 1회 적용 (최초/재적용 공용).
+-- setTarget(nil): lunge/attack 노드는 bhastarget 없이는 유지되지 않는다 —
+-- 플레이어 발밑 부활 좀비의 즉시 타겟 획득 -> lunge 선점을 여기서 끊는다.
+-- AI가 ZombieOnGroundState인 동안은 updateInternal이 타겟 블록을 스킵하므로
+-- 재획득도 봉쇄된다 (actionStateChanged가 AI를 되돌리기 전까지).
+local function applyLaydown(z)
+    return pcall(function()
+        z:setTarget(nil)
+        z:setOnFloor(true)
+        z:changeState(ZombieOnGroundState.instance())
+    end)
+end
+
+local function layDown(z, zid, why)
+    _done[zid] = true
+    local ok, err = applyLaydown(z)
+    if ok then _laid[zid] = { t = getTimestampMs(), tries = 0, laidOk = false, pinned = false } end
+    -- 어그로 스코프 등록: 여기서 눕힌 좀비 = 이번 강령술이 부활시킨 좀비
+    -- (서버는 reanimate가 다음 틱이라 새 zid를 모른다 — 클라 관측이 유일한
+    -- 식별점). src="riseup" 어그로 창이 열려있을 때만 실제 반영되므로,
+    -- 평시 realState 경로 laydown(스트리밍 인 시체 보정)은 자동 no-op.
+    pcall(function() aggro.addLocalIds({ zid }) end)
+    print("[PongDu][RiseUp][Getup] laydown zid=" .. tostring(zid)
+        .. " via=" .. why .. " ok=" .. tostring(ok)
+        .. (ok and "" or (" err=" .. tostring(err))))
+end
+
+-- ── AI/애니메이터 정합성 조정기 ──────────────────────────────────────────
+-- ★ 1차 시도(이동거리+6초 timeout 휴리스틱)의 실패 로그 확증:
+--   밀집 부활 더미에서는 좀비들이 서로를 밟아 isBeingSteppedOn()이 기상
+--   타이머를 계속 리셋한다(ZombieOnGroundState.execute) — 6초 이상 눕는 게
+--   정상이다. 이걸 timeout이 고착으로 오판해 AI만 idle로 밀면, 기상 타이머는
+--   ZombieOnGroundState.execute 안에서만 감소하므로 애니메이터가 lying에서
+--   영원히 못 나오는 역방향 데드락이 된다.
+--
+-- 2차(현행): 애니메이터를 직접 읽는다.
+--   getCurrentActionContextStateName() (IsoGameCharacter:1058, Kahlua 노출)
+--   이 ActionContext 노드명을 반환 — "onground"류 = 시각적으로 누움.
+--   enforcement 기간 안에서는 어긋남 = "아직 전이 못 함"으로 보고 재적용,
+--   기간 만료 후에도 남는 어긋남만 사분면 로직으로 교정한다:
+--     AI=onground + 애니=standing → idle로 rescue   (진짜 고착 — 애니메이터가
+--                                   전이 안 하면 actionStateChanged도 안 와서
+--                                   AI가 onground에 영구 방치되는 케이스)
+--     AI=idle    + 애니=onground → onground로 revert (역방향 데드락 치유
+--                                   — revert로 타이머 재가동, 자연 기상)
+--   일관 lying은 방치(기상은 바닐라 몫), 일관 standing은 추적 종료.
+-- ── 밟힘 리셋 우회기 (unpin) ─────────────────────────────────────────────
+-- 문제: 밟힌 좀비는 영원히 못 일어난다. ZombieOnGroundState.execute:
+--   setReanimateTimer(timer - multiplier/1.6)
+--   if (timer <= 2) { if (bClient) {
+--       if (isBeingSteppedOn() && !isReanimatedPlayer()) timer = Rand(60)+30 } }
+-- 밟힘 판정(isBeingSteppedOn, IsoGameCharacter:10247)은 "isOnFloor()가
+-- false인(=서있는) 캐릭터"의 본 충돌만 세므로, 먼저 일어난 좀비들이 아직
+-- 누운 좀비 위에 서 있는 한 리셋 루프가 끝나지 않는다. 캐시 필드가 아닌
+-- 실시간 계산이라 세터도 없다.
+--
+-- 타이머 직접 조작이 불가능한 이유 (프레임 순서 확증):
+--   update 페이즈: stateMachine.update() -> execute (감쇠 + 리셋)
+--                  (IsoGameCharacter:8342)
+--   postupdate    : actionContext.update() -> 전이 평가 (getup 아크는
+--                  reanimateTimer<=0 요구) (IsoGameCharacter:9929)
+--   OnTick        : IsoWorld.update() 완료 '후' 발화 (IngameState:1311)
+--   OnZombieUpdate: execute '전' 발화 (IsoZombie:2102 -> super.update:2145)
+--   => 어느 Lua 훅에서 타이머를 음수로 박아도 다음 전이 평가 전에 execute가
+--      한 번 끼어들어 "감쇠 -> <=2 체크 -> 리셋"을 수행한다. 구조적 패배.
+--
+-- 유일한 레버: 리셋 조건의 !isReanimatedPlayer(). setReanimatedPlayer(true)
+-- (IsoZombie:3418, public)면 리셋이 스킵되고 타이머가 자연 감쇠로 0을 뚫어
+-- getup 아크가 발동한다.
+--
+-- 부작용 통제 — 플래그는 비트32로 서버/원격에 양방향 동기화되고
+-- (NetworkZombieVariables:75/87), 서버의 ReanimatedPlayers 영속화·사망 시
+-- 특수 처리 등에 관여하므로 켜두는 시간을 최소화한다:
+--   · 대상: 우리가 눕힌(_laid 추적) + 애니메이터 onground 정착 좀비만
+--   · ON  : getReanimateTimer() <= UNPIN_FLAG_AT (카운트다운 막바지 수 틱 전)
+--   · OFF : onground 노드 이탈(getup 진입) 즉시 / rescue / track-cap
+--   => 노출 창 ~10틱(수백 ms). 이 창에 월드 세이브·사망이 겹칠 확률은 무시
+--      가능한 수준. 밟히지 않은 좀비에겐 리셋 자체가 없으므로 플래그는
+--      무해한 no-op — isBeingSteppedOn() 호출(본 충돌 연산)을 아끼기 위해
+--      밟힘 여부는 확인하지 않고 타이머만 본다.
+--   · 만약의 revert(changeState->enter)와 겹쳐도 enter의
+--     removeDeadBody(reanimatedBodyID)는 기본값 -1이라 Bodies.get(-1)=null
+--     no-op (IsoDeadBody:1540, NetworkZombieAI:53 확증).
+local LYING_NODES = {
+    ["onground"] = true, ["getup"] = true, ["getdown"] = true,
+    ["falldown"] = true, ["falling"] = true,
+    ["fakedead"] = true, ["fakedead-attack"] = true,
+}
+
+local function unpin(z, zid, rec, why)
+    if not rec.pinned then return end
+    rec.pinned = false
+    -- ★수정: 무조건 false로 밀면 좀비화 플레이어/강령술 플레이어 좀비의
+    -- 원래 isReanimatedPlayer=true(바닐라 인벤 보호 플래그)가 영구 소실된다
+    -- (DoZombieInventory: !isReanimatedPlayer()일 때만 인벤 리셋, IsoZombie:2510 /
+    --  DeadZombiePacket.parse: isReanimatedPlayer면 클라 빈 인벤으로 덮어쓰지 않음).
+    -- pin 시점에 기록해둔 원래 값(rec.origRP)으로 복원해야 안전하다.
+    local ok = pcall(function() z:setReanimatedPlayer(rec.origRP == true) end)
+    print("[PongDu][RiseUp][Getup] unpin zid=" .. tostring(zid)
+        .. " why=" .. why .. " restoreTo=" .. tostring(rec.origRP == true)
+        .. " ok=" .. tostring(ok))
+end
+
+local function rescueStuck(z, zid, tries)
+    local ok, err = pcall(function()
+        z:setOnFloor(false)
+        z:changeState(ZombieIdleState.instance())
+    end)
+    print("[PongDu][RiseUp][Getup] rescue zid=" .. tostring(zid)
+        .. " tries=" .. tostring(tries) .. " ok=" .. tostring(ok)
+        .. (ok and "" or (" err=" .. tostring(err))))
+end
+
+local function revertToGround(z, zid)
+    local ok, err = pcall(function()
+        z:setOnFloor(true)
+        z:changeState(ZombieOnGroundState.instance())
+    end)
+    print("[PongDu][RiseUp][Getup] revert zid=" .. tostring(zid)
+        .. " ok=" .. tostring(ok)
+        .. (ok and "" or (" err=" .. tostring(err))))
+end
+
+-- laydown 추적분 검사. 반환: 처리 완료 여부(true면 대기열에서 제거).
+local function checkLaid(z, zid, rec, now)
+    local elapsed = now - rec.t
+    if elapsed < ANIM_SETTLE_MS then return false end   -- 애니 전이 유예
+    if elapsed > TRACK_CAP_MS then
+        unpin(z, zid, rec, "trackcap")
+        print("[PongDu][RiseUp][Getup] track-cap zid=" .. tostring(zid)
+            .. " laidOk=" .. tostring(rec.laidOk))
+        return true
+    end
+
+    local ai, anim
+    local ok = pcall(function()
+        ai = z:getCurrentState()
+        anim = z:getCurrentActionContextStateName()
+    end)
+    if not ok then return false end
+    local aiGround = (ai == ZombieOnGroundState.instance())
+    local lying = LYING_NODES[anim] or false
+
+    if lying then
+        rec.laidOk = true
+        if anim == "onground" then
+            -- 밟힘 리셋 우회: 카운트다운 막바지에만 잠깐 플래그를 올린다.
+            if not rec.pinned then
+                local timer
+                pcall(function() timer = z:getReanimateTimer() end)
+                if timer and timer <= UNPIN_FLAG_AT then
+                    -- ★수정: 켜기 전에 원래 값을 기록해둬야 unpin에서 복원 가능.
+                    -- 일반 좀비는 orig=false라 기존과 동일하게 동작하고,
+                    -- 좀비화/강령술 플레이어 좀비는 orig=true가 보존된다.
+                    local orig
+                    pcall(function() orig = z:isReanimatedPlayer() end)
+                    rec.origRP = (orig == true)
+                    local okp = pcall(function() z:setReanimatedPlayer(true) end)
+                    if okp then
+                        rec.pinned = true
+                        print("[PongDu][RiseUp][Getup] pin zid=" .. tostring(zid)
+                            .. " timer=" .. tostring(timer)
+                            .. " origRP=" .. tostring(rec.origRP))
+                    end
+                end
+            end
+        else
+            -- onground 이탈(getup 등 진입): 즉시 해제
+            unpin(z, zid, rec, "leftground")
+        end
+        -- 역방향 데드락: 애니 lying인데 AI가 idle (rescue 잔재 등)
+        if not aiGround and anim == "onground" and ai == ZombieIdleState.instance() then
+            revertToGround(z, zid)
+        end
+        return false                 -- 일관 lying 또는 전이 중: 대기 (기상은 바닐라 몫)
+    end
+
+    unpin(z, zid, rec, "standing")   -- lying 이탈 후 미해제분 안전망
+
+    -- 애니메이터 standing류 --------------------------------------------------
+    if not rec.laidOk and elapsed <= ENFORCE_MS then
+        -- 아직 한 번도 못 눕힘 + enforcement 기간 내: 재적용.
+        -- lunge 선점이든 애니메이터 부하 지연이든 여기서 계속 밀어붙인다.
+        rec.tries = rec.tries + 1
+        applyLaydown(z)
+        return false
+    end
+
+    if aiGround then
+        -- enforcement 만료 후에도 AI=onground + 애니=standing: 진짜 고착.
+        unpin(z, zid, rec, "rescue")
+        rescueStuck(z, zid, rec.tries)
+        return false                 -- revert 필요 여부 계속 감시
+    end
+
+    -- 일관 standing: laidOk면 정상 기상 완료, 아니면 눕히기 최종 실패 (관측용 구분)
+    if rec.laidOk then
+        print("[PongDu][RiseUp][Getup] getup-ok zid=" .. tostring(zid)
+            .. " after=" .. tostring(elapsed) .. "ms anim=" .. tostring(anim))
+    else
+        print("[PongDu][RiseUp][Getup] never-laid zid=" .. tostring(zid)
+            .. " after=" .. tostring(elapsed) .. "ms anim=" .. tostring(anim)
+            .. " tries=" .. tostring(rec.tries))
+    end
+    return true
+end
+
+-- 신규 관측 좀비 1마리 판정 (zu/tick 공용). first=최초 관측 시각, tag=계층 표기.
+local function evaluateNew(z, zid, first, tag)
+    local rs
+    pcall(function() rs = z:getRealState() end)
+    local zz = z:getZ()
+    if z:isDead() or rs == "falling" or zz ~= math.floor(zz) then
+        _done[zid] = true          -- 사망/낙하 중: 영구 제외
+    elseif rs == "onground" then
+        layDown(z, zid, "realState" .. tag)
+    elseif insideWindow(z, first) then
+        layDown(z, zid, "window" .. tag)
+    end
+end
+
+local function getupScan()
+    local player = getSpecificPlayer(0)
+    if not player then return end
+    local cell = player:getCell()
+    if not cell then return end
+    local zlist = cell:getZombieList()
+    if not zlist then return end
+
+    local now = getTimestampMs()
+    local alive = {}
+    for i = 0, zlist:size() - 1 do
+        local z = zlist:get(i)
+        if z then
+            local zid = z:getOnlineID()
+            alive[zid] = z
+            local first = _seen[zid]
+            if not first then
+                first = now
+                _seen[zid] = now
+            end
+            if not _done[zid] and now - first <= YOUNG_MS then
+                evaluateNew(z, zid, first, "")
+            end
+        end
+    end
+
+    -- 고착 감시 + enforcement 패스
+    for zid, rec in pairs(_laid) do
+        local z = alive[zid]
+        if z and checkLaid(z, zid, rec, now) then
+            _laid[zid] = nil
+        end
+    end
+
+    for zid in pairs(_seen) do
+        if not alive[zid] then
+            _seen[zid] = nil
+            _done[zid] = nil
+            _laid[zid] = nil
+        end
+    end
+end
+
+Events.OnTick.Add(function()
+    local now = getTimestampMs()
+    local active = pruneWindows()
+    -- 창 활성 중이거나 enforcement/고착 감시 대기 좀비가 있으면 매 틱, 아니면 200ms 간격
+    if not active and isEmpty(_laid) then
+        if now - _lastScan < SCAN_INTERVAL_MS then return end
+    end
+    _lastScan = now
+    local ok, err = pcall(getupScan)
+    if not ok then
+        print("[PongDu][RiseUp][Getup] scan error: " .. tostring(err))
+    end
+end)
+
+-- 렌더 전 선눕히기: 창 활성 중에만. 좀비 update 페이즈 내부라 여기서 눕히면
+-- 그 프레임에 바로 lying으로 그려진다 (OnTick 경로의 1~수 프레임 플래시 제거).
+Events.OnZombieUpdate.Add(function(z)
+    if #_windows == 0 then return end   -- 평시 오버헤드 0 (창 없으면 즉시 탈출)
+    if not z then return end
+    local zid = z:getOnlineID()
+    if _done[zid] then return end
+    local now = getTimestampMs()
+    local first = _seen[zid]
+    if not first then
+        first = now
+        _seen[zid] = now
+    end
+    if now - first > YOUNG_MS then return end
+    local ok, err = pcall(evaluateNew, z, zid, first, "@zu")
+    if not ok then
+        print("[PongDu][RiseUp][Getup] zu error: " .. tostring(err))
+    end
+end)
+
+Events.OnServerCommand.Add(function(module, command, args)
+    if module ~= "PongDuRiseUp" or command ~= "GetupWindow" then return end
+    local x = tonumber(args and args["x"])
+    local y = tonumber(args and args["y"])
+    local r = tonumber(args and args["r"]) or 55
+    if not x or not y then return end
+    local now = getTimestampMs()
+    local rr = r + 5   -- 부활 직후 미세 이동 여유
+    _windows[#_windows + 1] = {
+        x = x, y = y, r2 = rr * rr,
+        arrived = now, expires = now + WINDOW_MS,
+    }
+    print("[PongDu][RiseUp][Getup] window open @" .. tostring(x) .. "," .. tostring(y)
+        .. " r=" .. tostring(r))
+end)
+
+return _a

@@ -1,0 +1,16 @@
+--
+-- ********************************
+-- *** 특수좀비 관리자 소환 메뉴  ***
+-- ********************************
+-- ── [PongDu] 제거됨 ─────────────────────────────────────────────────────────
+-- 원본은 isDebugEnabled() or isAdmin() 조건으로 우클릭한 칸에 "spawn mutant
+-- zombie" 서브메뉴(screamer / brute / roach / tracer / sprinter)를 붙이고
+-- sendClientCommand("PongDuMutant", "MutantSpawn", ...) 로 즉시 소환했다.
+-- HitmanMenu 의 "Spawn Hitman Clan" 과 같은 이유로 뺐다 -- 방송 중 어드민이
+-- 우클릭 한 번 잘못하면 특수좀비가 그대로 나온다.
+--
+-- 특수좀비 소환은 퐁듀 도네 경로(featureId mutant_spawn)로만 나가고,
+-- 수동 테스트는 DonationTestMenu 의 debuff 서브메뉴를 쓴다.
+--
+-- 서버측 DOServer["PongDuMutant"]["MutantSpawn"] 핸들러는 도네 경로가 그대로
+-- 쓰므로 건드리지 않는다. 이 파일만 비운다.

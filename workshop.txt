@@ -1,0 +1,6 @@
+version=1
+id=
+title=[PongDu] - 치지직 도네이션 연동모드 B42
+description=치지직 도네이션 연동
+tags=Build 42
+visibility=unlisted

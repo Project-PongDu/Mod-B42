@@ -1,0 +1,1072 @@
+module t3chzzkDonation
+{
+
+/* [주의] model 블록 이름에 "model" 문자열을 넣지 말 것.
+   ScriptModule.Load()가 블록명에서 String.replace("model","")로 키워드를
+   제거하는데, replace는 모든 occurrence를 지우기 때문에 이름 뒤쪽의
+   "model"까지 같이 날아간다. serum_supreme_model 은 serum_supreme_ 로
+   등록돼 WorldStaticModel 참조가 전부 미스나고, 부팅 시
+   ModelScript.check> no such model "???.serum_supreme_model" 이 뜬다.
+   (대소문자 구분이라 Model 은 안전하지만 헷갈리므로 아예 쓰지 않는다) */
+
+model PongDuSerumCommon
+{
+    mesh    = WorldItems/Candle,
+    texture = WorldItems/serum_common_world,
+    scale   = 0.4,
+}
+
+model PongDuSerumRare
+{
+    mesh    = WorldItems/Candle,
+    texture = WorldItems/serum_rare_world,
+    scale   = 0.4,
+}
+
+model PongDuSerumEpic
+{
+    mesh    = WorldItems/Candle,
+    texture = WorldItems/serum_epic_world,
+    scale   = 0.4,
+}
+
+/* vehicle_drop donation: 차량 착지 연출용 (Insurgent Profession 모드의 DeployedParachute
+   메쉬/텍스처를 자체 네임스페이스로 복사해와 의존성 없이 사용) */
+model t3DeployedParachute
+{
+    mesh    = WorldItems/t3DeployedParachute,
+    texture = WorldItems/t3DeployedParachute,
+    scale   = 0.005,
+}
+
+/* 강화혈청 42종 = 14스킬 x 3등급.
+   전부 같은 OnEat_serum 하나를 가리키고, 그 함수가 food:getType()으로 어느
+   혈청인지 판별한다(features/skillpotion.lua). 아이템별 함수를 42개 만들지
+   않기 위한 것이며, 그 외에는 전부 정적 정의다 -- 툴팁/표시명이 스크립트와
+   번역파일에만 있으므로 세이브·네트워크 직렬화를 신경 쓸 필요가 없다. */
+
+item serum_common_Fitness
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_Fitness,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_Strength
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_Strength,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_Sprinting
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_Sprinting,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_Lightfoot
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_Lightfoot,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_Nimble
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_Nimble,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_Sneak
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_Sneak,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_Axe
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_Axe,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_Blunt
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_Blunt,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_SmallBlunt
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_SmallBlunt,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_LongBlade
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_LongBlade,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_SmallBlade
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_SmallBlade,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_Spear
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_Spear,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_Maintenance
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_Maintenance,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_common_Aiming
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_common,
+    Tooltip             = Tooltip_serum_common_Aiming,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumCommon,
+    Tags                = CMP,
+}
+
+item serum_rare_Fitness
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_Fitness,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_Strength
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_Strength,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_Sprinting
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_Sprinting,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_Lightfoot
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_Lightfoot,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_Nimble
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_Nimble,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_Sneak
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_Sneak,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_Axe
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_Axe,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_Blunt
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_Blunt,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_SmallBlunt
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_SmallBlunt,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_LongBlade
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_LongBlade,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_SmallBlade
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_SmallBlade,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_Spear
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_Spear,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_Maintenance
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_Maintenance,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_rare_Aiming
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_rare,
+    Tooltip             = Tooltip_serum_rare_Aiming,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumRare,
+    Tags                = CMP,
+}
+
+item serum_epic_Fitness
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_Fitness,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_Strength
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_Strength,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_Sprinting
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_Sprinting,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_Lightfoot
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_Lightfoot,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_Nimble
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_Nimble,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_Sneak
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_Sneak,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_Axe
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_Axe,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_Blunt
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_Blunt,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_SmallBlunt
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_SmallBlunt,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_LongBlade
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_LongBlade,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_SmallBlade
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_SmallBlade,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_Spear
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_Spear,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_Maintenance
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_Maintenance,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+item serum_epic_Aiming
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.2,
+    Type                = Food,
+    DisplayName         = Enhancement Serum,
+    Icon                = serum_epic,
+    Tooltip             = Tooltip_serum_epic_Aiming,
+    Medical             = TRUE,
+    CustomContextMenu   = serum_useInjector,
+    EatType             = popcan,
+    OnEat               = OnEat_serum,
+    CustomEatSound      = serum_inject,
+    WorldStaticModel    = PongDuSerumEpic,
+    Tags                = CMP,
+}
+
+/* random_weapon donation: weapon gacha boxes */
+item weapon_box_melee
+{
+    DisplayCategory     = Container,
+    Weight              = 0.3,
+    Type                = Normal,
+    DisplayName         = Melee Weapon Box,
+    Icon                = DuffelbagMilitary,
+    Tooltip             = Tooltip_weapon_box,
+}
+
+item weapon_box_ranged
+{
+    DisplayCategory     = Container,
+    Weight              = 0.3,
+    Type                = Normal,
+    DisplayName         = Ranged Weapon Box,
+    Icon                = DuffelbagMilitary,
+    Tooltip             = Tooltip_weapon_box,
+}
+
+/* random_weapon easter egg: 근접 보급상자 1% 확률 등장 (t3RandomWeapon.lua).
+   바닐라 Pencil 기반 + 카타나급 살상력(확정 크리티컬), 대신 내구 3에
+   매 타격 내구 1 감소 = 정확히 세 번 휘두르면 부러진다.
+   Categories에 Improvised가 있어 일반 근접 풀 자동 편입에서 제외됨. */
+item JohnWickPencil
+{
+    DisplayCategory = Weapon,
+    Type            = Weapon,
+    DisplayName     = John Wick's Pencil,
+    Icon            = Pencil,
+    WeaponSprite    = Pencil,
+    Tooltip         = Tooltip_JohnWickPencil,
+    Categories      = Improvised;SmallBlade,
+    SubCategory     = Stab,
+    SwingAnim       = Stab,
+    RunAnim         = Run_Weapon2,
+    IdleAnim        = Idle_Weapon2,
+    IsAimedHandWeapon = TRUE,
+    Weight          = 0.1,
+    MinRange        = 0.61,
+    MaxRange        = 0.8,
+    MinAngle        = 0.65,
+    MinimumSwingTime = 2,
+    SwingTime       = 2,
+    SwingAmountBeforeImpact = 0.02,
+    AimingMod       = 0.8,
+    PushBackMod     = 0.3,
+    KnockdownMod    = 0,
+    KnockBackOnNoDeath = FALSE,
+    SplatBloodOnNoDeath = FALSE,
+    SplatNumber     = 1,
+    MaxHitCount     = 1,
+    EnduranceMod    = 0.5,
+    MinDamage       = 2,
+    MaxDamage       = 3,
+    CriticalChance  = 100,
+    CritDmgMultiplier = 10,
+    ConditionMax    = 3,
+    ConditionLowerChanceOneIn = 1,
+    DoorDamage      = 0,
+    TreeDamage      = 0,
+    WeaponLength    = 0.15,
+    Tags            = Write;Pencil,
+    BreakSound      = PenBreak,
+    HitFloorSound   = PenHit,
+    ImpactSound     = PenHit,
+    DoorHitSound    = PenHit,
+    HitSound        = PenHit,
+    SwingSound      = PenSwing,
+}
+
+recipe Open Weapon Box
+{
+    weapon_box_melee,
+    Result:weapon_box_melee,
+    RemoveResultItem:true,
+    OnCreate:t3RandomWeapon.OpenMeleeBox,
+    CanBeDoneFromFloor:true,
+    Time:150.0,
+    Sound:PutItemInBag,
+}
+
+recipe Open Weapon Box
+{
+    weapon_box_ranged,
+    Result:weapon_box_ranged,
+    RemoveResultItem:true,
+    OnCreate:t3RandomWeapon.OpenRangedBox,
+    CanBeDoneFromFloor:true,
+    Time:150.0,
+    Sound:PutItemInBag,
+}
+
+/* vehicle_drop donation: 개봉하면 근처 실외에 차량 한 대를 소환 */
+item vehicle_drop_kit
+{
+    DisplayCategory = Communications,
+    Weight              = 0.1,
+    Type                = Normal,
+    DisplayName         = Vehicle Drop Kit,
+    Icon			= WalkieTalkieMilitary,
+    Tooltip             = Tooltip_vehicle_drop_kit,
+    StaticModel = WalkieTalkieUSArmy,
+}
+
+recipe Open Vehicle Drop Kit
+{
+    vehicle_drop_kit,
+    Result:vehicle_drop_kit,
+    RemoveResultItem:true,
+    OnCreate:t3VehicleDrop.OpenKit,
+    CanBeDoneFromFloor:true,
+    Time:500,
+    Sound:RadioTalk,
+}
+
+item t3DeployedParachute
+{
+    Type                = Normal,
+    DisplayName         = Deployed Parachute,
+    Icon                = t3DeployedParachute,
+    Weight              = 10,
+    WorldStaticModel    = t3DeployedParachute,
+}
+
+/* inv_save_ticket donation: 소지한 채 사망하면 자동 발동/소모되어
+   사망 시점 인벤토리를 리스폰 후 그대로 돌려받는다 (features/invsave.lua).
+   Type=Key로 만들어 차키처럼 무게 0 + 인벤토리 열쇠고리 탭에 자동 편입되게 함. */
+item inv_save_ticket
+{
+    DisplayCategory     = Key,
+    Weight              = 0,
+    Type                = Key,
+    DisplayName         = Inventory Insurance,
+    Icon                = InvSaveTicket,
+    Tooltip             = Tooltip_inv_save_ticket,
+}
+
+/* FirstAidOverhaul 모드에서 이식. 제작 레시피 없이 아이템만 지급되는 형태로
+   단순화 (features/syringe.lua가 인벤토리 우클릭 메뉴에서 "주사하기"로 처리). */
+model PongDuSyringe
+{
+    mesh    = items/Item_Syringe|Syringe,
+    texture = WorldItems/MetalSheet,
+    scale   = 1,
+}
+
+item Syringe_Adrenaline
+{
+    DisplayCategory     = FirstAid,
+    Count               = 1,
+    Weight              = 0.01,
+    Type                = Normal,
+    DisplayName         = Adrenaline Syringe,
+    Icon                = SyringeAdrenline,
+    Tooltip             = Tooltip_Syringe_Adrenaline,
+    WorldStaticModel    = PongDuSyringe,
+}
+
+item Syringe_Doxycycline
+{
+    DisplayCategory     = FirstAid,
+    Count               = 1,
+    Weight              = 0.01,
+    Type                = Normal,
+    DisplayName         = Doxycycline Syringe,
+    Icon                = DoxycyclineSyringe,
+    Tooltip             = Tooltip_Syringe_Doxycycline,
+    WorldStaticModel    = PongDuSyringe,
+}
+
+/* 신규 2종. 아이콘은 전용 아트가 없어 FAO 미사용 텍스처를 임시로 재활용함
+   (Syringe_Morphine = FAO Syringe2, Syringe_Emergency = FAO EmptySyringe).
+   전용 아이콘 뽑으면 Icon 값과 textures 폴더의 png 파일만 교체하면 됨.
+
+   주의: 이 파일의 주석 안에는 슬래시+별표 조합을 절대 넣지 말 것.
+   ScriptParser.stripComments()가 파일을 뒤에서부터 훑으면서 닫는 기호에
+   가장 가까운 여는 기호를 찾는 방식이라, 주석 본문에 그 조합이 있으면
+   거기서부터만 지워지고 원래 여는 기호가 남아 바로 다음 블록이 깨진다.
+   (실제로 이 주석 때문에 MorphineSyringe가 등록되지 않았다) */
+item Syringe_Morphine
+{
+    DisplayCategory     = FirstAid,
+    Count               = 1,
+    Weight              = 0.01,
+    Type                = Normal,
+    DisplayName         = Morphine Syringe,
+    Icon                = MorphineSyringe,
+    Tooltip             = Tooltip_Syringe_Morphine,
+    WorldStaticModel    = PongDuSyringe,
+}
+
+item Syringe_Emergency
+{
+    DisplayCategory     = FirstAid,
+    Count               = 1,
+    Weight              = 0.01,
+    Type                = Normal,
+    DisplayName         = Emergency Regen Syringe,
+    Icon                = EmergencyRegenSyringe,
+    Tooltip             = Tooltip_Syringe_Emergency,
+    WorldStaticModel    = PongDuSyringe,
+}
+
+/* medical_box donation (server tier): 서버장 후원 시 접속자 전원에게 1개씩 지급.
+   개봉하면 샌드박스에서 켜져있는 주사기 4종이 전부 나온다 (PongDu.MedBox_Allow_*,
+   t3MedicalBox.lua). 아이콘/월드모델은 바닐라 FirstAidKit 것을 그대로 재사용한다
+   -- 전용 아트를 뽑으면 Icon 과 WorldStaticModel 만 교체하면 된다. */
+item medical_box
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.3,
+    Type                = Normal,
+    DisplayName         = Medical Supply Box,
+    Icon                = FirstAid,
+    Tooltip             = Tooltip_medical_box,
+    Medical             = TRUE,
+    WorldStaticModel    = LunchBoxMedic_Ground,
+}
+
+recipe Open Medical Box
+{
+    medical_box,
+    Result:medical_box,
+    RemoveResultItem:true,
+    OnCreate:t3MedicalBox.OpenBox,
+    CanBeDoneFromFloor:true,
+    Time:150.0,
+    Sound:PutItemInBag,
+}
+
+/* zRe Vaccin("They Knew") 모드의 TheyKnew.Zomboxivir 이식. vaccine 후원(rewardManager.lua)이
+   원래 그 모드가 로드돼 있어야만 지급 가능했던 걸, 퐁듀 전용 아이템으로 빼서 외부
+   모드 의존성을 제거함. WorldStaticModel은 바닐라 Tweezers 재사용(원본도 동일). */
+item Zomboxivir
+{
+    DisplayCategory     = FirstAid,
+    Weight              = 0.01,
+    Type                = Food,
+    HungerChange        = 1,
+    DisplayName         = Zomboxivir Ampule,
+    Icon                = Zomboxivir,
+    Tooltip             = Tooltip_Zomboxivir,
+    Medical             = TRUE,
+    EatType             = popcan,
+    CustomContextMenu   = Break_Ampule,
+    OnEat               = OnEat_Zomboxivir,
+    CustomEatSound      = BreakAmpule,
+    WorldStaticModel    = Tweezers,
+}
+
+/* zombie_rain(좀비 공습) 낙하산 연출용: 낙하 좀비 등에 ItemVisual로만 씌운다
+   (features/zombierain.lua). Parachuting Start 모드(Panopticon, Glytch3r, Sapph,
+   Dante271)의 OpenParachute 메쉬/텍스처를 자체 네임스페이스로 복사해 쓴다.
+   인벤토리/월드에 나오지 않는 연출 전용 아이템이다. */
+item PongDuZombieParachute
+{
+    DisplayCategory       = Bag,
+    Weight                = 10,
+    Type                  = Container,
+    Capacity              = 1,
+    DisplayName           = Zombie Parachute,
+    Icon                  = PongDuParachute,
+    CanBeEquipped         = Back,
+    ClothingItem          = PongDu_ZombieParachute,
+    BloodLocation         = Bag,
+    CanHaveHoles          = false,
+    AttachmentReplacement = Bag,
+    ReplaceInSecondHand   = Bag_HikingBag_LHand holdingbagleft,
+    ReplaceInPrimaryHand  = Bag_HikingBag_RHand holdingbagright,
+}
+
+/* fire_support/airborne(공수부대원) 배낭: hitmans.txt Airborne_Trooper 의 bag.
+   Parachuting Start 모드(Panopticon, Glytch3r, Sapph, Dante271)의 ParachuteContainer
+   메쉬를 자체 네임스페이스로 복사해 쓴다. 이 메쉬는 강하/좀비 공습 낙하산
+   (PongDu_OpenParachute)의 배낭 부분과 정점이 완전히 같다 -- 캐노피만 뺀 것.
+   텍스처/아이콘은 PongDuZombieParachute 와 공용(PongDu_parachute / PongDuParachute).
+   능력치는 원본 ParachuteContainer 그대로. 대원이 죽으면 시체 옆에 실제 가방으로
+   떨어진다(Hitman.lua addItemToSpawnAtDeath). */
+model PongDuParachutePackGround
+{
+    mesh    = WorldItems/PongDu_ParachutePack_Ground,
+    texture = PongDu_parachute,
+    scale   = 1.0,
+}
+
+item PongDuAirborneParachutePack
+{
+    DisplayCategory       = Bag,
+    WeightReduction       = 70,
+    Weight                = 0.8,
+    Type                  = Container,
+    Capacity              = 20,
+    DisplayName           = Airborne Parachute Pack,
+    Icon                  = PongDuParachute,
+    CanBeEquipped         = Back,
+    OpenSound             = OpenBag,
+    CloseSound            = CloseBag,
+    PutInSound            = PutItemInBag,
+    ClothingItem          = PongDu_AirborneParachutePack,
+    BloodLocation         = Bag,
+    RunSpeedModifier      = 0.96,
+    CanHaveHoles          = false,
+    AttachmentReplacement = Bag,
+    ReplaceInSecondHand   = Bag_HikingBag_LHand holdingbagleft,
+    ReplaceInPrimaryHand  = Bag_HikingBag_RHand holdingbagright,
+    WorldStaticModel      = PongDuParachutePackGround,
+}
+
+}

@@ -1,0 +1,23 @@
+# ── B42 포팅 중 제외 자산 ────────────────────────────────────────────────
+# 히트맨(밴딧) 계열 전부. 1차 포팅 범위에서 제외했다.
+# 되돌릴 수 있게 삭제하지 않고 남겨둔 것이므로 레포에는 올리지 않는다.
+Contents/mods/**/_hitman_excluded/
+
+# ── B41 잔재 ─────────────────────────────────────────────────────────────
+# 번역은 42.15.0 부터 UTF-8 JSON 이다. 구 UTF-16 .txt 는 B42 가 읽지 않는다.
+Contents/mods/**/media/lua/shared/Translate/**/*_KO.txt
+Contents/mods/**/media/lua/shared/Translate/**/*_EN.txt
+_b41_txt_backup/
+
+# ── 작업 중 산출물 ───────────────────────────────────────────────────────
+*.ps1
+*.bat
+PZ_diag.*
+Claude outputs/
+
+# ── OS / 에디터 ──────────────────────────────────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

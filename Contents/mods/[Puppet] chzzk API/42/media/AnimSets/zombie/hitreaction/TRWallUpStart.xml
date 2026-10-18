@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 트레이서 벽 클라임(한 층 위로): ClimbWall 모드의 z+1 상승 포팅.
+     기존 높은담장(TRClimbWall*)과 달리 완료 시 z+1 착지칸으로 텔레포트하는
+     별개 흐름이라 변수 네임스페이스를 분리(TRWallUp*). 애님 클립은 이미
+     모드에 있는 TR_ClimbWall_* 에셋 재사용. -->
+<animNode>
+	<m_Name>TRWallUpStart</m_Name>
+	<m_AnimName>TR_ClimbWall_Start</m_AnimName>
+	<m_deferredBoneAxis>Y</m_deferredBoneAxis>
+	<m_Looped>false</m_Looped>
+	<m_SpeedScale>1.04</m_SpeedScale>
+	<m_BlendTime>0.10</m_BlendTime>
+	<m_Conditions>
+		<m_Name>hitreaction</m_Name>
+		<m_Type>STRING</m_Type>
+		<m_StringValue>TRWallUpReactionStart</m_StringValue>
+	</m_Conditions>
+	<m_Conditions>
+		<m_Name>TRWallUpStarted</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_BoolValue>false</m_BoolValue>
+	</m_Conditions>
+	<m_Events>
+		<m_EventName>SetVariable</m_EventName>
+		<m_Time>End</m_Time>
+		<m_ParameterValue>TRWallUpStarted=true</m_ParameterValue>
+	</m_Events>
+</animNode>
