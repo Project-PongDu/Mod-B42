@@ -1,24 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 트레이서 높은담장(FenceTypeHigh) 클라임 전반부.
-     ZombieClimbsWall(SportXAI)의 ZombieClimbWallStart.xml 포팅 - 노드명/변수명/
-     애님명을 전부 TR 네임스페이스로 교체해 원본 모드와 동시 구동 시에도 충돌 없음.
-     애님 에셋: anims_X/Zombie/TR_ClimbWall_Start.X (원본 사본, AnimationSet명 변경). -->
+<!-- 스프린터 높은담장(FenceTypeHigh) 관통 클라임 전반부 (B42).
+     hitreaction 문자열로 상태를 태우는 방식은 B41/B42 동일하다 -
+     IsoGameCharacter.java:857 hashitreaction 콜백 + 각 상태의 to_hitreaction.xml.
+     주의: B42는 AnimSets/zombie/hitreaction/에서 Default.xml이 사라졌다. 커스텀
+     hitreaction 문자열에 매칭되는 노드가 없으면 NoAnimConditionsPass로 빠지므로,
+     Start/Success 두 노드가 전 구간을 덮어야 한다.
+     애님 에셋: anims_X/Zombie/TR_ClimbWall_Start.X -->
 <animNode>
 	<m_Name>TRClimbWallStart</m_Name>
 	<m_AnimName>TR_ClimbWall_Start</m_AnimName>
-	<m_deferredBoneAxis>Y</m_deferredBoneAxis>
+	<m_ConditionPriority>1</m_ConditionPriority>
 	<m_Looped>false</m_Looped>
 	<m_SpeedScale>1.04</m_SpeedScale>
 	<m_BlendTime>0.10</m_BlendTime>
 	<m_Conditions>
 		<m_Name>hitreaction</m_Name>
 		<m_Type>STRING</m_Type>
-		<m_StringValue>TRClimbWallReactionStart</m_StringValue>
+		<m_Value>TRClimbWallReactionStart</m_Value>
 	</m_Conditions>
 	<m_Conditions>
 		<m_Name>TRClimbWallStarted</m_Name>
 		<m_Type>BOOL</m_Type>
-		<m_BoolValue>false</m_BoolValue>
+		<m_Value>false</m_Value>
 	</m_Conditions>
 	<m_Events>
 		<m_EventName>SetVariable</m_EventName>

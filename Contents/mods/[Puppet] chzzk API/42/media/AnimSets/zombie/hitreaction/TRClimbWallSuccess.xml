@@ -1,23 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 트레이서 높은담장 클라임 성공부 (ZombieClimbWallSuccess.xml 포팅, TR 네임스페이스).
-     트레이서는 100% 성공이므로 Fail 노드는 포팅하지 않음. 진행 중 collidable
-     해제/복구는 Lua(updateTracerWallClimb)가 담당. -->
+<!-- 스프린터 높은담장 클라임 성공부 (B42). 파쿠르 실패는 0%이므로 Fail 노드는 없다.
+     진행 중 관통(collidable 해제)은 Lua(psWallClimb)가 매 틱 담당한다 -
+     IsoZombie.update가 OnZombieUpdate 발화 직전 setCollidable(true)를 때리므로
+     Lua가 매 틱 다시 꺼주지 않으면 관통이 유지되지 않는다. -->
 <animNode>
 	<m_Name>TRClimbWallSuccess</m_Name>
 	<m_AnimName>TR_ClimbWall_Success</m_AnimName>
-	<m_deferredBoneAxis>Y</m_deferredBoneAxis>
+	<m_ConditionPriority>1</m_ConditionPriority>
 	<m_Looped>false</m_Looped>
 	<m_SpeedScale>1.04</m_SpeedScale>
 	<m_BlendTime>0.10</m_BlendTime>
 	<m_Conditions>
 		<m_Name>hitreaction</m_Name>
 		<m_Type>STRING</m_Type>
-		<m_StringValue>TRClimbWallReactionSuccess</m_StringValue>
+		<m_Value>TRClimbWallReactionSuccess</m_Value>
 	</m_Conditions>
 	<m_Conditions>
 		<m_Name>TRClimbWallStarted</m_Name>
 		<m_Type>BOOL</m_Type>
-		<m_BoolValue>true</m_BoolValue>
+		<m_Value>true</m_Value>
 	</m_Conditions>
 	<m_Events>
 		<m_EventName>SetVariable</m_EventName>

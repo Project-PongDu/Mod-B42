@@ -1,35 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 트레이서 이속 오버라이드: 바닐라 pathfind/sprintPathfind5.xml 사본에 PuppetTracer 조건 + Priority를
-     얹고 m_SpeedScale을 숫자 대신 변수명으로 교체. 엔진(AnimNode.getSpeedScale)이
-     숫자 파싱 실패 시 getVariableFloat("TracerSpeed", 1.0)로 읽는 것을 이용 -
-     Lua(updateTracer)가 매 틱 세팅하는 TracerSpeed 값이 곧 재생배속=루트모션 이속.
-     바닐라 기준값 0.80 x 1.2 = Lua에서 0.96 세팅. -->
+<!-- 스프린터 경로탐색 이속 오버라이드 (B42).
+     바닐라 pathfind/sprintPathfindN.xml은 x_extends="sprintPathfind.xml" 상속으로
+     실효 조건이 3개(bMoving/intrees/zombieWalkType)다. m_ConditionPriority로 우선권 확보. -->
 <animNode>
 	<m_Name>TRsprintPathfind5</m_Name>
 	<m_AnimName>Zombie_Sprint</m_AnimName>
 	<m_Priority>5</m_Priority>
-	<m_deferredBoneAxis>Y</m_deferredBoneAxis>
+	<m_ConditionPriority>1</m_ConditionPriority>
 	<m_SpeedScale>TracerSpeed</m_SpeedScale>
 	<m_BlendTime>0.20</m_BlendTime>
 	<m_Conditions>
 		<m_Name>bMoving</m_Name>
 		<m_Type>BOOL</m_Type>
-		<m_BoolValue>true</m_BoolValue>
+		<m_Value>true</m_Value>
 	</m_Conditions>
 	<m_Conditions>
 		<m_Name>intrees</m_Name>
 		<m_Type>BOOL</m_Type>
-		<m_BoolValue>false</m_BoolValue>
+		<m_Value>false</m_Value>
 	</m_Conditions>
 	<m_Conditions>
 		<m_Name>zombieWalkType</m_Name>
 		<m_Type>STRING</m_Type>
-		<m_StringValue>sprint5</m_StringValue>
+		<m_Value>sprint5</m_Value>
 	</m_Conditions>
 	<m_Conditions>
 		<m_Name>PuppetTracer</m_Name>
 		<m_Type>BOOL</m_Type>
-		<m_BoolValue>true</m_BoolValue>
+		<m_Value>true</m_Value>
 	</m_Conditions>
 	<m_Events>
 		<m_EventName>Footstep</m_EventName>

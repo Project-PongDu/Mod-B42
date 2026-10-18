@@ -431,10 +431,26 @@ local trWallUpQueue = {}
 local function trWallUpTeleport(zombie)
     zombie:setVariable("TRWallUpDone", false)
     zombie:setVariable("TRWallUpActive", false)
-    trLog(zombie, "wallup: DONE teleport z=" .. tostring(zombie:getVariableFloat("TRWallUpZ", -1)))
-    zombie:setX(zombie:getVariableFloat("TRWallUpX", zombie:getX()))
-    zombie:setY(zombie:getVariableFloat("TRWallUpY", zombie:getY()))
-    zombie:setZ(zombie:getVariableFloat("TRWallUpZ", zombie:getZ()))
+    local tx = zombie:getVariableFloat("TRWallUpX", zombie:getX())
+    local ty = zombie:getVariableFloat("TRWallUpY", zombie:getY())
+    local tz = zombie:getVariableFloat("TRWallUpZ", zombie:getZ())
+    trLog(zombie, "wallup: DONE teleport z=" .. tostring(tz))
+    zombie:setX(tx)
+    zombie:setY(ty)
+    zombie:setZ(tz)
+    -- setX/Y/Z 만으로는 z+1 상승이 다음 업데이트에 되돌려진다.
+    -- IsoMovingObject.snapZToCurrentSquare(:1054)가 z를 current 스퀘어의
+    -- z+0.99999 로 깎는데, current 는 아직 아래층 스퀘어이기 때문이다.
+    -- setMovingSquareNow(:1967)는 movingSq 에 current 를 넘길 뿐이라 혼자서는
+    -- 소용이 없다. 엔진도 IsoGameCharacter 생성자(:819~820)에서 current 를 먼저
+    -- 잡고 setMovingSquareNow 를 부르는 순서다.
+    local destSq = getCell():getGridSquare(math.floor(tx), math.floor(ty), math.floor(tz))
+    if destSq then
+        zombie:setCurrent(destSq)
+        zombie:setMovingSquareNow()
+    else
+        trLog(zombie, "wallup: dest square is nil, current square left unchanged")
+    end
 end
 
 Events.OnTick.Add(function()

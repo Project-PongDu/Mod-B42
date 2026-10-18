@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 트레이서가 열린/이미 깨진 창문을 AI 경로로 통과할 때(ClimbThroughWindowState)의
-     전반부. Vaulting Zombies climbwindow/start.xml 구조(BlockWindow 이벤트 포함)에
+<!-- 스프린터가 열린/이미 깨진 창문을 AI 경로로 통과할 때(ClimbThroughWindowState)의
+     전반부 (B42). 바닐라 climbwindow/start.xml 구조(BlockWindow 이벤트 포함)에
      애님만 Sprint 볼트로 교체. 닫힌 창문은 이 스테이트를 타지 않고
-     OnObjectCollide -> 즉시파괴 -> climbOverFence(DTW 패턴) 경로로 처리된다. -->
+     OnObjectCollide -> 즉시파괴 -> climbOverFence 경로로 처리된다. -->
 <animNode>
 	<m_Name>TRclimbWindowStart</m_Name>
 	<m_AnimName>Bob_ValultOver_Sprint</m_AnimName>
 	<m_Priority>5</m_Priority>
-	<m_deferredBoneAxis>Y</m_deferredBoneAxis>
+	<m_ConditionPriority>1</m_ConditionPriority>
 	<m_Looped>false</m_Looped>
 	<m_EarlyTransitionOut>true</m_EarlyTransitionOut>
 	<m_SpeedScale>0.80</m_SpeedScale>
@@ -15,12 +15,12 @@
 	<m_Conditions>
 		<m_Name>PuppetTracer</m_Name>
 		<m_Type>BOOL</m_Type>
-		<m_BoolValue>true</m_BoolValue>
+		<m_Value>true</m_Value>
 	</m_Conditions>
 	<m_Conditions>
 		<m_Name>ClimbWindowStarted</m_Name>
 		<m_Type>BOOL</m_Type>
-		<m_BoolValue>false</m_BoolValue>
+		<m_Value>false</m_Value>
 	</m_Conditions>
 	<m_Events>
 		<m_EventName>SetVariable</m_EventName>

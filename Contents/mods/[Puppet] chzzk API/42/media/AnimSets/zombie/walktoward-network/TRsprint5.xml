@@ -1,36 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 트레이서 이속 오버라이드: 바닐라 walktoward-network/sprint5.xml 사본에 PuppetTracer 조건 + Priority를
-     얹고 m_SpeedScale을 숫자 대신 변수명으로 교체. 엔진(AnimNode.getSpeedScale)이
-     숫자 파싱 실패 시 getVariableFloat("TracerSpeed", 1.0)로 읽는 것을 이용 -
-     Lua(updateTracer)가 매 틱 세팅하는 TracerSpeed 값이 곧 재생배속=루트모션 이속.
-     바닐라 기준값 0.80 x 1.2 = Lua에서 0.96 세팅. -->
+<!-- 스프린터 이속 오버라이드 (B42).
+     B42 바닐라 walktoward/sprintN.xml은 x_extends="sprintToward.xml"로 부모 노드를
+     상속하므로 파일에 보이는 조건(2개)과 실효 조건(3개: shouldSprint/intrees/
+     zombieWalkType)이 다르다. 조건 수를 세서 이기는 B41식 관용구 대신 B42 신규
+     필드 m_ConditionPriority로 우선권을 잡는다 - AnimNode.compareSelectionConditions가
+     조건 수보다 먼저 비교하고, 조건이 통과 안 하면 바닐라로 그대로 흘러간다.
+     m_SpeedScale에 숫자 대신 변수명을 넣으면 AnimNode.getSpeedScale이 파싱 실패 후
+     getVariableFloat("TracerSpeed", 1.0)로 읽는다(B41/B42 동일). 재생배속=루트모션 이속. -->
 <animNode>
 	<m_Name>TRsprint5</m_Name>
 	<m_AnimName>Zombie_Sprint</m_AnimName>
 	<m_Priority>5</m_Priority>
-	<m_deferredBoneAxis>Y</m_deferredBoneAxis>
+	<m_ConditionPriority>1</m_ConditionPriority>
 	<m_SpeedScale>TracerSpeed</m_SpeedScale>
 	<m_BlendTime>0.35</m_BlendTime>
 	<m_randomAdvanceFraction>0.25</m_randomAdvanceFraction>
 	<m_Conditions>
-		<m_Name>bhastarget</m_Name>
+		<m_Name>shouldSprint</m_Name>
 		<m_Type>BOOL</m_Type>
-		<m_BoolValue>true</m_BoolValue>
+		<m_Value>true</m_Value>
 	</m_Conditions>
 	<m_Conditions>
 		<m_Name>intrees</m_Name>
 		<m_Type>BOOL</m_Type>
-		<m_BoolValue>false</m_BoolValue>
+		<m_Value>false</m_Value>
 	</m_Conditions>
 	<m_Conditions>
 		<m_Name>zombieWalkType</m_Name>
 		<m_Type>STRING</m_Type>
-		<m_StringValue>sprint5</m_StringValue>
+		<m_Value>sprint5</m_Value>
 	</m_Conditions>
 	<m_Conditions>
 		<m_Name>PuppetTracer</m_Name>
 		<m_Type>BOOL</m_Type>
-		<m_BoolValue>true</m_BoolValue>
+		<m_Value>true</m_Value>
 	</m_Conditions>
 	<m_Events>
 		<m_EventName>Footstep</m_EventName>

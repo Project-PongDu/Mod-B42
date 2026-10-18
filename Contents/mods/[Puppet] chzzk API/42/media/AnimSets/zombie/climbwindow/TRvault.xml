@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 스프린터가 열린/이미 깨진 창문을 AI 경로로 통과할 때(ClimbThroughWindowState)의
+     Sprint 볼트 (B42). climbfence/TRvault.xml과 같은 단일노드 구조다.
+
+     [이전 2노드 구조를 버린 이유]
+     바닐라 climbwindow/start.xml, end.xml은 ClimbWindowStarted 조건으로 노드를 둘로
+     나누는데, 그건 두 노드가 서로 다른 클립(Zombie_ClimbWindowStart /
+     Zombie_ClimbWindowEnd)을 쓰기 때문이다. 이 모드는 양쪽 다 Bob_ValultOver_Sprint
+     하나를 쓰므로, Started=false로 한 번 풀 재생하고 End에서 Started=true가 되면서
+     같은 클립을 처음부터 또 풀 재생했다(넘을 때 1번 + 착지 후 1번). 조건이 재생
+     도중에 바뀌지 않도록 노드를 하나로 합친다.
+
+     [ClimbWindowStarted를 끝까지 false로 두는 이유]
+     ClimbThroughWindowState.execute에는 슬라이드가 둘 있고 조건이 서로 반대다.
+       - :128  slideCharacterToWindowOpening : Started==false. '수직축' 정렬(창문 중앙
+               맞추기)이라 진행축 루트모션과 안 부딪힌다. 오히려 도움이 된다.
+       - :167~197 slideX/slideY             : Started==true. '진행축' 강제 견인이고
+               내부에서 setNextX/setNextY를 매 프레임 현재값으로 덮어써
+               (같은 파일 slideX/slideY 정의) 루트모션 이동을 통째로 죽인다.
+     후자는 ClimbOverFenceState.java:186~214와 완전히 동일한 코드다. 즉 담장과 창문의
+     견인 조건은 반대가 아니라 같으며, TRvault(climbfence)가 Started=false를 지키는
+     이유가 여기에도 그대로 적용된다. Started=true를 쏘면 볼트가 0.05/frame 기어가기가
+     된다.
+
+     [조기 종료]
+     actiongroups/zombie/climbwindow/to_idle.xml의 탈출 조건이 ClimbWindowFinished
+     단독이므로, TRvault와 동일하게 클립 50% 지점에 쏴서 착지/회복 구간을 스킵하고
+     스프린트로 블렌드시킨다.
+
+     [BlockWindow]
+     ClimbThroughWindowState.exit()는 이 변수를 정리하지 않는다(clear는 CloseWindowState
+     에만 있음). 0.5에 상태가 빠지므로 그 전에 반드시 되돌린다.
+
+     [Started=false 유지의 알려진 부작용 - climbfence/TRvault와 동일하게 감수]
+       - to_staggerback-knockeddown.xml이 isTrue ClimbWindowStarted라 볼트 중
+         넉다운 전이가 안 뜬다 (NoKnockdown 기본 ON이면 무의미)
+       - canRagdoll(:701)이 Started ? false : ... 라 볼트 중 래그돌이 열린다.
+         다만 RAG 노드는 bKnockedDown==true를 요구하므로 NoKnockdown ON에서는
+         후보에 오르지 않는다
+
+     m_ConditionPriority=1로 바닐라 start.xml / end.xml / windowLunge.xml보다 먼저
+     평가된다 (AnimNode.compareSelectionConditions:283~285 - priority 우선, 동률이면
+     조건 개수). -->
+<animNode>
+	<m_Name>TRclimbWindowVault</m_Name>
+	<m_AnimName>Bob_ValultOver_Sprint</m_AnimName>
+	<m_Priority>5</m_Priority>
+	<m_ConditionPriority>1</m_ConditionPriority>
+	<m_Looped>false</m_Looped>
+	<m_SpeedScale>0.80</m_SpeedScale>
+	<m_BlendTime>0.30</m_BlendTime>
+	<m_Conditions>
+		<m_Name>PuppetTracer</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+	<m_Conditions>
+		<m_Name>ClimbWindowStarted</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>false</m_Value>
+	</m_Conditions>
+	<m_Conditions>
+		<m_Name>ClimbWindowOutcome</m_Name>
+		<m_Type>STRING</m_Type>
+		<m_Value>success</m_Value>
+	</m_Conditions>
+	<m_Events>
+		<m_EventName>SetVariable</m_EventName>
+		<m_Time>Start</m_Time>
+		<m_ParameterValue>BlockWindow=true</m_ParameterValue>
+	</m_Events>
+	<m_Events>
+		<m_EventName>SetVariable</m_EventName>
+		<m_TimePc>0.45</m_TimePc>
+		<m_ParameterValue>BlockWindow=false</m_ParameterValue>
+	</m_Events>
+	<m_Events>
+		<m_EventName>SetVariable</m_EventName>
+		<m_TimePc>0.5</m_TimePc>
+		<m_ParameterValue>ClimbWindowFinished=true</m_ParameterValue>
+	</m_Events>
+	<m_Events>
+		<m_EventName>PlayWindowSound</m_EventName>
+		<m_Time>Start</m_Time>
+		<m_ParameterValue>ClimbThroughWindow</m_ParameterValue>
+	</m_Events>
+</animNode>
