@@ -55,8 +55,33 @@ end
 local TARGET_VOLUME = 0.5
 local DOT_INTERVAL_TICKS = 40 -- 점 개수가 바뀌는 간격(틱). Time 값이 바뀌면 체감 순환 속도도 바뀜.
 local DOT_PATTERNS = { ".", "..", "..." }
-local DOT_HALO_DISPLAY_TICKS = 100 -- setHaloNote 표시 지속(내부 틱). 갱신 간격(40)보다 여유있게.
 local DOT_HALO_COLOR = { 255, 255, 255 } -- r, g, b
+
+-- [대사 글꼴] setHaloNote 는 글꼴이 UIFont.Small 로 고정이고(IsoGameCharacter haloNote
+-- 생성부) 태그로도 못 바꾼다(TextDrawObject.allowFonts 기본 false). 화면에서 너무 작아서
+-- 특수좀비 이름표(features/mutantspawn.lua renderTags)와 같은 방식으로 직접 그린다:
+-- 우리 TextDrawObject 하나를 UIFont.Medium 으로 매 틱 배치드로우. 객체가 하나라 항상 한 줄만 보인다.
+local CALL_TEXT_FONT = UIFont.Medium
+local CALL_TEXT_TTL = 5          -- update() 가 멈춘 뒤 이 틱 수만큼 남았다가 사라진다
+local CALL_TEXT_HEAD_OFFSET = 150 -- 발 기준 화면 위쪽 오프셋(px, 줌 1 기준)
+local _callText, _callChar, _callTtl, _callTdo = nil, nil, 0, nil
+
+local function renderCallText()
+    if _callTtl <= 0 or not _callChar or not _callText then return end
+    _callTtl = _callTtl - 1
+    local c = _callChar
+    local sx = IsoUtils.XToScreen(c:getX(), c:getY(), c:getZ(), 0) - IsoCamera.getOffX() - c:getOffsetX()
+    local sy = IsoUtils.YToScreen(c:getX(), c:getY(), c:getZ(), 0) - IsoCamera.getOffY() - c:getOffsetY()
+        - CALL_TEXT_HEAD_OFFSET
+    local zoom = getCore():getZoom(0)
+    sx, sy = sx / zoom, sy / zoom
+    _callTdo = _callTdo or TextDrawObject.new()
+    _callTdo:setDefaultColors(DOT_HALO_COLOR[1] / 255, DOT_HALO_COLOR[2] / 255, DOT_HALO_COLOR[3] / 255, 1)
+    _callTdo:setOutlineColors(0, 0, 0, 1)
+    _callTdo:ReadString(CALL_TEXT_FONT, _callText, -1)
+    _callTdo:AddBatchedDraw(sx, sy - _callTdo:getHeight(), true)
+end
+Events.OnTick.Add(renderCallText)
 
 local CALL_SOUND_NAME = "vehicle_call_signal" -- t3_rewards_sounds.txt 등록명
 local CALL_SOUND_PROGRESS = 0.5 -- 진행률이 이 값을 넘는 순간 1회 재생
@@ -88,12 +113,11 @@ function ISHandcraftAction:update()
         local dotIndex = (math.floor(self.t3CallTick / DOT_INTERVAL_TICKS) + 2) % 3 + 1
         if dotIndex ~= self.t3LastDotIndex then
             self.t3LastDotIndex = dotIndex
-            self.character:setHaloNote(
-                getText("IGUI_donation_vehicle_drop_calling") .. DOT_PATTERNS[dotIndex],
-                DOT_HALO_COLOR[1], DOT_HALO_COLOR[2], DOT_HALO_COLOR[3],
-                DOT_HALO_DISPLAY_TICKS
-            )
+            _callText = getText("IGUI_donation_vehicle_drop_calling") .. DOT_PATTERNS[dotIndex]
         end
+        -- update()가 매 틱 도는 동안 TTL을 채워 두고, 액션이 끝나면 몇 틱 뒤 자연히 사라진다
+        _callChar = self.character
+        _callTtl = CALL_TEXT_TTL
 
         -- 진행률 50% 도달 시 호출 사운드 1회 재생
         if not self.t3CallSoundPlayed and self:getJobDelta() >= CALL_SOUND_PROGRESS then
