@@ -1018,7 +1018,8 @@ end
 -- 트리거 ②: 조준 중 마우스 올림 (applyMutant에서 특수좀비에 한해 호출)
 local function pokeTagOnHover(zombie)
     local player = getPlayer()
-    if not player or not player:IsAiming() then return end
+    -- B42 는 IsAiming -> isAiming (IsoPlayer.java:3859). B41 이름이면 매 틱 nil 호출
+    if not player or not player:isAiming() then return end
     if not zombie:isAlive() or not player:CanSee(zombie) then return end
     local zx, zy = screenXY(zombie, 90)
     local mx, my = getMouseX(), getMouseY()
