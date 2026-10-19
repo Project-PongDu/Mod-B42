@@ -125,7 +125,20 @@ local function spawnZombies(x, y, z, amount, useHighStats, sprint, sender)
                     ["sender"] = sender or "",
                 })
             else
-                lastSpawned:get(0):setWalkType("walk")
+                -- "walk" 는 바닐라 walkType 이 아니다. 바닐라 걸음 노드 조건은 1~5 / slow1~3 /
+                -- sprint1~5 뿐이라(AnimSets/zombie/walktoward) "walk" 면 애니메이션 없는
+                -- defaultWalktoward 만 걸려 좀비가 제자리에 굳는다. B41 은 히트맨 AnimSets 의
+                -- zombieWalkType=Walk 노드(ZSWalk, 비교는 equalsIgnoreCase)가 이걸 받아주고
+                -- 있었고 B42 에서 히트맨 자산을 빼면서 드러났다.
+                -- 엔진이 샌드박스 속도로 정한 걸음을 그대로 두고, 스프린터면 빠른 걸음
+                -- (speedType 2 = "1"~"5", IsoZombie.doZombieSpeedInternal2)으로만 낮춘다.
+                local zw = lastSpawned:get(0)
+                local wt = tostring(zw:getWalkType() or "")
+                if wt == "" or luautils.stringStarts(wt, "sprint") then
+                    zw:setWalkType(tostring(ZombRand(5) + 1))
+                    zw:setSpeedTypeFromWalkType()
+                    print("[PongDuServer] spawnZombies walkType " .. wt .. " -> " .. tostring(zw:getWalkType()))
+                end
             end
             if sender and sender ~= "" then
                 lastSpawned:get(0):getModData()["_cs"] = sender .. getText("IGUI_donation_zombie_owner")
@@ -695,7 +708,8 @@ local function heliSpawnVehicle(job, sx0, sy0)
         print("[PongDu][Heli] vehicle spawn FAILED err=" .. tostring(v))
         return
     end
-    pcall(function() v:setZombiesDontAttack(true) end)
+    -- (B41 에서 있던 v:setZombiesDontAttack(true) 는 제거. BaseVehicle 에는 B41/B42 모두
+    --  그 메서드가 없어(IsoGameCharacter 전용) pcall 안에서 매번 nil 호출 스택만 남겼다)
     job.vehicle = v
     job.vid     = v:getId()
     -- 권한 부여: authorizationServerCollide(short,boolean)는 Kahlua가 primitive

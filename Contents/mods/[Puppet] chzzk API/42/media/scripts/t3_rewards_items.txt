@@ -812,11 +812,15 @@ timedAction PongDuRadioCall
    - 이름이 곧 번역 키다 (Translate/KO/Recipes.json, 접두사 없음)
    - outputs 블록 없음: 결과물은 OnCreate(Lua)가 직접 지급한다 (바닐라 RemoveGasMaskFilter 와 같은 형태)
    - OnCreate 시그니처는 (craftRecipeData, character), 싱글=로컬 / MP=서버에서 실행 (shared/t3RecipeUtil.lua)
-   - InHandCraft;RightClickOnly = 아이템 우클릭 메뉴에만 노출 (바닐라 ScratchTicket 과 동일) */
+   - InHandCraft;RightClickOnly = 아이템 우클릭 메뉴에만 노출 (바닐라 ScratchTicket 과 동일)
+   - time 은 B41 Time 의 1/5 로 적는다. B42 ISHandcraftAction:getDuration() 이
+     craftRecipe:getTime(character) * 5 를 maxTime 으로 쓴다 (ISHandcraftAction.lua:260).
+     B41 ISCraftAction 은 recipe:getTimeToMake() 를 그대로 썼고 BaseAction 진행 단위는 같다.
+     B41 Time:150 -> time = 30, Time:500 -> time = 100 */
 craftRecipe PongDuOpenWeaponBoxMelee
 {
     timedAction = t3chzzkDonation.PongDuOpenBox,
-    time = 150,
+    time = 30,
     OnCreate = t3RandomWeapon.OpenMeleeBox,
     Tags = InHandCraft;RightClickOnly;CanBeDoneInDark,
     category = Miscellaneous,
@@ -829,7 +833,7 @@ craftRecipe PongDuOpenWeaponBoxMelee
 craftRecipe PongDuOpenWeaponBoxRanged
 {
     timedAction = t3chzzkDonation.PongDuOpenBox,
-    time = 150,
+    time = 30,
     OnCreate = t3RandomWeapon.OpenRangedBox,
     Tags = InHandCraft;RightClickOnly;CanBeDoneInDark,
     category = Miscellaneous,
@@ -855,7 +859,7 @@ item vehicle_drop_kit
 craftRecipe PongDuOpenVehicleDropKit
 {
     timedAction = t3chzzkDonation.PongDuRadioCall,
-    time = 500,
+    time = 100,
     OnCreate = t3VehicleDrop.OpenKit,
     AllowBatchCraft = false,
     Tags = InHandCraft;RightClickOnly;CanBeDoneInDark,
@@ -973,7 +977,7 @@ item medical_box
 craftRecipe PongDuOpenMedicalBox
 {
     timedAction = t3chzzkDonation.PongDuOpenBox,
-    time = 150,
+    time = 30,
     OnCreate = t3MedicalBox.OpenBox,
     Tags = InHandCraft;RightClickOnly;CanBeDoneInDark,
     category = Miscellaneous,
