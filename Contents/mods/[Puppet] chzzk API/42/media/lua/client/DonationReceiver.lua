@@ -361,14 +361,19 @@ function DonationEntryPanel:render()
     if self:isMouseOver() then
         local label = effectName(e.featureId)
         local br = { col[1] + (1 - col[1]) * 0.55, col[2] + (1 - col[2]) * 0.55, col[3] + (1 - col[3]) * 0.55 }
-        local tw = getTextManager():MeasureStringX(UIFont.Medium, label)
-        local boxW = tw + sc(14)
-        local boxH = sc(25)
+        -- 상자 크기는 실제 폰트 크기로 잡는다. B41 의 고정 높이 sc(25)는 B42 Medium 폰트가
+        -- 더 커지면서 글자가 상자 위아래로 삐져나왔다 (실측).
+        local tm = getTextManager()
+        local tw = tm:MeasureStringX(UIFont.Medium, label)
+        local fh = tm:getFontHeight(UIFont.Medium)
+        local padX, padY = sc(7), sc(3)
+        local boxW = tw + padX * 2
+        local boxH = fh + padY * 2
         local tx = math.floor(w / 2 - boxW / 2)
         local ty = -boxH - sc(4)
         self:drawRect(tx, ty, boxW, boxH, 0.9, 0.05, 0.05, 0.05)
         self:drawRectBorder(tx, ty, boxW, boxH, 0.8, br[1], br[2], br[3])
-        self:drawTextCentre(label, w / 2, ty + sc(4), br[1], br[2], br[3], 1, UIFont.Medium)
+        self:drawTextCentre(label, w / 2, ty + padY, br[1], br[2], br[3], 1, UIFont.Medium)
     end
 
     ISPanel.render(self)

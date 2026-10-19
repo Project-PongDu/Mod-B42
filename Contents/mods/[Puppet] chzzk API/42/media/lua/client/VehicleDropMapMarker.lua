@@ -35,7 +35,10 @@ local LEGACY_KEYS = {
     "t3VehicleDropMarkerRemove",
 }
 
-local MARKER_SYMBOL = "Boat" -- 바닐라 MapSymbolDefinitions 등록 심볼
+-- 바닐라 MapSymbolDefinitions 등록 심볼. B42 에서 생긴 운전대 아이콘(전리품 탭)을 쓴다
+-- (shared/Definitions/MapSymbolDefinitions.lua: "SteeringWheel" -> map_steeringwheel.png).
+-- B41 은 이 심볼이 없어 "Boat" 를 썼다.
+local MARKER_SYMBOL = "SteeringWheel"
 local MARKER_R, MARKER_G, MARKER_B = 0.1, 0.3, 0.9
 -- 바닐라 심볼 UI가 제공하는 색은 검정(0,0,0) / 회색(0.2,0.2,0.2) / 빨강(1,0,0) /
 -- 파랑(0,0,1) 네 가지뿐이라, 위 RGB는 플레이어가 직접 만들 수 없다.
