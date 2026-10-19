@@ -19,8 +19,15 @@
 --   from the weapon's own script data (getMagazineType / getAmmoBox), so no
 --   per-gun clip/ammo pairing table is needed.
 --
--- Global table (no module return) so recipe OnCreate can resolve
--- "t3RandomWeapon.OpenMeleeBox" / "t3RandomWeapon.OpenRangedBox".
+-- Global table (no module return) so craftRecipe OnCreate can resolve
+-- "t3RandomWeapon.OpenMeleeBox" / "t3RandomWeapon.OpenRangedBox"
+-- (craftRecipe PongDuOpenWeaponBoxMelee / PongDuOpenWeaponBoxRanged).
+--
+-- B42: OnCreate runs where ISHandcraftAction.performRecipe runs -- the local
+-- process in SP, the SERVER in MP (see shared/t3RecipeUtil.lua). On the
+-- server resolvePools()/resolveRangedPool() take the "local-server" branch,
+-- so the client pool sync below is no longer on the grant path; it is kept
+-- only so an MP client still has pools if something reads them locally.
 
 t3RandomWeapon = t3RandomWeapon or {}
 
@@ -44,6 +51,39 @@ t3RandomWeapon.CATEGORY_TABLE = {
 
 -- Categories where "Improvised" items stay in the pool.
 local ALLOW_IMPROVISED = { Spear = true }
+
+-- B42 script API: Item:getTypeString()/getCategories() are gone.
+--   type     -> Item:isItemType(ItemType.WEAPON)              (Item.java:1864)
+--   category -> Item:containsWeaponCategory(WeaponCategory.X) (Item.java:967)
+-- ItemType / WeaponCategory are exposed (LuaManager:2315, :2342) and vanilla
+-- Lua uses WeaponCategory.AXE etc. (ISRemoveBush.lua:43).
+local CATEGORY_ENUM = {
+    SmallBlunt = "SMALL_BLUNT",
+    SmallBlade = "SMALL_BLADE",
+    Blunt      = "BLUNT",
+    Spear      = "SPEAR",
+    Axe        = "AXE",
+    LongBlade  = "LONG_BLADE",
+}
+
+function t3RandomWeapon.isWeaponScript(scriptItem)
+    return scriptItem:isItemType(ItemType.WEAPON) and not scriptItem:getObsolete()
+end
+
+-- First CATEGORY_TABLE category the script item belongs to (respecting the
+-- Improvised rule), or nil. One pool per item; first match wins.
+function t3RandomWeapon.matchCategory(scriptItem)
+    local improvised = scriptItem:containsWeaponCategory(WeaponCategory.IMPROVISED)
+    for _, entry in ipairs(t3RandomWeapon.CATEGORY_TABLE) do
+        local enumName = CATEGORY_ENUM[entry.category]
+        local cat = enumName and WeaponCategory[enumName]
+        if cat and scriptItem:containsWeaponCategory(cat)
+                and (ALLOW_IMPROVISED[entry.category] or not improvised) then
+            return entry.category
+        end
+    end
+    return nil
+end
 
 -- ── Vanilla ranged table (weights sum = 100) ────────────────────────────────
 -- Fallback used only when no Arsenal ranged pool is available. Magazines and
@@ -93,17 +133,13 @@ local function buildMeleePools()
         -- was loaded from; vanilla items report "pz-vanilla" regardless of
         -- which module they declare. Confirmed via Item.java: modID =
         -- ScriptManager.getCurrentLoadFileMod(), independent of module name.
-        if scriptItem:getTypeString() == "Weapon" and not scriptItem:getObsolete()
-                and scriptItem:getModID() == "pz-vanilla" then
-            local cats = scriptItem:getCategories()
-            for _, entry in ipairs(t3RandomWeapon.CATEGORY_TABLE) do
-                if cats:contains(entry.category)
-                        and (ALLOW_IMPROVISED[entry.category] or not cats:contains("Improvised")) then
-                    table.insert(meleePools[entry.category], scriptItem:getFullName())
-                    break -- one pool per item; first matching category wins
-                end
+        local isWeapon = t3RandomWeapon.isWeaponScript(scriptItem)
+        if isWeapon and scriptItem:getModID() == "pz-vanilla" then
+            local category = t3RandomWeapon.matchCategory(scriptItem)
+            if category then
+                table.insert(meleePools[category], scriptItem:getFullName())
             end
-        elseif scriptItem:getTypeString() == "Weapon" and not scriptItem:getObsolete() then
+        elseif isWeapon then
             rejectedModded = rejectedModded + 1
         end
     end
@@ -172,20 +208,6 @@ local function pickMeleeItem()
     return itemName, catEntry.category
 end
 
--- Read the donor name stashed on the box item's modData at grant time.
--- OnCreate(items, result, player): items = source items consumed by the recipe.
-local function findDonor(items)
-    if not items then return "" end
-    for i = 0, items:size() - 1 do
-        local it = items:get(i)
-        if it and it.getModData then
-            local donor = it:getModData().t3Donor
-            if donor and donor ~= "" then return donor end
-        end
-    end
-    return ""
-end
-
 -- Prefix a bare item name with a module. Weapon scripts store AmmoBox WITHOUT
 -- a module prefix (confirmed: Item.java resolves magazineType only;
 -- ItemPickerJava.java adds getAmmoBox() verbatim), so we qualify it with the
@@ -219,16 +241,12 @@ local function resolveRealAmmoBox(ammoType)
 end
 
 local function grant(player, itemName, donor)
-    local inv = player:getInventory()
-    local weapon = inv:AddItem(itemName)
+    local weapon = t3RecipeUtil.addItem(player, itemName, donor)
     if not weapon then
         print(LOG .. "ERROR: AddItem failed for " .. tostring(itemName))
         return
     end
-    if donor ~= "" then
-        weapon:setName(donor .. "'s " .. weapon:getDisplayName())
-    end
-    player:Say(weapon:getDisplayName() .. "!")
+    t3RecipeUtil.say(player, "item", { fullType = itemName, donor = donor })
 
     -- Ammunition package: 2 magazines + 3 openable ammo boxes, resolved from
     -- the weapon's own script data. Melee weapons return nil for all getters,
@@ -241,14 +259,19 @@ local function grant(player, itemName, donor)
     -- loader, the loader takes the MAGAZINE role (2x) and the real box is
     -- re-derived from AmmoType (3x). Falls back to loose rounds when no real
     -- box can be resolved.
+    --
+    -- B42: getAmmoType() returns an AmmoType object, not a string
+    -- (InventoryItem.java:4207). Its item full type is :getItemKey()
+    -- (AmmoType.java:46; vanilla ISRackFirearm.lua:83 does the same).
     local moduleHint = string.match(itemName, "^([^%.]+)") or "Base"
-    local ammoType = weapon.getAmmoType and weapon:getAmmoType()
+    local ammoTypeObj = weapon.getAmmoType and weapon:getAmmoType()
+    local ammoType = ammoTypeObj and ammoTypeObj:getItemKey() or nil
     local rawBox = weapon.getAmmoBox and weapon:getAmmoBox()
     local boxName = qualifyItemName(rawBox, moduleHint)
     local loaderName = nil
 
-    if boxName and InventoryItemFactory and InventoryItemFactory.CreateItem then
-        local probe = InventoryItemFactory.CreateItem(boxName)
+    if boxName then
+        local probe = instanceItem(boxName)
         if probe and probe.getMaxAmmo and probe:getMaxAmmo() > 0 then
             loaderName = boxName
             local real = resolveRealAmmoBox(ammoType)
@@ -264,7 +287,7 @@ local function grant(player, itemName, donor)
     if not (magType and magType ~= "") then magType = loaderName end
     if magType and magType ~= "" then
         for _ = 1, MAG_COUNT do
-            if not inv:AddItem(magType) then
+            if not t3RecipeUtil.addItem(player, magType) then
                 print(LOG .. "WARNING: AddItem failed for magazine " .. tostring(magType))
                 break
             end
@@ -274,27 +297,26 @@ local function grant(player, itemName, donor)
     -- Ammo boxes
     if boxName then
         for _ = 1, AMMO_BOX_COUNT do
-            if not inv:AddItem(boxName) then
+            if not t3RecipeUtil.addItem(player, boxName) then
                 print(LOG .. "WARNING: AddItem failed for ammo box " .. tostring(boxName))
                 break
             end
         end
-    else
-        if ammoType and ammoType ~= "" then
-            inv:AddItems(ammoType, FALLBACK_LOOSE_ROUNDS)
-            print(LOG .. "no ammo box for " .. itemName .. ", granted " .. FALLBACK_LOOSE_ROUNDS .. " loose rounds of " .. ammoType)
-        end
+    elseif ammoType and ammoType ~= "" then
+        local n = t3RecipeUtil.addItems(player, ammoType, FALLBACK_LOOSE_ROUNDS)
+        print(LOG .. "no ammo box for " .. itemName .. ", granted " .. n .. " loose rounds of " .. ammoType)
     end
 end
 
--- Recipe OnCreate handlers -------------------------------------------------
+-- craftRecipe OnCreate handlers --------------------------------------------
+-- B42 signature: (craftRecipeData, character).
 -- Easter egg: 1% chance the melee box contains John Wick's Pencil instead of
 -- a category roll. Item defined in t3_rewards_items.txt (Improvised category +
 -- non-Base module keeps it out of the normal pools).
 local EASTER_EGG_CHANCE = 1 -- percent
 local EASTER_EGG_ITEM = "t3chzzkDonation.JohnWickPencil"
 
-function t3RandomWeapon.OpenMeleeBox(items, result, player)
+function t3RandomWeapon.OpenMeleeBox(craftRecipeData, player)
     if not player then return end
     local itemName
     if ZombRand(100) < EASTER_EGG_CHANCE then
@@ -303,15 +325,15 @@ function t3RandomWeapon.OpenMeleeBox(items, result, player)
     else
         itemName = pickMeleeItem()
     end
-    grant(player, itemName, findDonor(items))
+    grant(player, itemName, t3RecipeUtil.findDonor(craftRecipeData))
 end
 
-function t3RandomWeapon.OpenRangedBox(items, result, player)
+function t3RandomWeapon.OpenRangedBox(craftRecipeData, player)
     if not player then return end
     local pool, source = resolveRangedPool()
     local entry = pickWeighted(pool)
     print(LOG .. "rolled ranged item=" .. entry.item .. " (pool size " .. #pool .. ", source=" .. source .. ")")
-    grant(player, entry.item, findDonor(items))
+    grant(player, entry.item, t3RecipeUtil.findDonor(craftRecipeData))
 end
 
 -- ── MP pool sync ────────────────────────────────────────────────────────────

@@ -6,13 +6,16 @@
 -- item (4 syringes + Zomboxivir vaccine) from t3_rewards_items.txt at once
 -- (no random pick anymore).
 --
--- The grant happens per box, on the opening client. The sandbox options
+-- The grant happens per box, wherever the craftRecipe OnCreate runs: the
+-- local process in SP, the SERVER in MP (B42 ISHandcraftAction.performRecipe
+-- only runs when not isClient(); see shared/t3RecipeUtil.lua). The sandbox options
 -- (PongDu.MedBox_Allow_*, read at open time, never cached) decide which
 -- items are included; toggling one off in-session takes effect on the
 -- next box opened.
 --
--- Global table (no module return) so the recipe OnCreate can resolve
--- "t3MedicalBox.OpenBox". Same pattern as t3RandomWeapon / t3VehicleDrop.
+-- Global table (no module return) so the craftRecipe OnCreate can resolve
+-- "t3MedicalBox.OpenBox" (craftRecipe PongDuOpenMedicalBox in
+-- t3_rewards_items.txt). Same pattern as t3RandomWeapon / t3VehicleDrop.
 
 t3MedicalBox = t3MedicalBox or {}
 
@@ -35,20 +38,6 @@ t3MedicalBox.ITEMS = {
     { item = "Zomboxivir",          option = "MedBox_Allow_Vaccine"     },
 }
 
--- Read the donor name stashed on the box item's modData at grant time.
--- OnCreate(items, result, player): items = source items consumed by the recipe.
-local function findDonor(items)
-    if not items then return "" end
-    for i = 0, items:size() - 1 do
-        local it = items:get(i)
-        if it and it.getModData then
-            local donor = it:getModData().t3Donor
-            if donor and donor ~= "" then return donor end
-        end
-    end
-    return ""
-end
-
 -- Every medbox item enabled in the sandbox options. Read here (use time), not
 -- at file load, so mid-session changes take effect immediately. Returns a
 -- list of bare item names (empty when all five are off).
@@ -67,10 +56,10 @@ function t3MedicalBox.rollAll()
     return pool
 end
 
--- Recipe OnCreate handler --------------------------------------------------
--- Grants every currently-enabled medbox item (syringes + vaccine) at once
--- (no longer a random pick).
-function t3MedicalBox.OpenBox(items, result, player)
+-- craftRecipe OnCreate handler ---------------------------------------------
+-- B42 signature: (craftRecipeData, character). Grants every currently-enabled
+-- medbox item (syringes + vaccine) at once, synced to the owning client.
+function t3MedicalBox.OpenBox(craftRecipeData, player)
     if not player then
         print(LOG .. "OpenBox aborted: player is nil")
         return
@@ -79,27 +68,17 @@ function t3MedicalBox.OpenBox(items, result, player)
     local pool = t3MedicalBox.rollAll()
     if #pool == 0 then return end
 
-    local donor = findDonor(items)
-    local inv = player:getInventory()
-    local grantedNames = {}
+    local donor = t3RecipeUtil.findDonor(craftRecipeData)
     local grantedTypes = {}
 
     for _, itemType in ipairs(pool) do
-        local grantedItem = inv:AddItem(MODULE .. itemType)
-        if not grantedItem then
-            print(LOG .. "ERROR: AddItem failed for " .. MODULE .. itemType)
-        else
-            if donor ~= "" then
-                grantedItem:setName(donor .. "'s " .. grantedItem:getDisplayName())
-            end
-            table.insert(grantedNames, grantedItem:getDisplayName())
+        if t3RecipeUtil.addItem(player, MODULE .. itemType, donor) then
             table.insert(grantedTypes, itemType)
+        else
+            print(LOG .. "ERROR: AddItem failed for " .. MODULE .. itemType)
         end
     end
 
-    -- if #grantedNames > 0 then
-    --     player:Say(table.concat(grantedNames, ", ") .. "!")
-    -- end
-
-    print(LOG .. "box opened: items=" .. table.concat(grantedTypes, ",") .. ", donor=" .. tostring(donor))
+    print(LOG .. "box opened: items=" .. table.concat(grantedTypes, ",") .. ", donor=" .. tostring(donor)
+        .. ", server=" .. tostring(isServer()))
 end

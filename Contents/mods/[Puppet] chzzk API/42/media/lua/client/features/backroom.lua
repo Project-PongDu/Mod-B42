@@ -33,9 +33,10 @@ local function movePlayer(a, pos)
     a:setX(pos.x)
     a:setY(pos.y)
     a:setZ(pos.z)
-    a:setLx(pos.x)
-    a:setLy(pos.y)
-    a:setLz(pos.z)
+    -- B42: setLx/Ly/Lz -> setLastX/Y/Z (IsoMovingObject.java:1437~1455)
+    a:setLastX(pos.x)
+    a:setLastY(pos.y)
+    a:setLastZ(pos.z)
     getWorld():update()
 end
 
@@ -81,7 +82,13 @@ function _a.a(a)
     saveOriginalPosition(a, b)
     local dest = spawnPoints[ZombRand(#spawnPoints) + 1]
     local v = a:getVehicle()
-    if v then v:removePassenger(a) end
+    -- removePassenger 는 B41/B42 모두 없다 (B41에서도 여기서 터지던 잠복 버그).
+    -- randomteleport.lua forceExitVehicle 과 같은 정석: exit + OnExitVehicle (대시보드 정리)
+    if v then
+        v:exit(a)
+        a:PlayAnim("Idle")
+        triggerEvent("OnExitVehicle", a)
+    end
     movePlayer(a, dest)
     b.isDead                = false
     b.hasReturned           = false

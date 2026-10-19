@@ -3,7 +3,7 @@
 -- 목적: 좋은 모드 차량을 vehicle_drop 후원으로만 얻을 수 있게 만들고 싶은 서버를 위한 옵션.
 -- 기본값은 꺼짐(false)이라, 켜지 않으면 바닐라/모드 어떤 차량의 자연 생성에도 관여하지 않는다.
 --
--- 동작 원리 (B41 디컴파일 기준):
+-- 동작 원리 (B41 디컴파일 기준, B42 42.21 에서도 동일 - IsoChunk.AddVehicles:1739 의 lazy init):
 --   차량 자연 생성 풀은 Lua 전역 테이블 VehicleZoneDistribution에 들어 있고,
 --   zombie.vehicles.VehicleType.init()이 이 테이블을 읽어 자바 캐시(VehicleType.vehicles)로
 --   한 번 굳힌 뒤 그 캐시만 쓴다. init()은 IsoChunk가 처음 차량 존을 처리할 때 lazy로 딱 1회
@@ -21,19 +21,20 @@ t3VehicleNaturalSpawn = t3VehicleNaturalSpawn or {}
 
 local LOG = "[t3VehicleNaturalSpawn] "
 
--- 바닐라 B41이 VehicleZoneDistribution에 실제로 등록하는 차량 전체(58종).
+-- 바닐라 B42(42.21)가 VehicleZoneDistribution에 실제로 등록하는 차량 전체(121종).
 -- media/lua/shared/VehicleZoneDefinition.lua 전수 추출 기준이며, burnt 변형까지 포함한다.
+-- (바닐라에서 이 테이블을 채우는 파일은 이것 하나뿐이다)
 --
--- t3VehicleDrop.lua의 VANILLA_VEHICLES(45종)를 재사용하지 않는 이유:
+-- t3VehicleDrop.lua의 VANILLA_VEHICLES를 재사용하지 않는 이유:
 --   그쪽은 "보급으로 줄 만한 정상 차량" 목록이라 burnt/smashed 변형이 빠져 있다.
 --   그걸 소거법 기준으로 쓰면 Base.CarNormalBurnt 같은 바닐라 전소차까지 모드차로 오판해
 --   trailerpark/junkyard의 전소차 자연 생성이 통째로 사라진다. 용도가 다르므로 목록도 따로 둔다.
 --
--- B42로 올라가면 재검증 필요.
+-- 게임 업데이트로 존 차량이 바뀌면 PZ-Library 의 같은 파일에서 다시 뽑을 것.
 local VANILLA_ZONE_VEHICLES = {
     ["Base.AmbulanceBurnt"] = true,
-    ["Base.CarLights"] = true,
     ["Base.CarLightsPolice"] = true,
+    ["Base.CarLightsRanger"] = true,
     ["Base.CarLuxury"] = true,
     ["Base.CarNormal"] = true,
     ["Base.CarNormalBurnt"] = true,
@@ -50,18 +51,26 @@ local VANILLA_ZONE_VEHICLES = {
     ["Base.OffRoad"] = true,
     ["Base.OffRoadBurnt"] = true,
     ["Base.PickUpTruck"] = true,
-    ["Base.PickUpTruckLights"] = true,
+    ["Base.PickUpTruckLightsAirport"] = true,
+    ["Base.PickUpTruckLightsAirportSecurity"] = true,
     ["Base.PickUpTruckLightsFire"] = true,
+    ["Base.PickUpTruckLightsFossoil"] = true,
     ["Base.PickUpTruckMccoy"] = true,
+    ["Base.PickUpTruck_Camo"] = true,
     ["Base.PickUpVan"] = true,
+    ["Base.PickUpVanBuilder"] = true,
     ["Base.PickUpVanBurnt"] = true,
-    ["Base.PickUpVanLights"] = true,
     ["Base.PickUpVanLightsBurnt"] = true,
+    ["Base.PickUpVanLightsCarpenter"] = true,
     ["Base.PickUpVanLightsFire"] = true,
+    ["Base.PickUpVanLightsFossoil"] = true,
     ["Base.PickUpVanLightsPolice"] = true,
+    ["Base.PickUpVanLightsRanger"] = true,
     ["Base.PickUpVanMccoy"] = true,
+    ["Base.PickUpVan_Camo"] = true,
     ["Base.PickupBurnt"] = true,
     ["Base.PickupSpecialBurnt"] = true,
+    ["Base.RaceCarBurnt"] = true,
     ["Base.SUV"] = true,
     ["Base.SUVBurnt"] = true,
     ["Base.SmallCar"] = true,
@@ -71,24 +80,79 @@ local VANILLA_ZONE_VEHICLES = {
     ["Base.SportsCar"] = true,
     ["Base.SportsCarBurnt"] = true,
     ["Base.StepVan"] = true,
+    ["Base.StepVanAirportCatering"] = true,
     ["Base.StepVanMail"] = true,
+    ["Base.StepVan_Blacksmith"] = true,
+    ["Base.StepVan_Butchers"] = true,
+    ["Base.StepVan_Cereal"] = true,
+    ["Base.StepVan_Citr8"] = true,
+    ["Base.StepVan_Florist"] = true,
+    ["Base.StepVan_Genuine_Beer"] = true,
+    ["Base.StepVan_Glass"] = true,
     ["Base.StepVan_Heralds"] = true,
+    ["Base.StepVan_HuangsLaundry"] = true,
+    ["Base.StepVan_MarineBites"] = true,
+    ["Base.StepVan_Masonry"] = true,
+    ["Base.StepVan_Mechanic"] = true,
+    ["Base.StepVan_MobileLibrary"] = true,
+    ["Base.StepVan_Plonkies"] = true,
+    ["Base.StepVan_Propane"] = true,
     ["Base.StepVan_Scarlet"] = true,
+    ["Base.StepVan_SmartKut"] = true,
+    ["Base.StepVan_SouthEasternHosp"] = true,
+    ["Base.StepVan_SouthEasternPaint"] = true,
+    ["Base.StepVan_USL"] = true,
+    ["Base.StepVan_Zippee"] = true,
     ["Base.TaxiBurnt"] = true,
+    ["Base.Trailer"] = true,
+    ["Base.TrailerAdvert"] = true,
+    ["Base.TrailerCover"] = true,
+    ["Base.Trailer_Livestock"] = true,
     ["Base.Van"] = true,
     ["Base.VanAmbulance"] = true,
+    ["Base.VanBuilder"] = true,
     ["Base.VanBurnt"] = true,
+    ["Base.VanCarpenter"] = true,
+    ["Base.VanDeerValley"] = true,
+    ["Base.VanFossoil"] = true,
+    ["Base.VanGardener"] = true,
+    ["Base.VanGreenes"] = true,
+    ["Base.VanKnobCreekGas"] = true,
+    ["Base.VanKnoxCom"] = true,
+    ["Base.VanMail"] = true,
+    ["Base.VanMccoy"] = true,
+    ["Base.VanMechanic"] = true,
+    ["Base.VanMeltingPointMetal"] = true,
+    ["Base.VanMetalworker"] = true,
+    ["Base.VanMobileMechanics"] = true,
+    ["Base.VanOldMill"] = true,
+    ["Base.VanOvoFarm"] = true,
+    ["Base.VanPluggedInElectrics"] = true,
     ["Base.VanRadio"] = true,
     ["Base.VanRadioBurnt"] = true,
     ["Base.VanRadio_3N"] = true,
     ["Base.VanSeats"] = true,
+    ["Base.VanSeatsAirportShuttle"] = true,
     ["Base.VanSeatsBurnt"] = true,
-    ["Base.VanSpecial"] = true,
+    ["Base.VanSeats_Mural"] = true,
+    ["Base.VanSeats_Prison"] = true,
     ["Base.VanSpiffo"] = true,
+    ["Base.VanUncloggers"] = true,
+    ["Base.Van_Blacksmith"] = true,
+    ["Base.Van_BugWipers"] = true,
+    ["Base.Van_Charlemange_Beer"] = true,
+    ["Base.Van_CraftSupplies"] = true,
+    ["Base.Van_Glass"] = true,
+    ["Base.Van_HeritageTailors"] = true,
     ["Base.Van_KnoxDisti"] = true,
+    ["Base.Van_Leather"] = true,
     ["Base.Van_LectroMax"] = true,
+    ["Base.Van_Locksmith"] = true,
+    ["Base.Van_Masonry"] = true,
     ["Base.Van_MassGenFac"] = true,
+    ["Base.Van_Perfick_Potato"] = true,
     ["Base.Van_Transit"] = true,
+    ["Base.Van_VoltMojo"] = true,
 }
 
 -- 실제로 차단을 수행했는지 여부. 아래 두 이벤트 중 한쪽에서만 처리하면 되므로 중복 실행을 막는다.

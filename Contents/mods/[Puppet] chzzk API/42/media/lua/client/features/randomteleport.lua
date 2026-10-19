@@ -122,9 +122,10 @@ local function movePlayer(p, x, y, z)
     p:setX(x)
     p:setY(y)
     p:setZ(z)
-    p:setLx(x)
-    p:setLy(y)
-    p:setLz(z)
+    -- B42: setLx/Ly/Lz -> setLastX/Y/Z (IsoMovingObject.java:1437~1455)
+    p:setLastX(x)
+    p:setLastY(y)
+    p:setLastZ(z)
     getWorld():update()
 end
 

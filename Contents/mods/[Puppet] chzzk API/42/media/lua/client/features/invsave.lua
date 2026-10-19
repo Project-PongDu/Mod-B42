@@ -221,7 +221,7 @@ local function serializeItem(item, depth, wornLoc, out, handSlot)
     end
 
     if instanceof(item, "Clothing") then
-        f[14] = tostring(item:getDirtyness())
+        f[14] = tostring(item:getDirtiness())   -- B42: getDirtyness -> getDirtiness (Clothing.java:780)
         f[15] = tostring(item:getBloodlevel())
         f[16] = tostring(item:getWetness())
     else
@@ -498,7 +498,8 @@ local function restoreLine(f, player, stack, pendingHotbar)
     local parent = stack[depth]
     if not parent then parent = stack[0]; depth = 0 end
 
-    local item = InventoryItemFactory.CreateItem(dec(f[2]))
+    -- B42: InventoryItemFactory 미노출 -> 전역 instanceItem (LuaManager:4903)
+    local item = instanceItem(dec(f[2]))
     if not item then return 0 end   -- 모드 제거 등으로 타입이 사라진 경우 스킵
 
     local nm = dec(f[4] or "")
@@ -531,7 +532,7 @@ local function restoreLine(f, player, stack, pendingHotbar)
         if f[10] ~= "-" then item:setContainsClip(f[10] == "1") end
         if f[18] and f[18] ~= "-" and f[18] ~= "" then
             for pt in string.gmatch(f[18], "([^,]+)") do
-                local part = InventoryItemFactory.CreateItem(dec(pt))
+                local part = instanceItem(dec(pt))
                 if part and instanceof(part, "WeaponPart") then
                     item:attachWeaponPart(part)
                 end
@@ -546,7 +547,7 @@ local function restoreLine(f, player, stack, pendingHotbar)
     end
 
     if instanceof(item, "Clothing") then
-        if f[14] ~= "-" then item:setDirtyness(tonumber(f[14]) or 0) end
+        if f[14] ~= "-" then item:setDirtiness(tonumber(f[14]) or 0) end
         if f[15] ~= "-" then item:setBloodLevel(tonumber(f[15]) or 0) end
         if f[16] ~= "-" then item:setWetness(tonumber(f[16]) or 0) end
     end

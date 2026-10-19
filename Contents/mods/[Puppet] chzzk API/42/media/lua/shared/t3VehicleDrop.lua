@@ -12,11 +12,11 @@
 --
 -- 실제 addVehicleDebug 호출(t3VehicleDrop.spawnVehicle)은
 -- server/t3VehicleDropSpawner.lua 에 있다 (솔로/서버에서만 로드됨).
--- 이 파일(shared)은 모든 realm에서 로드되므로 recipe의 OnCreate 대상이 될 수 있다.
+-- 이 파일(shared)은 모든 realm에서 로드되므로 craftRecipe의 OnCreate 대상이 될 수 있다.
 --
--- 솔로: OpenKit -> spawnVehicle 직접 호출 (같은 프로세스에 server 파일도 로드돼있음)
--- MP: OpenKit -> sendClientCommand로 서버에 좌표/차종 전달 -> 서버가 spawnVehicle 실행
---    (InsurgentStartLUV의 AirdroppedLUV 구조와 동일한 패턴)
+-- B42: craftRecipe OnCreate 는 싱글=로컬, MP=서버에서 돈다. 두 경우 모두 server 파일이
+-- 같은 프로세스에 로드돼 있으므로 OpenKit 이 spawnVehicle 을 직접 호출한다.
+-- (B41은 MP 클라에서 OnCreate가 돌아 sendClientCommand로 서버에 소환을 맡겼다)
 
 t3VehicleDrop = t3VehicleDrop or {}
 
@@ -124,7 +124,8 @@ local function hasDriverSeat(fullType)
 end
 
 -- military 존에 모드가 등록한 차량 풀네임("Base.67commando" 등) 목록 수집.
--- 바닐라 B41에는 military 존이 없으므로, 여기 값이 있으면 전부 모드가 추가한 군용차.
+-- 바닐라 B41/B42(42.21) 모두 military 존이 없으므로(VehicleZoneDefinition.lua 확인),
+-- 여기 값이 있으면 전부 모드가 추가한 군용차.
 -- 운전석이 없는 항목(트레일러/피견인체 등)은 보급 리워드로 부적합하므로 제외한다.
 local function collectMilitaryVehicles()
     local list = {}
@@ -255,13 +256,22 @@ local function collectExcludePool()
     return set
 end
 
--- 바닐라 B41 차량 화이트리스트 (media/scripts/vehicles 전수 기준, burnt/smashed 변형 제외 45종).
+-- 바닐라 B42(42.21) 차량 화이트리스트 (media/scripts/vehicles 전수 기준, burnt/smashed 변형 제외 157종).
 -- 모드 차량 판별은 "이 목록에 없으면 모드차"라는 소거법이라 목록이 완전해야 성립한다.
--- VehicleZoneDistribution 기반 수집은 존 미등록 차량(ModernCar_ez 등 3종)을 놓치므로
--- 스크립트 파일 정의를 직접 훑어 만든 목록을 쓴다. B42로 올라가면 재검증 필요.
+-- VehicleZoneDistribution 기반 수집은 존 미등록 차량(RaceCar12 등)을 놓치므로
+-- 스크립트 파일 정의를 직접 훑어 만든 목록을 쓴다.
+-- B42 VehicleScript 는 BaseScriptObject 를 상속해 GameEntityScript.getModID() 같은 출처 정보가
+-- 없다. 그래서 런타임 판별 대신 이 목록을 둔다. 게임 업데이트로 바닐라 차량이 추가되면
+-- PZ-Library Vanilla/<버전>/media/scripts/vehicles 에서 다시 뽑을 것.
+-- (B41 목록 45종 중 CarLights, ModernCar_ez, PickUpTruckLights, PickUpVanLights, VanSpecial 은
+-- B42에서 사라졌다)
 local VANILLA_VEHICLES = {
-    ["Base.CarLights"] = true,
+    ["Base.CarLightsBulletinSheriff"] = true,
+    ["Base.CarLightsKST"] = true,
+    ["Base.CarLightsLouisvilleCounty"] = true,
+    ["Base.CarLightsMuldraughPolice"] = true,
     ["Base.CarLightsPolice"] = true,
+    ["Base.CarLightsRanger"] = true,
     ["Base.CarLuxury"] = true,
     ["Base.CarNormal"] = true,
     ["Base.CarStationWagon"] = true,
@@ -270,41 +280,149 @@ local VANILLA_VEHICLES = {
     ["Base.CarTaxi2"] = true,
     ["Base.ModernCar"] = true,
     ["Base.ModernCar02"] = true,
+    ["Base.ModernCarLightsCityLouisvillePD"] = true,
+    ["Base.ModernCarLightsMeadeSheriff"] = true,
+    ["Base.ModernCarLightsWestPoint"] = true,
     ["Base.ModernCar_Martin"] = true,
-    ["Base.ModernCar_ez"] = true,
     ["Base.OffRoad"] = true,
     ["Base.PickUpTruck"] = true,
-    ["Base.PickUpTruckLights"] = true,
+    ["Base.PickUpTruckJPLandscaping"] = true,
+    ["Base.PickUpTruckLightsAirport"] = true,
+    ["Base.PickUpTruckLightsAirportSecurity"] = true,
     ["Base.PickUpTruckLightsFire"] = true,
+    ["Base.PickUpTruckLightsFossoil"] = true,
+    ["Base.PickUpTruckLightsRanger"] = true,
     ["Base.PickUpTruckMccoy"] = true,
+    ["Base.PickUpTruck_Camo"] = true,
     ["Base.PickUpVan"] = true,
-    ["Base.PickUpVanLights"] = true,
+    ["Base.PickUpVanBrickingIt"] = true,
+    ["Base.PickUpVanBuilder"] = true,
+    ["Base.PickUpVanCallowayLandscaping"] = true,
+    ["Base.PickUpVanHeltonMetalWorking"] = true,
+    ["Base.PickUpVanKimbleKonstruction"] = true,
+    ["Base.PickUpVanLightsCarpenter"] = true,
     ["Base.PickUpVanLightsFire"] = true,
+    ["Base.PickUpVanLightsFossoil"] = true,
+    ["Base.PickUpVanLightsKentuckyLumber"] = true,
+    ["Base.PickUpVanLightsLouisvilleCounty"] = true,
     ["Base.PickUpVanLightsPolice"] = true,
+    ["Base.PickUpVanLightsRanger"] = true,
+    ["Base.PickUpVanLightsStatePolice"] = true,
+    ["Base.PickUpVanMarchRidgeConstruction"] = true,
     ["Base.PickUpVanMccoy"] = true,
+    ["Base.PickUpVanMetalworker"] = true,
+    ["Base.PickUpVanWeldingbyCamille"] = true,
+    ["Base.PickUpVanYingsWood"] = true,
+    ["Base.PickUpVan_Camo"] = true,
+    ["Base.RaceCar12"] = true,
+    ["Base.RaceCar34"] = true,
+    ["Base.RaceCar58"] = true,
     ["Base.SUV"] = true,
     ["Base.SmallCar"] = true,
     ["Base.SmallCar02"] = true,
     ["Base.SportsCar"] = true,
     ["Base.SportsCar_ez"] = true,
     ["Base.StepVan"] = true,
+    ["Base.StepVanAirportCatering"] = true,
     ["Base.StepVanMail"] = true,
+    ["Base.StepVan_Blacksmith"] = true,
+    ["Base.StepVan_Butchers"] = true,
+    ["Base.StepVan_Cereal"] = true,
+    ["Base.StepVan_Citr8"] = true,
+    ["Base.StepVan_CompleteRepairShop"] = true,
+    ["Base.StepVan_Florist"] = true,
+    ["Base.StepVan_Genuine_Beer"] = true,
+    ["Base.StepVan_Glass"] = true,
     ["Base.StepVan_Heralds"] = true,
+    ["Base.StepVan_HuangsLaundry"] = true,
+    ["Base.StepVan_Jorgensen"] = true,
+    ["Base.StepVan_LouisvilleMotorShop"] = true,
+    ["Base.StepVan_LouisvilleSWAT"] = true,
+    ["Base.StepVan_MarineBites"] = true,
+    ["Base.StepVan_Masonry"] = true,
+    ["Base.StepVan_Mechanic"] = true,
+    ["Base.StepVan_MobileLibrary"] = true,
+    ["Base.StepVan_Plonkies"] = true,
+    ["Base.StepVan_Propane"] = true,
+    ["Base.StepVan_RandisPlants"] = true,
     ["Base.StepVan_Scarlet"] = true,
+    ["Base.StepVan_SmartKut"] = true,
+    ["Base.StepVan_SouthEasternHosp"] = true,
+    ["Base.StepVan_SouthEasternPaint"] = true,
+    ["Base.StepVan_USL"] = true,
+    ["Base.StepVan_Zippee"] = true,
     ["Base.Trailer"] = true,
     ["Base.TrailerAdvert"] = true,
     ["Base.TrailerCover"] = true,
+    ["Base.Trailer_Horsebox"] = true,
+    ["Base.Trailer_Livestock"] = true,
     ["Base.Van"] = true,
     ["Base.VanAmbulance"] = true,
+    ["Base.VanBeckmans"] = true,
+    ["Base.VanBrewsterHarbin"] = true,
+    ["Base.VanBuilder"] = true,
+    ["Base.VanCarpenter"] = true,
+    ["Base.VanCoastToCoast"] = true,
+    ["Base.VanDeerValley"] = true,
+    ["Base.VanFossoil"] = true,
+    ["Base.VanGardenGods"] = true,
+    ["Base.VanGardener"] = true,
+    ["Base.VanGreenes"] = true,
+    ["Base.VanJohnMcCoy"] = true,
+    ["Base.VanJonesFabrication"] = true,
+    ["Base.VanKerrHomes"] = true,
+    ["Base.VanKnobCreekGas"] = true,
+    ["Base.VanKnoxCom"] = true,
+    ["Base.VanKorshunovs"] = true,
+    ["Base.VanLouisvilleLandscaping"] = true,
+    ["Base.VanMail"] = true,
+    ["Base.VanMccoy"] = true,
+    ["Base.VanMechanic"] = true,
+    ["Base.VanMeltingPointMetal"] = true,
+    ["Base.VanMetalheads"] = true,
+    ["Base.VanMetalworker"] = true,
+    ["Base.VanMicheles"] = true,
+    ["Base.VanMobileMechanics"] = true,
+    ["Base.VanMooreMechanics"] = true,
+    ["Base.VanOldMill"] = true,
+    ["Base.VanOvoFarm"] = true,
+    ["Base.VanPennSHam"] = true,
+    ["Base.VanPlattAuto"] = true,
+    ["Base.VanPluggedInElectrics"] = true,
     ["Base.VanRadio"] = true,
     ["Base.VanRadio_3N"] = true,
+    ["Base.VanRiversideFabrication"] = true,
+    ["Base.VanRosewoodworking"] = true,
+    ["Base.VanSchwabSheetMetal"] = true,
     ["Base.VanSeats"] = true,
-    ["Base.VanSpecial"] = true,
+    ["Base.VanSeatsAirportShuttle"] = true,
+    ["Base.VanSeats_Creature"] = true,
+    ["Base.VanSeats_LadyDelighter"] = true,
+    ["Base.VanSeats_Mural"] = true,
+    ["Base.VanSeats_Prison"] = true,
+    ["Base.VanSeats_Space"] = true,
+    ["Base.VanSeats_Trippy"] = true,
+    ["Base.VanSeats_Valkyrie"] = true,
     ["Base.VanSpiffo"] = true,
+    ["Base.VanTreyBaines"] = true,
+    ["Base.VanUncloggers"] = true,
+    ["Base.VanUtility"] = true,
+    ["Base.VanWPCarpentry"] = true,
+    ["Base.Van_Blacksmith"] = true,
+    ["Base.Van_BugWipers"] = true,
+    ["Base.Van_Charlemange_Beer"] = true,
+    ["Base.Van_CraftSupplies"] = true,
+    ["Base.Van_Glass"] = true,
+    ["Base.Van_HeritageTailors"] = true,
     ["Base.Van_KnoxDisti"] = true,
+    ["Base.Van_Leather"] = true,
     ["Base.Van_LectroMax"] = true,
+    ["Base.Van_Locksmith"] = true,
+    ["Base.Van_Masonry"] = true,
     ["Base.Van_MassGenFac"] = true,
+    ["Base.Van_Perfick_Potato"] = true,
     ["Base.Van_Transit"] = true,
+    ["Base.Van_VoltMojo"] = true,
 }
 
 -- 설치된 모든 차량 스크립트의 풀네임 수집.
@@ -421,62 +539,79 @@ local function drawDropMarker(player, x, y)
     t3VehicleDropMarker.place(player, x, y)
 end
 
--- 소모된 kit 아이템의 modData에 심어둔 후원자 이름을 읽는다 (t3RandomWeapon.lua와 동일 패턴).
-local function findDonor(items)
-    if not items then return "" end
-    for i = 0, items:size() - 1 do
-        local it = items:get(i)
-        if it and it.getModData then
-            local donor = it:getModData().t3Donor
-            if donor and donor ~= "" then return donor end
-        end
-    end
-    return ""
-end
-
--- Recipe OnCreate handler: OnCreate:t3VehicleDrop.OpenKit
-function t3VehicleDrop.OpenKit(items, result, player)
+-- craftRecipe OnCreate handler: OnCreate = t3VehicleDrop.OpenKit
+-- (craftRecipe PongDuOpenVehicleDropKit, t3_rewards_items.txt)
+--
+-- B42 시그니처는 (craftRecipeData, character) 이고, 실행 위치가 B41과 반대다.
+--   B41: MP에서 클라가 OnCreate -> sendClientCommand로 서버에 소환 요청
+--   B42: OnCreate 자체가 서버(MP) / 로컬(싱글)에서 돈다 (shared/t3RecipeUtil.lua 참고)
+-- 그래서 소환은 그 자리에서 바로 spawnVehicle 을 부르고(서버 파일이 같은 프로세스에
+-- 로드돼 있음), 대사와 맵 마커만 개봉자 클라이언트로 넘긴다.
+-- 클라가 좌표·차종을 보내던 SpawnVehicleDrop 명령은 아무 클라나 임의 차량을 소환할 수
+-- 있는 구멍이라 서버 핸들러에서 같이 뺐다 (server/t3VehicleDropServer.lua).
+function t3VehicleDrop.OpenKit(craftRecipeData, player)
     if not player then return end
 
-    local donor       = findDonor(items)
+    local donor       = t3RecipeUtil.findDonor(craftRecipeData)
     local vehicleType = pickVehicleType()
     if not vehicleType then
-        -- OnCreate는 크래프팅이 끝난 뒤에 호출되므로 이 시점엔 키트가 이미 소모돼 있다.
+        -- OnCreate는 입력 소모 뒤에 호출되므로 이 시점엔 키트가 이미 소모돼 있다.
         -- 여기서 그냥 return하면 후원자는 아이템만 잃고 아무것도 못 받으므로 키트를 돌려준다.
         -- 후원자 표기(이름 + modData.t3Donor)도 rewardManager의 최초 지급 시점과
         -- 동일하게 복원해야 재개봉 시 키 이름에 후원자가 붙는다.
-        local kit = player:getInventory():AddItem("t3chzzkDonation.vehicle_drop_kit")
+        -- modData 는 동기화 패킷에 실려야 하므로 addItem(=send) 전에 심는다.
+        local inv = player:getInventory()
+        local kit = inv:AddItem("t3chzzkDonation.vehicle_drop_kit")
         if kit then
             if donor ~= "" then
                 kit:setName(donor .. "'s " .. kit:getDisplayName())
             end
             kit:getModData().t3Donor = donor
+            sendAddItemToContainer(inv, kit)
             print("[t3VehicleDrop] Kit refunded (donor: " .. tostring(donor) .. ")")
         else
             print("[t3VehicleDrop] Kit refund FAILED (donor: " .. tostring(donor) .. ")")
         end
-        player:Say(getText("IGUI_donation_vehicle_drop_nopool"))
+        t3RecipeUtil.say(player, "text", { key = "IGUI_donation_vehicle_drop_nopool" })
         return
     end
-    local sq          = findDropSquare(player)
+    local sq = findDropSquare(player)
+    local sx, sy, sz = sq:getX(), sq:getY(), sq:getZ()
 
-    if not isClient() and not isServer() then
-        -- 솔로: server/t3VehicleDropSpawner.lua 도 같은 프로세스에 로드되어 있음
-        t3VehicleDrop.spawnVehicle(player, sq:getX(), sq:getY(), sq:getZ(), vehicleType, donor)
-    elseif isClient() then
-        -- MP: 실제 소환은 서버 권한으로 처리
-        sendClientCommand("PongDuVehicleDrop", "SpawnVehicleDrop", {
-            x = sq:getX(), y = sq:getY(), z = sq:getZ(),
-            vehicleType = vehicleType,
-            sender = donor,
-        })
+    if isClient() then
+        -- B42에선 오면 안 되는 경로. 혹시 클라에서 불리면 소환하지 않고 원인만 남긴다.
+        print("[t3VehicleDrop] OpenKit called on an MP client; craftRecipe OnCreate should run on the server. Spawn skipped")
+        return
     end
 
-    -- 개봉 라디오 사운드(RadioTalk)는 레시피 Sound 필드로 재생됨.
-    -- 볼륨 절반 처리는 client/VehicleDropCraftSound.lua 에서 ISCraftAction:start 훅으로 처리.
+    t3VehicleDrop.spawnVehicle(player, sx, sy, sz, vehicleType, donor)
+    print("[t3VehicleDrop] OpenKit: spawn requested at " .. sx .. "," .. sy .. "," .. sz
+        .. " type=" .. tostring(vehicleType) .. " donor=" .. tostring(donor) .. " server=" .. tostring(isServer()))
 
-    local sx, sy = sq:getX(), sq:getY()
+    -- 개봉 라디오 사운드(RadioTalk)는 craftRecipe timedAction(t3chzzkDonation.PongDuRadioCall)의
+    -- sound 로 재생된다. 볼륨 절반 처리는 client/VehicleDropCraftSound.lua 의 ISHandcraftAction 훅.
+    if isServer() then
+        sendServerCommand(player, "PongDuVehicleDrop", "DropLocated", { x = sx, y = sy })
+    else
+        t3VehicleDrop.announceDrop(player, sx, sy)
+    end
+end
+
+-- 투하 좌표 대사 + 맵 마커. 개봉자 본인 화면에서만 실행돼야 한다.
+-- 싱글: OpenKit 이 직접 호출 / MP: 서버의 DropLocated 명령을 받은 클라가 호출.
+function t3VehicleDrop.announceDrop(player, sx, sy)
     player:Say(getText("IGUI_donation_vehicle_drop_location",
         string.format("%d", sx), string.format("%d", sy)))
     drawDropMarker(player, sx, sy)
 end
+
+Events.OnServerCommand.Add(function(module, command, args)
+    if module ~= "PongDuVehicleDrop" or command ~= "DropLocated" then return end
+    local player = getPlayer()
+    if not player then return end
+    if not args or args.x == nil or args.y == nil then
+        print("[t3VehicleDrop] DropLocated: missing x/y")
+        return
+    end
+    t3VehicleDrop.announceDrop(player, args.x, args.y)
+end)

@@ -3,8 +3,11 @@
 --
 -- Why server-side: ProceduralDistributions / SuburbsDistributions /
 -- VehicleDistributions live in media/lua/server, which MP clients never load.
--- The box-opening recipe OnCreate runs on the client, so the server scans the
--- tables once, builds the pools, and pushes them down via sendServerCommand.
+-- B41: the box-opening recipe OnCreate ran on the client, so the server scanned
+-- the tables once and pushed the pools down via sendServerCommand.
+-- B42: craftRecipe OnCreate runs on the server itself (ISHandcraftAction
+-- performRecipe), so t3RandomWeapon.resolvePools() calls BuildPools() directly;
+-- the push is kept for clients that still request it.
 -- In singleplayer this file is loaded locally, so t3RandomWeapon (shared)
 -- calls the build functions directly with no round trip.
 --
@@ -153,10 +156,8 @@ local function detectArsenal()
 end
 
 -- ── Pool build ──────────────────────────────────────────────────────────────
--- Melee category rules mirror t3RandomWeapon (shared): 6 skill categories,
--- Improvised excluded except for Spear.
-
-local ALLOW_IMPROVISED = { Spear = true }
+-- Melee category rules live in t3RandomWeapon (shared): matchCategory() /
+-- isWeaponScript() -- 6 skill categories, Improvised excluded except Spear.
 
 -- Builds both pools in one distribution scan. Returns pools, ranged.
 function t3RandomWeaponServer.BuildAll()
@@ -171,16 +172,12 @@ function t3RandomWeaponServer.BuildAll()
     local allItems = getScriptManager():getAllItems()
     for i = 1, allItems:size() do
         local scriptItem = allItems:get(i - 1)
-        if scriptItem:getTypeString() == "Weapon" and not scriptItem:getObsolete() then
+        if t3RandomWeapon.isWeaponScript(scriptItem) then
             local inWorld = whitelist[scriptItem:getFullName()] or whitelist[scriptItem:getName()]
             if inWorld then
-                local cats = scriptItem:getCategories()
-                for _, entry in ipairs(t3RandomWeapon.CATEGORY_TABLE) do
-                    if cats:contains(entry.category)
-                            and (ALLOW_IMPROVISED[entry.category] or not cats:contains("Improvised")) then
-                        table.insert(pools[entry.category], scriptItem:getFullName())
-                        break
-                    end
+                local category = t3RandomWeapon.matchCategory(scriptItem)
+                if category then
+                    table.insert(pools[category], scriptItem:getFullName())
                 end
             else
                 rejectedNotDistributed = rejectedNotDistributed + 1
@@ -206,7 +203,7 @@ function t3RandomWeaponServer.BuildAll()
         local byFullName = {}
         for name, wsum in pairs(weightSum) do
             local si = sm:FindItem(name)
-            if si and si:getTypeString() == "Weapon" and not si:getObsolete() and si:isRanged() then
+            if si and t3RandomWeapon.isWeaponScript(si) and si:isRanged() then
                 local full = si:getFullName()
                 byFullName[full] = (byFullName[full] or 0) + wsum
             end

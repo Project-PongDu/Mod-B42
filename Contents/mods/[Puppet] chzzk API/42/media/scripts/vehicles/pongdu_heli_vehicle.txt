@@ -130,7 +130,6 @@ module Base
 
 		textureShadow = Shadows/shadowPongDuHeli,
 		textureMask = Vehicles/Vehicle_PongDuHeli_mask,
-		spawnOffsetY = 0.24999994,
 
 		sound
 		{

@@ -65,7 +65,6 @@ module Base
 		}
 
 		textureShadow = Shadows/shadowPongDuChute,
-		spawnOffsetY = 0.0000,
 
 		sound
 		{

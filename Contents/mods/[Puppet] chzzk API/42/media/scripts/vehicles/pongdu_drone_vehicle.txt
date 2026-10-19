@@ -139,7 +139,6 @@ module Base
 		}
 
 		textureShadow = Shadows/shadowPongDuDrone,
-		spawnOffsetY = 0.0000,
 
 		sound
 		{

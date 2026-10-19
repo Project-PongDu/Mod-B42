@@ -253,7 +253,7 @@ local function updateScreamer(zombie)
     if _nextScream[zid] and now < _nextScream[zid] then return end
     _nextScream[zid] = now + SCREAM_COOLDOWN_MS
     local player = getPlayer()
-    if player and not player:HasTrait("Deaf") then
+    if player and not player:hasTrait(CharacterTrait.DEAF) then
         zombie:playSound("mutant_scream" .. tostring(ZombRand(2) + 1))
     end
     -- 소스=좀비: 바닐라 addSound 패턴. 소스 본인은 월드사운드에 반응하지

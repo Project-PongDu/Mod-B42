@@ -28,7 +28,9 @@ local function onServerCommand(module, command, args)
     end
 
     -- 차량 조회 없이 로컬에서 키 생성 (BaseVehicle.createVehicleKey와 동일 구성)
-    local key = InventoryItemFactory.CreateItem("Base.CarKey")
+    -- B42: InventoryItemFactory 는 Lua 에 노출되지 않는다 (LuaManager setExposed 목록에 없음).
+    -- 바닐라와 같은 전역 instanceItem 을 쓴다 (LuaManager:4903).
+    local key = instanceItem("Base.CarKey")
     if not key then
         print("[VehicleDropKeyGrant] Failed to create CarKey item")
         return

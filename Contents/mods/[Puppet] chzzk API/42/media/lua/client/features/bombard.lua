@@ -179,8 +179,9 @@ local function killZombiesAround(cx, cy, radius)
                 z:setHealth(0)
                 -- z:clearAttachedItems()
                 z:changeState(ZombieOnGroundState.instance())
-                z:setAttackedBy(cell:getFakeZombieForHit())
-                z:becomeCorpse()
+                -- B42: becomeCorpse() 가 private 이 됐다 (IsoGameCharacter.java:15457).
+                -- 공개 사망 경로 Kill(killer) 로 대체한다. setAttackedBy 도 Kill 안에서 한다.
+                z:Kill(cell:getFakeZombieForHit())
             end
         end
     end

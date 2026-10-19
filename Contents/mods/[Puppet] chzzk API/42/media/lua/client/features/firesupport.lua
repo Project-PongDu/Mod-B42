@@ -359,7 +359,7 @@ local _sniperGun = nil       -- HandWeapon 캐시. 매 발 생성하면 GC 낭�
 local function sniperWeapon()
     if _sniperGun then return _sniperGun end
     local ok, item = pcall(function()
-        return InventoryItemFactory.CreateItem("Base.HuntingRifle")
+        return instanceItem("Base.HuntingRifle")   -- B42: InventoryItemFactory 미노출
     end)
     if ok and item then
         _sniperGun = item
@@ -375,11 +375,10 @@ local function killZombieNow(z)
     local fake = cell:getFakeZombieForHit()
     local gun  = sniperWeapon()
     if not gun then
-        -- 폴백: 총기 생성 실패 시 구 경로(모션 없음)로라도 확실히 죽인다.
-        z:setHealth(0)
-        z:changeState(ZombieOnGroundState.instance())
-        z:setAttackedBy(fake)
-        z:becomeCorpse()
+        -- 폴백: 총기 생성 실패 시 모션 없이라도 확실히 죽인다.
+        -- B42: becomeCorpse() 는 private 이 됐다 (IsoGameCharacter.java:15457).
+        -- 공개 사망 경로 Kill(killer) 로 대체 (IsoGameCharacter.java:15367).
+        z:Kill(fake)
         return
     end
     z:setBumpDone(true)

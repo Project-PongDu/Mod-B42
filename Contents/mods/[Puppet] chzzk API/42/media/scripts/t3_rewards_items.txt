@@ -49,7 +49,7 @@ item serum_common_Fitness
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_Fitness,
@@ -59,14 +59,13 @@ item serum_common_Fitness
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_Strength
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_Strength,
@@ -76,14 +75,13 @@ item serum_common_Strength
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_Sprinting
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_Sprinting,
@@ -93,14 +91,13 @@ item serum_common_Sprinting
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_Lightfoot
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_Lightfoot,
@@ -110,14 +107,13 @@ item serum_common_Lightfoot
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_Nimble
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_Nimble,
@@ -127,14 +123,13 @@ item serum_common_Nimble
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_Sneak
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_Sneak,
@@ -144,14 +139,13 @@ item serum_common_Sneak
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_Axe
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_Axe,
@@ -161,14 +155,13 @@ item serum_common_Axe
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_Blunt
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_Blunt,
@@ -178,14 +171,13 @@ item serum_common_Blunt
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_SmallBlunt
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_SmallBlunt,
@@ -195,14 +187,13 @@ item serum_common_SmallBlunt
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_LongBlade
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_LongBlade,
@@ -212,14 +203,13 @@ item serum_common_LongBlade
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_SmallBlade
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_SmallBlade,
@@ -229,14 +219,13 @@ item serum_common_SmallBlade
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_Spear
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_Spear,
@@ -246,14 +235,13 @@ item serum_common_Spear
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_Maintenance
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_Maintenance,
@@ -263,14 +251,13 @@ item serum_common_Maintenance
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_common_Aiming
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_common,
     Tooltip             = Tooltip_serum_common_Aiming,
@@ -280,14 +267,13 @@ item serum_common_Aiming
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumCommon,
-    Tags                = CMP,
 }
 
 item serum_rare_Fitness
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_Fitness,
@@ -297,14 +283,13 @@ item serum_rare_Fitness
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_Strength
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_Strength,
@@ -314,14 +299,13 @@ item serum_rare_Strength
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_Sprinting
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_Sprinting,
@@ -331,14 +315,13 @@ item serum_rare_Sprinting
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_Lightfoot
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_Lightfoot,
@@ -348,14 +331,13 @@ item serum_rare_Lightfoot
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_Nimble
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_Nimble,
@@ -365,14 +347,13 @@ item serum_rare_Nimble
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_Sneak
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_Sneak,
@@ -382,14 +363,13 @@ item serum_rare_Sneak
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_Axe
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_Axe,
@@ -399,14 +379,13 @@ item serum_rare_Axe
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_Blunt
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_Blunt,
@@ -416,14 +395,13 @@ item serum_rare_Blunt
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_SmallBlunt
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_SmallBlunt,
@@ -433,14 +411,13 @@ item serum_rare_SmallBlunt
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_LongBlade
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_LongBlade,
@@ -450,14 +427,13 @@ item serum_rare_LongBlade
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_SmallBlade
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_SmallBlade,
@@ -467,14 +443,13 @@ item serum_rare_SmallBlade
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_Spear
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_Spear,
@@ -484,14 +459,13 @@ item serum_rare_Spear
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_Maintenance
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_Maintenance,
@@ -501,14 +475,13 @@ item serum_rare_Maintenance
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_rare_Aiming
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_rare,
     Tooltip             = Tooltip_serum_rare_Aiming,
@@ -518,14 +491,13 @@ item serum_rare_Aiming
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumRare,
-    Tags                = CMP,
 }
 
 item serum_epic_Fitness
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_Fitness,
@@ -535,14 +507,13 @@ item serum_epic_Fitness
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_Strength
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_Strength,
@@ -552,14 +523,13 @@ item serum_epic_Strength
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_Sprinting
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_Sprinting,
@@ -569,14 +539,13 @@ item serum_epic_Sprinting
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_Lightfoot
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_Lightfoot,
@@ -586,14 +555,13 @@ item serum_epic_Lightfoot
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_Nimble
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_Nimble,
@@ -603,14 +571,13 @@ item serum_epic_Nimble
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_Sneak
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_Sneak,
@@ -620,14 +587,13 @@ item serum_epic_Sneak
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_Axe
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_Axe,
@@ -637,14 +603,13 @@ item serum_epic_Axe
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_Blunt
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_Blunt,
@@ -654,14 +619,13 @@ item serum_epic_Blunt
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_SmallBlunt
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_SmallBlunt,
@@ -671,14 +635,13 @@ item serum_epic_SmallBlunt
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_LongBlade
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_LongBlade,
@@ -688,14 +651,13 @@ item serum_epic_LongBlade
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_SmallBlade
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_SmallBlade,
@@ -705,14 +667,13 @@ item serum_epic_SmallBlade
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_Spear
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_Spear,
@@ -722,14 +683,13 @@ item serum_epic_Spear
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_Maintenance
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_Maintenance,
@@ -739,14 +699,13 @@ item serum_epic_Maintenance
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 item serum_epic_Aiming
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.2,
-    Type                = Food,
+    ItemType            = base:food,
     DisplayName         = Enhancement Serum,
     Icon                = serum_epic,
     Tooltip             = Tooltip_serum_epic_Aiming,
@@ -756,7 +715,6 @@ item serum_epic_Aiming
     OnEat               = OnEat_serum,
     CustomEatSound      = serum_inject,
     WorldStaticModel    = PongDuSerumEpic,
-    Tags                = CMP,
 }
 
 /* random_weapon donation: weapon gacha boxes */
@@ -764,7 +722,7 @@ item weapon_box_melee
 {
     DisplayCategory     = Container,
     Weight              = 0.3,
-    Type                = Normal,
+    ItemType            = base:normal,
     DisplayName         = Melee Weapon Box,
     Icon                = DuffelbagMilitary,
     Tooltip             = Tooltip_weapon_box,
@@ -774,7 +732,7 @@ item weapon_box_ranged
 {
     DisplayCategory     = Container,
     Weight              = 0.3,
-    Type                = Normal,
+    ItemType            = base:normal,
     DisplayName         = Ranged Weapon Box,
     Icon                = DuffelbagMilitary,
     Tooltip             = Tooltip_weapon_box,
@@ -787,7 +745,7 @@ item weapon_box_ranged
 item JohnWickPencil
 {
     DisplayCategory = Weapon,
-    Type            = Weapon,
+    ItemType        = base:weapon,
     DisplayName     = John Wick's Pencil,
     Icon            = Pencil,
     WeaponSprite    = Pencil,
@@ -831,26 +789,54 @@ item JohnWickPencil
     SwingSound      = PenSwing,
 }
 
-recipe Open Weapon Box
+/* B42 craftRecipe 용 timedAction. B41 recipe 의 Sound 필드가 craftRecipe 에는 없어
+   소리는 timedAction 의 sound 로 준다 (soundTime 기본값 ACTION_START).
+   craftRecipe 에서 module 접두사를 붙여 참조한다 - 접두사 없으면 Base 모듈에서 찾는다
+   (ScriptBucketCollection.getScript). */
+timedAction PongDuOpenBox
 {
-    weapon_box_melee,
-    Result:weapon_box_melee,
-    RemoveResultItem:true,
-    OnCreate:t3RandomWeapon.OpenMeleeBox,
-    CanBeDoneFromFloor:true,
-    Time:150.0,
-    Sound:PutItemInBag,
+    metabolics = SedentaryActivity,
+    actionAnim = UnPackBox_Small,
+    prop2 = Base.CraftingParcel_Small,
+    sound = PutItemInBag,
 }
 
-recipe Open Weapon Box
+timedAction PongDuRadioCall
 {
-    weapon_box_ranged,
-    Result:weapon_box_ranged,
-    RemoveResultItem:true,
-    OnCreate:t3RandomWeapon.OpenRangedBox,
-    CanBeDoneFromFloor:true,
-    Time:150.0,
-    Sound:PutItemInBag,
+    metabolics = SedentaryActivity,
+    actionAnim = Making,
+    sound = RadioTalk,
+}
+
+/* B41 recipe -> B42 craftRecipe.
+   - 이름이 곧 번역 키다 (Translate/KO/Recipes.json, 접두사 없음)
+   - outputs 블록 없음: 결과물은 OnCreate(Lua)가 직접 지급한다 (바닐라 RemoveGasMaskFilter 와 같은 형태)
+   - OnCreate 시그니처는 (craftRecipeData, character), 싱글=로컬 / MP=서버에서 실행 (shared/t3RecipeUtil.lua)
+   - InHandCraft;RightClickOnly = 아이템 우클릭 메뉴에만 노출 (바닐라 ScratchTicket 과 동일) */
+craftRecipe PongDuOpenWeaponBoxMelee
+{
+    timedAction = t3chzzkDonation.PongDuOpenBox,
+    time = 150,
+    OnCreate = t3RandomWeapon.OpenMeleeBox,
+    Tags = InHandCraft;RightClickOnly;CanBeDoneInDark,
+    category = Miscellaneous,
+    inputs
+    {
+        item 1 [t3chzzkDonation.weapon_box_melee],
+    }
+}
+
+craftRecipe PongDuOpenWeaponBoxRanged
+{
+    timedAction = t3chzzkDonation.PongDuOpenBox,
+    time = 150,
+    OnCreate = t3RandomWeapon.OpenRangedBox,
+    Tags = InHandCraft;RightClickOnly;CanBeDoneInDark,
+    category = Miscellaneous,
+    inputs
+    {
+        item 1 [t3chzzkDonation.weapon_box_ranged],
+    }
 }
 
 /* vehicle_drop donation: 개봉하면 근처 실외에 차량 한 대를 소환 */
@@ -858,27 +844,31 @@ item vehicle_drop_kit
 {
     DisplayCategory = Communications,
     Weight              = 0.1,
-    Type                = Normal,
+    ItemType            = base:normal,
     DisplayName         = Vehicle Drop Kit,
     Icon			= WalkieTalkieMilitary,
     Tooltip             = Tooltip_vehicle_drop_kit,
     StaticModel = WalkieTalkieUSArmy,
 }
 
-recipe Open Vehicle Drop Kit
+/* AllowBatchCraft = false: 한 번에 여러 개 개봉하면 차량이 한꺼번에 떨어진다 */
+craftRecipe PongDuOpenVehicleDropKit
 {
-    vehicle_drop_kit,
-    Result:vehicle_drop_kit,
-    RemoveResultItem:true,
-    OnCreate:t3VehicleDrop.OpenKit,
-    CanBeDoneFromFloor:true,
-    Time:500,
-    Sound:RadioTalk,
+    timedAction = t3chzzkDonation.PongDuRadioCall,
+    time = 500,
+    OnCreate = t3VehicleDrop.OpenKit,
+    AllowBatchCraft = false,
+    Tags = InHandCraft;RightClickOnly;CanBeDoneInDark,
+    category = Miscellaneous,
+    inputs
+    {
+        item 1 [t3chzzkDonation.vehicle_drop_kit],
+    }
 }
 
 item t3DeployedParachute
 {
-    Type                = Normal,
+    ItemType            = base:normal,
     DisplayName         = Deployed Parachute,
     Icon                = t3DeployedParachute,
     Weight              = 10,
@@ -887,12 +877,12 @@ item t3DeployedParachute
 
 /* inv_save_ticket donation: 소지한 채 사망하면 자동 발동/소모되어
    사망 시점 인벤토리를 리스폰 후 그대로 돌려받는다 (features/invsave.lua).
-   Type=Key로 만들어 차키처럼 무게 0 + 인벤토리 열쇠고리 탭에 자동 편입되게 함. */
+   ItemType=base:key로 만들어 차키처럼 무게 0 + 인벤토리 열쇠고리 탭에 자동 편입되게 함. */
 item inv_save_ticket
 {
     DisplayCategory     = Key,
     Weight              = 0,
-    Type                = Key,
+    ItemType            = base:key,
     DisplayName         = Inventory Insurance,
     Icon                = InvSaveTicket,
     Tooltip             = Tooltip_inv_save_ticket,
@@ -912,7 +902,7 @@ item Syringe_Adrenaline
     DisplayCategory     = FirstAid,
     Count               = 1,
     Weight              = 0.01,
-    Type                = Normal,
+    ItemType            = base:normal,
     DisplayName         = Adrenaline Syringe,
     Icon                = SyringeAdrenline,
     Tooltip             = Tooltip_Syringe_Adrenaline,
@@ -924,7 +914,7 @@ item Syringe_Doxycycline
     DisplayCategory     = FirstAid,
     Count               = 1,
     Weight              = 0.01,
-    Type                = Normal,
+    ItemType            = base:normal,
     DisplayName         = Doxycycline Syringe,
     Icon                = DoxycyclineSyringe,
     Tooltip             = Tooltip_Syringe_Doxycycline,
@@ -945,7 +935,7 @@ item Syringe_Morphine
     DisplayCategory     = FirstAid,
     Count               = 1,
     Weight              = 0.01,
-    Type                = Normal,
+    ItemType            = base:normal,
     DisplayName         = Morphine Syringe,
     Icon                = MorphineSyringe,
     Tooltip             = Tooltip_Syringe_Morphine,
@@ -957,7 +947,7 @@ item Syringe_Emergency
     DisplayCategory     = FirstAid,
     Count               = 1,
     Weight              = 0.01,
-    Type                = Normal,
+    ItemType            = base:normal,
     DisplayName         = Emergency Regen Syringe,
     Icon                = EmergencyRegenSyringe,
     Tooltip             = Tooltip_Syringe_Emergency,
@@ -972,7 +962,7 @@ item medical_box
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.3,
-    Type                = Normal,
+    ItemType            = base:normal,
     DisplayName         = Medical Supply Box,
     Icon                = FirstAid,
     Tooltip             = Tooltip_medical_box,
@@ -980,15 +970,17 @@ item medical_box
     WorldStaticModel    = LunchBoxMedic_Ground,
 }
 
-recipe Open Medical Box
+craftRecipe PongDuOpenMedicalBox
 {
-    medical_box,
-    Result:medical_box,
-    RemoveResultItem:true,
-    OnCreate:t3MedicalBox.OpenBox,
-    CanBeDoneFromFloor:true,
-    Time:150.0,
-    Sound:PutItemInBag,
+    timedAction = t3chzzkDonation.PongDuOpenBox,
+    time = 150,
+    OnCreate = t3MedicalBox.OpenBox,
+    Tags = InHandCraft;RightClickOnly;CanBeDoneInDark,
+    category = Miscellaneous,
+    inputs
+    {
+        item 1 [t3chzzkDonation.medical_box],
+    }
 }
 
 /* zRe Vaccin("They Knew") 모드의 TheyKnew.Zomboxivir 이식. vaccine 후원(rewardManager.lua)이
@@ -998,7 +990,7 @@ item Zomboxivir
 {
     DisplayCategory     = FirstAid,
     Weight              = 0.01,
-    Type                = Food,
+    ItemType            = base:food,
     HungerChange        = 1,
     DisplayName         = Zomboxivir Ampule,
     Icon                = Zomboxivir,
@@ -1019,7 +1011,7 @@ item PongDuZombieParachute
 {
     DisplayCategory       = Bag,
     Weight                = 10,
-    Type                  = Container,
+    ItemType              = base:container,
     Capacity              = 1,
     DisplayName           = Zombie Parachute,
     Icon                  = PongDuParachute,
@@ -1051,7 +1043,7 @@ item PongDuAirborneParachutePack
     DisplayCategory       = Bag,
     WeightReduction       = 70,
     Weight                = 0.8,
-    Type                  = Container,
+    ItemType              = base:container,
     Capacity              = 20,
     DisplayName           = Airborne Parachute Pack,
     Icon                  = PongDuParachute,
