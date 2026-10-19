@@ -89,8 +89,12 @@ function _a.a(sender)
         -- 부위 플래그는 위 루프의 RestoreToFullHealth() 에서 이미 지워졌다.
         bodyDamage:setInfected(false)
         bodyDamage:setIsFakeInfected(false)
-        bodyDamage:setInfectionLevel(0)
-        bodyDamage:setFakeInfectionLevel(0)
+        -- B42: InfectionLevel/FakeInfectionLevel 은 Stats 로 옮겨졌다
+        --   (ZOMBIE_INFECTION / ZOMBIE_FEVER, BodyDamage.java:1665 getApparentInfectionLevel)
+        PongDuStats.apply(player, {
+            { op = "set", stat = "ZOMBIE_INFECTION", v = 0 },
+            { op = "set", stat = "ZOMBIE_FEVER",     v = 0 },
+        }, "instant_heal")
         bodyDamage:setInfectionTime(-1)
         bodyDamage:setInfectionMortalityDuration(-1)
     end

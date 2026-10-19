@@ -186,7 +186,10 @@ end
 -- [0.64, 1.28] 구간으로 나타난다(하한이 0.8이 아니라 0.8*0.8=0.64).
 -- 이 배율을 몰랐을 땐 클램프 감지 임계값이 어긋나 있었다.
 local function getAnimSpeedFixMultiplier(playerObj, weapon)
-    if weapon and playerObj:getTraits():contains("Axeman") and weapon:getCategories():contains("Axe") then
+    -- B42: getTraits():contains("X") -> hasTrait(CharacterTrait.X) (IsoGameCharacter.java:6254),
+    --      weapon:getCategories() -> getScriptItem():containsWeaponCategory (바닐라 ISRemoveBush.lua:43)
+    if weapon and playerObj:hasTrait(CharacterTrait.AXEMAN)
+            and weapon:getScriptItem():containsWeaponCategory(WeaponCategory.AXE) then
         return 1.0
     end
     return 0.8
@@ -312,7 +315,8 @@ local function getEngineHealthCap(bodyDamage)
     local cap = 100.0
 
     if bodyDamage:isInfected() then
-        local p = bodyDamage:getInfectionLevel() / 100.0
+        -- B42: BodyDamage:getInfectionLevel() 제거 -> Stats ZOMBIE_INFECTION (0~100)
+        local p = bodyDamage:getParentChar():getStats():get(CharacterStat.ZOMBIE_INFECTION) / 100.0
         local p4 = p * p
         p4 = p4 * p4
         local c = (1.0 - p4) * 100.0
@@ -470,11 +474,12 @@ end
 -- 사실상 항상 1이다. 즉 이 체력 회복 분기는 실제로는 거의 발동하지 않는다.
 -- 원본 동작을 그대로 두기로 한 결정이므로 손대지 않는다.
 local function applyAdrenaline(playerObj, stats)
-    stats:setFatigue(stats:getFatigue() - 0.7)
-    stats:setEndurance(stats:getEndurance() + 0.85)
-    -- stats:setHunger(stats:getHunger() + 0.3)
-    -- stats:setThirst(stats:getThirst() + 0.5)
-    stats:setPanic(stats:getPanic() + 15)
+    -- B42: 개별 setter 제거 + MP 서버 권위 -> shared/PongDuStats.lua (범위 clamp 는 엔진이 한다)
+    PongDuStats.apply(playerObj, {
+        { op = "add", stat = "FATIGUE",   v = -0.7 },
+        { op = "add", stat = "ENDURANCE", v = 0.85 },
+        { op = "add", stat = "PANIC",     v = 15 },
+    }, "syringe_adrenaline")
 
     if playerObj:getHealth() < 1 then
         playerObj:setHealth(playerObj:getHealth() + 0.2)
@@ -516,14 +521,15 @@ local function applyDoxycycline(playerObj, stats, bodyDamage)
     bodyDamage:setSneezeCoughActive(0)
     bodyDamage:setSneezeCoughTime(0)
 
-    -- 식중독. 상한 음식/날음식 섭취로 쌓이는 진짜 식중독은 PoisonLevel 이다
+    -- 식중독. 상한 음식/날음식 섭취로 쌓이는 진짜 식중독은 PoisonLevel(B42: POISON) 이다
     -- (JustAteFood(): PoisonPower / isTaintedWater / bDangerousUncooked 경로).
-    bodyDamage:setPoisonLevel(0)
-
-    -- 시체 악취로 인한 메스꺼움. 이름과 달리 음식과 무관하며, 주변 시체 수로만
-    -- 올라간다(UpdateIllness() -> FliesSound.getCorpseCount()). PoisonLevel 이
-    -- 0 이 아니면 자연 감소가 막혀 있어(:2011) 위 줄보다 뒤에 두는 편이 안전하다.
-    bodyDamage:setFoodSicknessLevel(0)
+    -- 시체 악취로 인한 메스꺼움(FoodSicknessLevel, B42: FOOD_SICKNESS). 이름과 달리 음식과
+    -- 무관하며 주변 시체 수로만 올라간다. POISON 이 0 이 아니면 자연 감소가 막혀 있어
+    -- POISON 을 먼저 내린다 (ops 는 배열 순서대로 적용된다).
+    PongDuStats.apply(playerObj, {
+        { op = "set", stat = "POISON",        v = 0 },
+        { op = "set", stat = "FOOD_SICKNESS", v = 0 },
+    }, "syringe_doxycycline")
 
     -- 상처 세균감염. isInfectedWound() 만 끄면 woundInfectionLevel 이 남아 곧
     -- 재발하므로(BodyPart.DamageUpdate():293 이 확률로 다시 true) 근원값을
@@ -559,7 +565,7 @@ end
 -- 누르고 BodyPart.getPain()(부위 통증)은 그대로 두는데, 공격속도 계산은 후자를
 -- 보기 때문에 통증 억제만으로는 전혀 해결되지 않는다.
 local function applyMorphine(playerObj, stats)
-    stats:setPain(0)                                          -- 즉시 제거
+    PongDuStats.apply(playerObj, { { op = "set", stat = "PAIN", v = 0 } }, "syringe_morphine")  -- 즉시 제거
     playerObj:setPainEffect(MORPHINE_PAIN_EFFECT_TICKS)       -- 이후 억제는 바닐라가 담당
 
     local md = playerObj:getModData()
@@ -661,7 +667,7 @@ local function logRegenDiag(playerObj, bodyDamage, st)
         .. " restored=" .. tostring(st.restored)
         .. " hits=" .. tostring(st.hits)
         .. " capped=" .. tostring(st.capped)
-        .. " inf=" .. tostring(bodyDamage:getInfectionLevel())
+        .. " inf=" .. tostring(playerObj:getStats():get(CharacterStat.ZOMBIE_INFECTION))
         .. " cold=" .. tostring(bodyDamage:getColdDamageStage())
         .. " held=" .. tostring(held))
 

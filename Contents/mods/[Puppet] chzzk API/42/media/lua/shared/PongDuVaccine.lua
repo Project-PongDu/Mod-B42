@@ -1,4 +1,4 @@
--- vaccine.lua : Zomboxivir 앰퓰 (좀비 감염 완전 치료)
+-- PongDuVaccine.lua : Zomboxivir 앰퓰 (좀비 감염 완전 치료)
 --
 -- zRe Vaccin("They Knew") 모드의 TheyKnew.Zomboxivir 아이템 + OnEat_Zomboxivir
 -- (원본: TheyKnew_BreakAmpule.lua)를 퐁듀 전용 아이템으로 이식. vaccine 후원
@@ -9,8 +9,12 @@
 -- 함수가 원본 모드 어디에도 없는 죽은 참조였다(전체 파일 검색으로 확인). 그래서
 -- 이식하지 않았고, 순수 OnEat(우클릭 Eat) 소모형 아이템으로만 동작한다.
 --
--- 좀비 감염(Knox Infection)을 완전히 치료한다. 물린 부위(bodyPart)의 감염
--- 플래그까지 전부 해제하는 원본 로직 그대로 유지.
+-- [B42] client/features/vaccine.lua 에서 shared 로 옮겼다.
+--   B42 MP 에서 먹기는 ISEatFoodAction:complete() -> 서버의 IsoGameCharacter.Eat 에서 처리되고
+--   (OnEat 호출: IsoGameCharacter.java:6487), 클라는 EatFood 패킷을 받아 EatOnClient(:6400)로
+--   OnEat 을 한 번 더 부른다. client 폴더에 두면 서버에선 함수가 없어 감염 치료가 서버에
+--   반영되지 않는다. 양쪽에서 불려도 결과가 같도록(멱등) 짠다.
+--   감염 수치는 B42에서 Stats ZOMBIE_INFECTION 으로 옮겨졌다 (shared/PongDuStats.lua).
 
 function OnEat_Zomboxivir(food, player, percent)
     local bodyDamage = player:getBodyDamage()
@@ -22,7 +26,7 @@ function OnEat_Zomboxivir(food, player, percent)
     bodyDamage:setInfected(false)
     bodyDamage:setInfectionMortalityDuration(-1)
     bodyDamage:setInfectionTime(-1)
-    bodyDamage:setInfectionLevel(0)
+    PongDuStats.applyLocal(player, { { op = "set", stat = "ZOMBIE_INFECTION", v = 0 } }, "vaccine")
 
     local bodyParts = bodyDamage:getBodyParts()
     for i = bodyParts:size() - 1, 0, -1 do
@@ -30,5 +34,6 @@ function OnEat_Zomboxivir(food, player, percent)
         bodyPart:SetInfected(false)
     end
 
-    print("[PongDu] vaccine: Zomboxivir applied, infection cleared")
+    print("[PongDu] vaccine: Zomboxivir applied, infection cleared (server=" .. tostring(isServer())
+        .. ", client=" .. tostring(isClient()) .. ")")
 end
