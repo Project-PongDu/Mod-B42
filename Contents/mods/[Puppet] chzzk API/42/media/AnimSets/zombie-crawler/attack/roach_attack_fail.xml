@@ -4,6 +4,7 @@
 <animNode>
 	<m_Name>roachattack_fail</m_Name>
 	<m_AnimName>Zombie_CrawlLunge_Fail</m_AnimName>
+	<m_ConditionPriority>1</m_ConditionPriority>
 	<m_Priority>5</m_Priority>
 	<m_deferredBoneAxis>Y</m_deferredBoneAxis>
 	<m_Looped>false</m_Looped>
