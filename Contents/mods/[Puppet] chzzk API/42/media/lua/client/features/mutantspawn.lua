@@ -3,6 +3,19 @@ local _a = {}
 local zone   = require("utils/zone")
 local global = require("global")
 
+-- 좀비별 로컬 상태(체력 스냅샷·비명 쿨다운·이름표·벽등반 큐)의 테이블 키.
+-- MP 는 onlineID 가 좀비마다 다르지만 싱글은 전부 -1 이다(서버에서만 발급:
+-- IsoZombie.java onlineId 는 GameServer.server 일 때만 getUniqueZombieId()).
+-- 그래서 싱글에서 onlineID 를 키로 쓰면 모든 특수좀비가 한 칸을 공유한다 -- 실측으로
+-- 브루트(HP 5)가 다른 특좀의 체력 스냅샷(3)으로 깎이고, 죽은 특좀의 낮은 스냅샷이
+-- 새로 소환된 특좀에 덮여 "소환되자마자 사망"했다. 싱글은 좀비 객체 자체를 키로 쓴다.
+-- 객체 풀 재활용 오염은 OnZombieDead 정리가 그대로 막는다(같은 키로 지운다).
+-- modData 의 PuppetMutantZid 는 객체를 담을 수 없어 계속 onlineID 를 쓴다.
+local function zkey(zombie)
+    if isClient() or isServer() then return zombie:getOnlineID() end
+    return zombie
+end
+
 -- ═══════════════════════════════════════════════════════════════════════════
 --  뮤턴트 (mutant_spawn): 스크리머 / 브루트 / 로치 중 1마리 랜덤 소환.
 --
@@ -190,7 +203,7 @@ local SPRINT_KIND = { brute = true, tracer = true, sprinter = true }
 
 local function guardStats(zombie, kind)
     if not zombie:getVariableBoolean("PuppetMutantInit") then return end
-    local zid = zombie:getOnlineID()
+    local zid = zkey(zombie)
     local reason = nil
 
     -- ① 걸음타입: sprint 계열이어야 할 종류가 다른 값으로 재생성됨
@@ -238,7 +251,7 @@ end
 function _a.restoreHealth(zombie, hp)
     if not zombie or not hp then return end
     zombie:setHealth(hp)
-    _hpSnap[zombie:getOnlineID()] = hp
+    _hpSnap[zkey(zombie)] = hp
 end
 
 -- ── 스크리머: 비명 (CDDA_ZombieFunction.Scream 이식) ─────────────────────────
@@ -248,7 +261,7 @@ end
 local function updateScreamer(zombie)
     local target = zombie:getTarget()
     if not target then return end
-    local zid = zombie:getOnlineID()
+    local zid = zkey(zombie)
     local now = getTimestampMs()
     if _nextScream[zid] and now < _nextScream[zid] then return end
     _nextScream[zid] = now + SCREAM_COOLDOWN_MS
@@ -483,7 +496,7 @@ local function updateTracerWallUp(zombie)
     -- 놓쳤을 때의 안전망 - 상태 탈출 후 OnZombieUpdate가 재개되면 잡힌다.
     if zombie:getVariableBoolean("TRWallUpDone") then
         trWallUpTeleport(zombie)
-        trWallUpQueue[zombie:getOnlineID()] = nil
+        trWallUpQueue[zkey(zombie)] = nil
         if zombie:isVariable("hitreaction", "TRWallUpReactionStart")
             or zombie:isVariable("hitreaction", "TRWallUpReactionSuccess") then
             zombie:setVariable("hitreaction", nil)
@@ -584,7 +597,7 @@ local function updateTracerWallUp(zombie)
     zombie:setVariable("TRWallUpTop", false) -- 이전 클라임의 후반 페이즈 잔여값 리셋
     zombie:setVariable("TRWallUpActive", true)
     zombie:setVariable("hitreaction", "TRWallUpReactionStart")
-    trWallUpQueue[zombie:getOnlineID()] = zombie
+    trWallUpQueue[zkey(zombie)] = zombie
     trLog(zombie, "wallup: TRIGGER -> (" .. forwardX .. "," .. forwardY .. "," .. (baseSq:getZ() + 1) .. ")")
 end
 
@@ -915,7 +928,7 @@ local function applyMutant(zombie)
         -- 재적용은 initMutant의 초기 체력(샌드박스 설정값)을 다시 씌우므로,
         -- 그동안 입은 전투 피해가 회복돼버린다. 마지막 정상 스냅샷이 더 낮으면
         -- 그 값으로 되돌려 피해를 보존한다(최초 초기화 시엔 스냅샷이 없다).
-        local lastHP = _hpSnap[curZid]
+        local lastHP = _hpSnap[zkey(zombie)]
         if lastHP and lastHP < zombie:getHealth() then
             zombie:setHealth(lastHP)
         end
@@ -947,9 +960,10 @@ Events.OnZombieUpdate.Add(applyMutant)
 --  옷차림 pid 충돌로 일반좀비의 잘못된 death-mark를 유발하던 오탐원이라 제거.)
 Events.OnZombieDead.Add(function(zombie)
     local zid = zombie:getOnlineID()
-    _pending[zid] = nil
-    _nextScream[zid] = nil
-    _hpSnap[zid] = nil
+    _pending[zid] = nil              -- 서버 MutantMark 가 onlineID 로 오므로 그대로
+    local k = zkey(zombie)
+    _nextScream[k] = nil
+    _hpSnap[k] = nil                 -- 이름표(_showTags)는 renderTags 가 사망 시 스스로 지운다
 end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -996,7 +1010,7 @@ end
 
 local function pokeTag(zombie)
     if not nameTagEnabled() then return end
-    local zid = zombie:getOnlineID()
+    local zid = zkey(zombie)
     local t = _showTags[zid]
     if t then
         t.ttl = TAG_TTL
