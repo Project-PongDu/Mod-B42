@@ -432,6 +432,8 @@ local function finishChuteJob(job, reason)
     -- 1) 리그 제거: permanentlyRemove가 제거 패킷을 전 클라에 보내고 VehiclesDB에서도 지운다
     local rig = findChuteRig(job.rigVid)
     if rig then
+        -- 스폰 직후 회수 뒤에 늦게 생긴 키가 있을 수 있어 제거 전에 한 번 더
+        pcall(function() removeAutoSpawnedKeys(rig) end)
         local ok, err = pcall(function() rig:permanentlyRemove() end)
         if ok then
             print("[t3VehicleDrop] Chute rig removed vid=" .. tostring(job.rigVid))
@@ -517,6 +519,9 @@ local function startChuteDrop(player, vehicle, x, y, z)
         print("[t3VehicleDrop] Chute rig spawn FAILED at all offsets, falling back to instant landing")
         return false
     end
+    -- 리그도 차량이라 바닐라가 키를 같이 뿌린다 (실측: 바닥에 "차 열쇠 -
+    -- IGUI_VehicleNamePongDuChuteRig" 가 남았다). 리그 키는 아무 쓸모가 없으니 바로 회수한다.
+    removeAutoSpawnedKeys(rig)
 
     local now = getTimestampMs()
     local durationSec = chuteDurationSec()

@@ -58,72 +58,26 @@ local _panel       = nil
 -- 이미 호출되며, 중복 호출하면 speedMod/bLunger/walkVariant 가 한 번 더
 -- 재굴림되어 좀비 걸음걸이가 불필요하게 흔들린다.
 
--- ── IsoZombie 필드 리플렉션 ─────────────────────────────────────────────────
--- Kahlua 의 LuaJavaClassExposer 는 인스턴스 public 필드를 Lua 에 노출하지
--- 않는다 -- exposeLikeJava() 가 메서드(exposeMethods)와 static 필드
--- (exposeStatics)만 테이블에 얹는다. 즉 zed.speedType / zed.inactive 는
--- 항상 nil 이고, 이걸 그대로 쓰면 조건문이 통째로 죽는다(이번 버그의 절반).
--- PZ 가 전역으로 뚫어둔 리플렉션 API(getNumClassFields / getClassField /
--- getClassFieldVal, LuaManager.java:5597-5766)로 읽어야 한다.
--- RandomZombies 가 같은 이유로 같은 방식을 쓴다.
---
--- Field 객체는 클래스 단위라 한 번만 찾아 캐싱한다. 실패하면 nil 을 캐싱해
--- 매 스윕 재시도하지 않는다(마커 전용 폴백 모드로 내려간다).
-local FIELD_SPEED    = "public int zombie.characters.IsoZombie.speedType"
-local FIELD_INACTIVE = "public boolean zombie.characters.IsoZombie.inactive"
-
-local _fields      = nil
-local _fieldsTried = false
-
-local function fields(zed)
-    if _fieldsTried then return _fields end
-    _fieldsTried = true
-
-    local found = {}
-    local ok, err = pcall(function()
-        for i = 0, getNumClassFields(zed) - 1 do
-            local f = getClassField(zed, i)
-            local n = tostring(f)
-            if n == FIELD_SPEED then
-                found.speed = f
-            elseif n == FIELD_INACTIVE then
-                found.inactive = f
-            end
-        end
-    end)
-
-    if not ok then
-        log("field reflection failed: " .. tostring(err) .. " (marker-only fallback)")
-        return nil
-    end
-    if not found.speed then
-        log("speedType field not found (marker-only fallback)")
-        return nil
-    end
-
-    _fields = found
-    log("field reflection ready (inactive="
-        .. tostring(found.inactive ~= nil) .. ")")
-    return _fields
-end
+-- ── IsoZombie 상태 읽기 ─────────────────────────────────────────────────────
+-- B41 은 public 필드 speedType / inactive 를 리플렉션(getNumClassFields 등)으로
+-- 읽었다 -- Kahlua 는 인스턴스 필드를 Lua 에 노출하지 않기 때문이다.
+-- B42 는 리플렉션 전역 함수가 디버그 모드가 아니면 예외를 던진다
+-- (LuaManager.validateReflectionAccess: !Core.debug -> "Not in debug").
+-- 대신 B42 에는 getSpeedType() 게터가 있다 (IsoZombie.java:5723).
+-- inactive 는 게터가 없어 false 로 본다 -- B41 의 "읽기 실패 시 보수적 처리"와 같다.
 
 -- 현재 speedType. 1/2/3 이 정상값이고, 아직 DoZombieStats 를 한 번도 타지
--- 않은 개체는 -1 이다(IsoZombie.java:200). -1 도 그대로 돌려준다 -- "읽지
--- 못함(nil)"과 "아직 미배정(-1)"은 처리가 다르기 때문이다.
+-- 않은 개체는 -1 이다. -1 도 그대로 돌려준다 -- "읽지 못함(nil)"과
+-- "아직 미배정(-1)"은 처리가 다르기 때문이다.
 local function readSpeed(zed)
-    local f = fields(zed)
-    if not f then return nil end
-    local ok, v = pcall(getClassFieldVal, zed, f.speed)
+    local ok, v = pcall(function() return zed:getSpeedType() end)
     if not ok then return nil end
     return tonumber(v)
 end
 
--- 휴면(가상) 좀비 여부. 읽지 못하면 false 로 보수적으로 처리한다.
+-- 휴면(가상) 좀비 여부. B42 는 읽을 수단이 없어 항상 false.
 local function isInactive(zed)
-    local f = fields(zed)
-    if not f or not f.inactive then return false end
-    local ok, v = pcall(getClassFieldVal, zed, f.inactive)
-    return ok and v == true
+    return false
 end
 
 local function setZombieSpeed(zed, target)

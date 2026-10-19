@@ -11,8 +11,8 @@
 -- 다른 클라는 아무것도 안 해도 엔진 물리 스트림(sendPhysic)으로 같은 모습을 본다.
 --
 -- 텔레포트 방식은 헬기 화력지원(features/firesupport.lua heliMoveTo)과 동일하다:
--- BaseVehicle의 private tempTransform을 리플렉션으로 꺼내 getWorldTransform ->
--- origin 수정 -> setWorldTransform(클라에서는 내부적으로 Bullet.teleportVehicle).
+-- getWorldTransform -> origin 수정 -> setWorldTransform(클라에서는 내부적으로
+-- Bullet.teleportVehicle). Transform 은 utils/vehtransform 이 만든다.
 -- 물리 좌표축: origin.x = iso x(월드심 오프셋 좌표계), origin.y = 고도, origin.z = iso y.
 -- 월드심 오프셋은 플레이어 이동에 따라 바뀔 수 있으므로 x/z는 매 틱 차량의 현재
 -- origin 값을 그대로 쓰고 y(고도)만 덮어쓴다.
@@ -45,31 +45,11 @@ local ERR_LOG_EVERY    = 10    -- 틱 에러는 첫 회 + 이 횟수마다 한 �
 
 local _jobs = {}      -- [cargoVid] = job
 local _count = 0      -- Kahlua에 next()가 없어 개수로 빈 테이블 판정
-local _fieldNum = nil -- BaseVehicle.tempTransform 필드 인덱스 (클래스 공용)
 
-local function fieldNum(obj, name)
-    for i = 0, getNumClassFields(obj) - 1 do
-        local f = getClassField(obj, i)
-        if luautils.stringEnds(tostring(f), "." .. name) then return i end
-    end
-    return nil
-end
-
--- 차량의 월드 트랜스폼(tempTransform에 복사된 것)과 그 origin(Vector3f)을 돌려준다.
-local function getOrigin(v)
-    if not _fieldNum then _fieldNum = fieldNum(v, "tempTransform") end
-    if not _fieldNum then error("tempTransform field not found") end
-    local tmp = getClassFieldVal(v, getClassField(v, _fieldNum))
-    local tr = v:getWorldTransform(tmp)
-    local origin = getClassFieldVal(tr, getClassField(tr, 1))
-    return tr, origin
-end
-
-local function setOrigin(v, ox, oy, oz)
-    local tr, origin = getOrigin(v)
-    origin:set(ox, oy, oz)
-    v:setWorldTransform(tr)
-end
+-- 월드 트랜스폼 접근은 utils/vehtransform 으로 (B42 는 리플렉션이 막혀 있다)
+local vxf = require("utils/vehtransform")
+local getOrigin = vxf.get
+local setOrigin = vxf.set
 
 -- MP 물리 권한/정적/활성 상태 한 줄 요약 (BaseVehicle.getAuthorizationDescription).
 -- 차량이 안 움직이면 대부분 auth가 Local이 아니거나 static=true 인 경우다.

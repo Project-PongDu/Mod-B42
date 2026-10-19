@@ -682,9 +682,8 @@ end
 local _helis  = {}    -- [own] = 헬기 인스턴스
 local _drones = {}    -- [own] = 드론 인스턴스
 
--- tempTransform 자바 필드 인덱스. BaseVehicle 클래스 공용이라 인스턴스와
--- 무관하게 하나만 캐시하면 된다(헬기/드론 공용).
-local _wFieldNum = nil
+-- 헬기/드론 텔레포트용 월드 트랜스폼 헬퍼 (B42 는 리플렉션이 막혀 있다)
+local vxf = require("utils/vehtransform")
 
 local function myOnlineID()
     local p = getSpecificPlayer(0)
@@ -964,24 +963,11 @@ local function heliCurPos(h)
     return heliPathPos(h)
 end
 
--- BH 모드 moveVehicle과 동일한 리플렉션 경로. BaseVehicle의 private
--- tempTransform 필드를 꺼내 getWorldTransform/setWorldTransform으로 물리
--- 원점을 직접 옮긴다 (클라 setWorldTransform은 내부에서 Bullet.teleportVehicle
--- 호출 -- BaseVehicle.java:3453).
-local function heliFieldNum(obj, name)
-    for i = 0, getNumClassFields(obj) - 1 do
-        local f = getClassField(obj, i)
-        if luautils.stringEnds(tostring(f), "." .. name) then return i end
-    end
-    return nil
-end
-
+-- getWorldTransform/setWorldTransform으로 물리 원점을 직접 옮긴다
+-- (클라 setWorldTransform은 내부에서 Bullet.teleportVehicle 호출 -- BaseVehicle.java:4105).
+-- B41 은 private tempTransform 을 리플렉션으로 꺼냈지만 B42 는 막혀서 utils/vehtransform 사용.
 local function heliMoveTo(v, wx, wy, alt)
-    if not _wFieldNum then _wFieldNum = heliFieldNum(v, "tempTransform") end
-    if not _wFieldNum then error("tempTransform field not found") end
-    local tmp    = getClassFieldVal(v, getClassField(v, _wFieldNum))
-    local tr     = v:getWorldTransform(tmp)
-    local origin = getClassFieldVal(tr, getClassField(tr, 1))
+    local tr, origin = vxf.get(v)
     -- 물리축 매핑: origin.x = iso x(월드심 오프셋 좌표계), origin.y = 고도,
     -- origin.z = iso y. 오프셋 값을 몰라도 되도록 iso 좌표 "델타"를 더한다
     -- (BH moveVehicle 방식). 고도만 절대값으로 박아 중력 드리프트를 차단.
@@ -1475,14 +1461,9 @@ local function droneCurPos(d)
     return droneComputePos(d)
 end
 
--- heliMoveTo와 동일한 리플렉션 경로. _wFieldNum은 BaseVehicle 공용 필드
--- 인덱스라 헬기 쪽 캐시를 그대로 재사용한다(클래스가 같다).
+-- heliMoveTo와 동일한 경로 (utils/vehtransform).
 local function droneMoveTo(v, wx, wy)
-    if not _wFieldNum then _wFieldNum = heliFieldNum(v, "tempTransform") end
-    if not _wFieldNum then error("tempTransform field not found") end
-    local tmp    = getClassFieldVal(v, getClassField(v, _wFieldNum))
-    local tr     = v:getWorldTransform(tmp)
-    local origin = getClassFieldVal(tr, getClassField(tr, 1))
+    local tr, origin = vxf.get(v)
     origin:set(origin:x() + (wx - v:getX()), DRONE_FLY_ALT, origin:z() + (wy - v:getY()))
     v:setWorldTransform(tr)
 end
