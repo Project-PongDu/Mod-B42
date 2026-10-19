@@ -608,8 +608,29 @@ local function chuteSweepOrphanRigs()
     end
 end
 
+-- 일시정지 보정: 싱글에서 일시정지하면 OnTick 이 멈추는데 getTimestampMs 는 계속 흐른다.
+-- 그대로 두면 재개 직후 데드라인이 지나 하강 중인 차량을 강제 착지시킨다(실측: 일시정지 후
+-- "deadline reached" -> 리그가 공중에 남음). 틱 간격이 이보다 크면 그만큼 데드라인을 민다.
+-- MP 서버는 일시정지가 없어 심한 랙에서만 걸리고, 그때 데드라인이 늘어나는 건 무해하다.
+local CHUTE_PAUSE_GAP_MS = 500
+local _chuteLastSeen = nil
+
 local function chuteServerTick()
     local now = getTimestampMs()
+    if _chuteLastSeen then
+        local gap = now - _chuteLastSeen
+        if gap > CHUTE_PAUSE_GAP_MS then
+            local n = 0
+            for _, job in pairs(t3VehicleDrop._chuteJobs) do
+                job.deadline = job.deadline + gap
+                n = n + 1
+            end
+            if n > 0 then
+                print(string.format("[t3VehicleDrop] Chute tick gap %dms (pause?) -> deadline extended for %d job(s)", gap, n))
+            end
+        end
+    end
+    _chuteLastSeen = now
     if now - _chuteLastTick >= CHUTE_TICK_MS then
         _chuteLastTick = now
         local expired = nil

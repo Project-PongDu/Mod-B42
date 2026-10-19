@@ -264,9 +264,29 @@ end
 
 local _closing = {}
 
+-- 일시정지 보정: 싱글에서 일시정지하면 OnTick 은 멈추지만 getTimestampMs 는 흐른다.
+-- 재개 첫 틱에 경과시간이 통째로 들어가 고도가 -300 같은 값으로 튀고 바로 착지 처리된다
+-- (실측: "released at alt=-302.44 after 130184ms"). 틱 간격이 이보다 크면 그 공백만큼
+-- 모든 시각 기준을 뒤로 민다.
+local PAUSE_GAP_MS = 500
+local _lastTickAt = nil
+
+local function shiftJobTimes(job, gap)
+    if job.t0 then job.t0 = job.t0 + gap end
+    if job.releaseAt then job.releaseAt = job.releaseAt + gap end
+    if job.startedAt then job.startedAt = job.startedAt + gap end
+    if job.localDeadline then job.localDeadline = job.localDeadline + gap end
+end
+
 local function onTick()
-    if _count <= 0 then return end
     local now = getTimestampMs()
+    local gap = _lastTickAt and (now - _lastTickAt) or 0
+    _lastTickAt = now
+    if _count <= 0 then return end
+    if gap > PAUSE_GAP_MS then
+        for _, job in pairs(_jobs) do shiftJobTimes(job, gap) end
+        print(string.format("%stick gap %dms (pause?) -> job times shifted", LOG, gap))
+    end
     local n = 0
     for _, job in pairs(_jobs) do
         local ok, err = pcall(tickJob, job, now)
