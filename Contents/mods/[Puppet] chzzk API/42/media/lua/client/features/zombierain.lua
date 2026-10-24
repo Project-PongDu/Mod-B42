@@ -385,6 +385,15 @@ local _pending      = {}
 local _pendingCount = 0
 local _sweepAcc     = 0
 
+-- 대기열 키. MP 는 onlineID, SP 는 좀비 객체 자체.
+-- SP 는 onlineID 가 전부 -1 이라 키로 쓰면 모든 좀비가 한 항목을 공유한다
+-- (특좀 스폰 즉사 버그와 같은 원인, features/mutantspawn.lua zkey 참고).
+-- 서버 SP 브리지(PongDuRainServer.lua toClients)가 RainMark 항목에 obj 를 실어 보낸다.
+local function zkey(zombie)
+    if isClient() or isServer() then return zombie:getOnlineID() end
+    return zombie
+end
+
 Events.OnServerCommand.Add(function(module, command, args)
     if module ~= "PongDuRain" then return end
 
@@ -462,11 +471,13 @@ Events.OnServerCommand.Add(function(module, command, args)
     local para   = args["para"] == true               -- 세션 공통 (낙하산 연출)
     local now = getTimestampMs()
     for _, e in pairs(zeds) do
-        local id = e and tonumber(e["id"])
-        if id then
-            if not _pending[id] then _pendingCount = _pendingCount + 1 end
+        local id  = e and tonumber(e["id"])
+        local obj = e and e["obj"]
+        local key = obj or id
+        if key then
+            if not _pending[key] then _pendingCount = _pendingCount + 1 end
             local kind = e["k"]
-            _pending[id] = {
+            _pending[key] = {
                 k = kind,
                 e = now + PENDING_MS,
                 para = para,     -- 낙하산 대상
@@ -474,7 +485,10 @@ Events.OnServerCommand.Add(function(module, command, args)
             }
             -- 특좀: 도네 특좀(MutantMark)과 같은 대기열에 등록 -> OnZombieUpdate
             -- 적용기가 onlineID로 매칭해 능력/체력/이름표를 입힌다 (전 클라 각자).
-            if kind then mutantspawn.mark(id, kind, sender) end
+            -- SP(obj 있음)는 건너뛴다: id 가 -1 이라 mark 하면 모든 좀비가 특좀이 되고,
+            -- 서버가 같은 객체에 심은 modData PuppetMutant/PuppetMutantZid(-1) 경로로
+            -- 적용기가 이미 정확히 매칭한다.
+            if kind and not obj then mutantspawn.mark(id, kind, sender) end
         end
     end
 end)
@@ -509,9 +523,10 @@ local function onTick()
     local zl   = cell and cell:getZombieList()
     if zl then
         for i = 0, zl:size() - 1 do
-            local z  = zl:get(i)
-            local id = z and z:getOnlineID()
-            local p  = id and _pending[id]
+            local z   = zl:get(i)
+            local id  = z and z:getOnlineID()
+            local key = z and zkey(z)
+            local p   = key and _pending[key]
             if p then
                 local zz = z:getZ()
                 if now > p.e then
@@ -521,7 +536,7 @@ local function onTick()
                         print("[PongDuRain] WARN parachute expired in air zid=" .. tostring(id)
                             .. " z=" .. tostring(zz))
                     end
-                    _pending[id]  = nil
+                    _pending[key] = nil
                     _pendingCount = _pendingCount - 1
                 elseif zz > 0.05 and not z:isDead() then
                     -- ── 공중 ──
@@ -596,7 +611,7 @@ local function onTick()
                         p.chute = false
                         _paraStats.detach = _paraStats.detach + 1
                     end
-                    _pending[id]  = nil
+                    _pending[key] = nil
                     _pendingCount = _pendingCount - 1
                 end
             end
@@ -622,7 +637,7 @@ Events.OnTick.Add(onTick)
 -- 비주얼과 인벤토리의 낙하산을 둘 다 지워 시체에 남지 않게 한다.
 Events.OnZombieDead.Add(function(zombie)
     if _pendingCount == 0 or not zombie then return end
-    local p = _pending[zombie:getOnlineID()]
+    local p = _pending[zkey(zombie)]
     if not p or not p.chute then return end
     local n = chuteDetach(zombie)
     pcall(function() zombie:getInventory():RemoveAll("PongDuZombieParachute") end)

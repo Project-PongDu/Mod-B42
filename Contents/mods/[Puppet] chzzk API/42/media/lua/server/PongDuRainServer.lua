@@ -65,6 +65,22 @@ local AIR_JITTER         = 0.52                             -- B 각도 지터 (
 
 local _sessions = {}
 
+-- [B42 SP 브리지] Lua sendServerCommand 는 GameServer.server 일 때만 패킷을 보낸다
+-- (LuaManager.sendServerCommand). SP 에선 아무 일도 안 일어나 RainMark/Flight 가
+-- 클라에 안 닿고, 낙하산·수송기 그림자·엔진음이 통째로 빠졌다(B41 SP 도 동일).
+-- SP 는 서버·클라 Lua 가 한 VM 이므로 클라 OnServerCommand 핸들러를 직접 발화시킨다.
+local function isSP()
+    return not isClient() and not isServer()
+end
+
+local function toClients(command, args)
+    if isSP() then
+        triggerEvent("OnServerCommand", "PongDuRain", command, args)
+    else
+        sendServerCommand("PongDuRain", command, args)
+    end
+end
+
 -- 건물 없는 야외 지상(z=0) 컬럼 선정.
 --  ① sq:isOutside()            : 실외
 --  ② sq:getBuilding() == nil   : 맵 건물 스퀘어 제외 (지붕 착지 방지)
@@ -167,6 +183,9 @@ local function spawnRainZombie(session, col, kind)
     session.batch[#session.batch + 1] = {
         ["id"] = zed:getOnlineID(),
         ["k"]  = mutant and kind or nil,
+        -- SP 는 onlineID 가 전부 -1 이라 키로 못 쓴다. 같은 자바 객체를 그대로 넘겨
+        -- 클라가 객체로 매칭한다 (MP 는 nil -- 객체는 직렬화 대상이 아니다).
+        ["obj"] = isSP() and zed or nil,
     }
     return true
 end
@@ -177,7 +196,7 @@ local function flushBatch(session, force)
     -- 매 틱 즉시 보낸다: 클라가 RainMark를 받아야 낙하 데미지 방지/방향 고정/
     -- 낙하산을 적용하므로, 묶어 보내면 그동안 무방비로 떨어진다.
     session.lastFlush = now
-    sendServerCommand("PongDuRain", "RainMark", {
+    toClients("RainMark", {
         ["zeds"]   = session.batch,
         ["sender"] = session.sender or "",   -- 스프린터 이름표용 (세션 공통)
         ["para"]   = session.para,           -- 낙하산 연출 (Rain_Parachute, 세션 공통)
@@ -356,12 +375,17 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     end
     local tSquares1 = getTimestampMs()
 
-    sendServerCommand("PongDuRain", "Prep", { ["cols"] = payload, ["z"] = RAIN_DROP_Z })
+    -- SP 는 서버와 클라가 같은 셀을 쓰므로 위에서 만든 스퀘어가 곧 클라 스퀘어다
+    if isSP() then
+        print("[PongDuRain] SP bridge on (Prep skipped, shared cell)")
+    else
+        sendServerCommand("PongDuRain", "Prep", { ["cols"] = payload, ["z"] = RAIN_DROP_Z })
+    end
 
     -- 투하 모드: 그림자 연출용 비행 정보. 수송기는 PREP_DELAY_MS 시점에 A, 그로부터
     -- durMs 뒤 B에 도달한다 (서버 스폰 시각 t와 같은 기준).
     if flight then
-        sendServerCommand("PongDuRain", "Flight", {
+        toClients("Flight", {
             ["ax"] = flight.ax, ["ay"] = flight.ay,
             ["bx"] = flight.bx, ["by"] = flight.by,
             ["prep"] = PREP_DELAY_MS, ["dur"] = durMs,
