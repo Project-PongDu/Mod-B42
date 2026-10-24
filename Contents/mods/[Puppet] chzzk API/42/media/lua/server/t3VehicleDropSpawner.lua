@@ -46,6 +46,26 @@ local function clampTileOffset(v)
     return v
 end
 
+-- [3D 진단] 바닥 낙하산이 3D 대신 2D 아이콘으로 보이는 원인 분리용 (배치당 1회).
+-- B42 FBO 렌더러는 바닥 아이템을 3D 바닥 아이템 옵션이 켜져 있고
+-- ItemModelRenderer.itemHasModel(= getModelScript(getWorldStaticItem()) ~= nil) 일 때만
+-- 3D 로 그리고, 아니면 2D 스프라이트로 그린다 (FBORenderCell.renderWorldInventoryObject).
+-- modelScript=true 인데도 2D 면 메시/텍스처 로드 실패 쪽이다.
+local function logParachuteModelDiag(item)
+    local ok, err = pcall(function()
+        local wsm = item:getWorldStaticItem()
+        local ms = wsm and getScriptManager():getModelScript(wsm)
+        local opt3d = "n/a"
+        pcall(function() opt3d = tostring(getCore():isOption3DGroundItem()) end)
+        print("[t3VehicleDrop] parachute model diag worldStatic=" .. tostring(wsm)
+            .. " modelScript=" .. tostring(ms ~= nil)
+            .. " mesh=" .. tostring(ms and ms:getMeshName())
+            .. " tex=" .. tostring(ms and ms:getTextureName())
+            .. " opt3DGround=" .. opt3d)
+    end)
+    if not ok then print("[t3VehicleDrop] parachute model diag failed: " .. tostring(err)) end
+end
+
 local function scatterParachutes(centerX, centerY, z)
     local cell = getCell()
     local placed = {}
@@ -73,6 +93,7 @@ local function scatterParachutes(centerX, centerY, z)
                 item:setWorldZRotation(math.floor((angleDeg + PARACHUTE_MODEL_ANGLE_OFFSET) % 360))
                 sq:AddWorldInventoryItem(item, clampTileOffset(px - tx), clampTileOffset(py - ty), 0)
                 placed[#placed + 1] = sq:getX() .. "," .. sq:getY() .. "," .. sq:getZ()
+                if #placed == 1 then logParachuteModelDiag(item) end
                 print(string.format("[t3VehicleDrop] Parachute %d placed at %.2f,%.2f (angle %d, center %.2f,%.2f)",
                     i + 1, px, py, math.floor(angleDeg), centerX, centerY))
             else
