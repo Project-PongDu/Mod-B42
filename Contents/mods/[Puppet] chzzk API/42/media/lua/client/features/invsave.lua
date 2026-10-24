@@ -606,8 +606,24 @@ local function restoreLine(f, player, stack, pendingHotbar)
     parent:AddItem(item)
 
     -- 착용 복원 (최상위 아이템만 worn 정보를 가짐)
+    -- B42: setWornItem 은 문자열이 아니라 ItemBodyLocation 을 받는다
+    -- (IsoGameCharacter.java:3781). 저장된 값은 tostring(ItemBodyLocation) = "base:belt"
+    -- 형식이라 바닐라와 같은 ItemBodyLocation.get(ResourceLocation.of(...)) 로 되돌린다
+    -- (CharacterCreationMain.lua:931). 못 찾으면 아이템 자체 착용 부위로 폴백.
     if depth == 0 and f[3] and f[3] ~= "-" then
-        player:setWornItem(dec(f[3]), item)
+        local locStr = dec(f[3])
+        local okL, loc = pcall(function() return ItemBodyLocation.get(ResourceLocation.of(locStr)) end)
+        if not (okL and loc) then
+            local okB, bl = pcall(function() return item:getBodyLocation() end)
+            loc = okB and bl or nil
+            print("[PongDu] invsave: body location '" .. tostring(locStr) .. "' not in registry, fallback="
+                .. tostring(loc) .. " item=" .. tostring(item:getFullType()))
+        end
+        if loc then
+            player:setWornItem(loc, item)
+        else
+            print("[PongDu] invsave: no body location for " .. tostring(item:getFullType()) .. ", kept in inventory")
+        end
     end
 
     -- 손 장착 복원 (사망 시점에 들고 있던/핫바 장착 무기를 그대로 재장착)
