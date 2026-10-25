@@ -225,9 +225,25 @@ local function kindTally(s)
     return out
 end
 
+-- 일시정지(SP) 보정: 스폰 시각은 실시간(getTimestampMs) 기준인데 일시정지 중엔 OnTick 이
+-- 안 돈다. 재개 첫 틱에 경과시간이 통째로 들어가 밀린 컬럼이 한꺼번에 쏟아지고
+-- (틱당 상한까지), durMs+5초를 넘기면 남은 컬럼을 버리고 세션이 끝났다.
+-- 틱 간격이 이보다 크면 그 공백만큼 세션 시각 기준을 뒤로 민다 (차량보급과 같은 방식).
+local PAUSE_GAP_MS = 500
+local _lastTickAt = nil
+
 local function onTick()
-    if #_sessions == 0 then return end
     local now = getTimestampMs()
+    local gap = _lastTickAt and (now - _lastTickAt) or 0
+    _lastTickAt = now
+    if #_sessions == 0 then return end
+    if gap > PAUSE_GAP_MS then
+        for _, s in ipairs(_sessions) do
+            if s.startMs then s.startMs = s.startMs + gap end
+            s.readyAt = s.readyAt + gap
+        end
+        print(string.format("[PongDuRain] tick gap %dms (pause?) -> %d session(s) shifted", gap, #_sessions))
+    end
     for i = #_sessions, 1, -1 do
         local s = _sessions[i]
         -- 플레이어 접속 종료 등으로 무효화되면 세션 폐기

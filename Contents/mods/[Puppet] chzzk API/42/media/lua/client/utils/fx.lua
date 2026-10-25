@@ -130,14 +130,29 @@ end)
 -- ── 로컬 반경 마커 ────────────────────────────────────────────────────────
 -- addGridSquareMarker(square, r, g, b, doAlpha, radius) -> marker 객체.
 -- ISSpawnHordeUI(바닐라 좀비떼 스폰 UI)가 쓰는 것과 동일한 API.
+--
+-- [B42] 바닥 마커는 FBO 렌더러(FBORenderWorldMarkers.render)가 그리며, 화면에 나오는
+-- 원 반경은 size * 0.69 타일이다 (B41/구 렌더러의 setScaleCircleTexture 1.5배는 무시됨).
+-- radius 를 그대로 넘기면 실제 효과 반경의 69% 로 그려져(실측 r=20 -> 약 13.8칸)
+-- 원 밖에 좀비가 떨어지는 것처럼 보였다. 효과 반경 = 표시 반경이 되게 나눠서 넘긴다.
+-- (PerformanceSettings.fboRenderChunk 는 기본 true, 디버그 키로만 끈다)
+local FBO_MARKER_RADIUS_K = 0.69
+
 local function attachMarker(square, radius, col, durationMs)
-    local marker = getWorldMarkers():addGridSquareMarker(square, col[1], col[2], col[3], true, radius)
+    local size = radius / FBO_MARKER_RADIUS_K
+    local marker = getWorldMarkers():addGridSquareMarker(square, col[1], col[2], col[3], true, size)
     if not marker then return end
     marker:setScaleCircleTexture(true)
 
+    -- 일시정지 중엔 OnTick 이 안 도므로, 틱 간격이 0.5초를 넘으면 그 공백만큼 시작
+    -- 시각을 민다 (일시정지 동안 표시 시간이 소모돼 재개 직후 마커가 사라지던 것 방지).
     local start = getTimestampMs()
+    local last  = start
     local function tick()
-        if getTimestampMs() - start >= durationMs then
+        local now = getTimestampMs()
+        if now - last > 500 then start = start + (now - last) end
+        last = now
+        if now - start >= durationMs then
             marker:remove()
             Events.OnTick.Remove(tick)
         end

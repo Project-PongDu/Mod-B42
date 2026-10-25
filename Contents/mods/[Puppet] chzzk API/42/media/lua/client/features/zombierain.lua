@@ -147,6 +147,12 @@ local _landRestored  = 0
 local _rainCenter    = nil      -- { x, y, r } (좀비 레인 방식만)
 local _landCount     = 0
 local _landOutside   = 0
+local _landMaxDist   = 0
+
+-- 일시정지 보정 (서버 PongDuRainServer.lua 와 같은 기준). 대기열 만료 시각(p.e)과
+-- 수송기 그림자 시작 시각(f.t0)이 실시간 기준이라 일시정지만큼 뒤로 민다.
+local PAUSE_GAP_MS   = 500
+local _lastTickAt    = nil
 local PARA_LOG_MAX   = 5        -- 공습 1회당 부착/재부착 상세 로그 상한
 local _paraScriptOk  = nil      -- 아이템 스크립트 존재 여부 캐시
 local _paraLogLeft   = PARA_LOG_MAX
@@ -521,10 +527,12 @@ local function paraStatsFlush()
     if _fallAnimCount > 0 then
         print("[PongDuRain] fall anim summary set=" .. _fallAnimCount
             .. " landHpRestored=" .. _landRestored
-            .. " landed=" .. _landCount .. " landOutsideRadius=" .. _landOutside)
+            .. " landed=" .. _landCount .. " landOutsideRadius=" .. _landOutside
+            .. string.format(" landMaxDist=%.1f", _landMaxDist))
         _landRestored    = 0
         _landCount       = 0
         _landOutside     = 0
+        _landMaxDist     = 0
         _landLogLeft     = LAND_LOG_MAX
         _fallAnimCount   = 0
         _fallAnimLogLeft = FALL_ANIM_LOG_MAX
@@ -539,6 +547,14 @@ end
 
 local function onTick()
     local dtMs = deltaTime.ms()
+    local tNow = getTimestampMs()
+    local gap  = _lastTickAt and (tNow - _lastTickAt) or 0
+    _lastTickAt = tNow
+    if gap > PAUSE_GAP_MS and (_pendingCount > 0 or #_flights > 0) then
+        for _, p in pairs(_pending) do p.e = p.e + gap end
+        for i = 1, #_flights do _flights[i].t0 = _flights[i].t0 + gap end
+        print(string.format("[PongDuRain] tick gap %dms (pause?) -> pending/flights shifted", gap))
+    end
     -- ① 타이머 감산 (패널 update()가 0에서 자가 제거). 프레임 수가 아닌 실제 경과시간.
     if _rainRemainMs > 0 then
         _rainRemainMs = _rainRemainMs - dtMs
@@ -643,6 +659,8 @@ local function onTick()
                         _landCount = _landCount + 1
                         local dx, dy = z:getX() - _rainCenter.x, z:getY() - _rainCenter.y
                         local lim = _rainCenter.r + 1
+                        local d = math.sqrt(dx * dx + dy * dy)
+                        if d > _landMaxDist then _landMaxDist = d end
                         if dx * dx + dy * dy > lim * lim then
                             _landOutside = _landOutside + 1
                             if _landLogLeft > 0 then
