@@ -2,7 +2,9 @@
 <!-- 좀비 공습 낙하 자세 고정 (client/features/zombierain.lua 낙하 애니메이션 절).
      공중에 있는 공습 좀비는 Lua가 PongDuRainFall=true 를 세운다. 이 노드는 바닐라
      falling/fall_loop.xml 과 같은 클립을 어느 상태에서든 재생한다.
-     B42는 fall_loop 클립을 Bob_FallIdle -> Zombie_FallIdle 로 바꿨으므로 따라간다.
+     클립은 B41 과 같은 Bob_FallIdle (팔을 늘어뜨린 Y자). B42 좀비 fall_loop 의
+     Zombie_FallIdle 은 팔을 버둥거리는 자유낙하 클립이라 낙하산과 맞지 않는다.
+     (B42 플레이어 falling/fall_loop.xml 이 fallSpeedSeverity None/Light 에서 아직 Bob_FallIdle 을 쓴다)
 
      [우선순위] B42 AnimState는 m_ConditionPriority 가 높은 노드를 먼저 고르고,
      같으면 조건 개수로 고른다 (AnimNode.compareSelectionConditions:280~291).
@@ -16,7 +18,7 @@
      에 들어 있다 - 수정 시 전부 같이 바꿀 것. -->
 <animNode>
 	<m_Name>PongDuRainFall</m_Name>
-	<m_AnimName>Zombie_FallIdle</m_AnimName>
+	<m_AnimName>Bob_FallIdle</m_AnimName>
 	<m_ConditionPriority>2</m_ConditionPriority>
 	<m_Looped>true</m_Looped>
 	<m_SpeedScale>0.80</m_SpeedScale>

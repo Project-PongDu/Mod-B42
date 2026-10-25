@@ -17,8 +17,8 @@ local mutantspawn = require("features/mutantspawn")
 --     않는다. createNewGridSquare는 멱등(있으면 그대로 반환) -- 중복 안전.
 --  ③ 남은시간 UI: 폭격 타이머와 동일 스타일의 30초 카운트다운 패널
 --  ④ 낙하 처리: 서버 RainMark(zedId+종류)를 받아 공중에 있는 동안
---     - 소유 클라: 매 틱 fallTime=0 -> 착지 데미지 없음 (DoLand는 fallTime<20이면 무시).
---       자유낙하는 bHardFall을 직접 세워 착지 넘어짐 연출은 유지
+--     - 소유 클라: 낙하 속도(lastFallSpeed)를 매 틱 직접 정한다 (아래 낙하 속도 절).
+--       낙하산은 데미지 없이 사뿐히, 자유낙하는 넘어짐 연출만 남긴다
 --     - 전 클라: 바라보는 방향 고정 (플레이어 쪽으로 돌며 낙하산이 회전하는 것 방지)
 --     - 전 클라: 낙하 자세 고정 (아래 낙하 애니메이션 절)
 --     - 낙하산 연출이면 낙하산 부착 + 감속 (아래 Rain_Parachute 절)
@@ -26,10 +26,15 @@ local mutantspawn = require("features/mutantspawn")
 --     특좀 체력 옵션) 그대로다. 종류(k)가 있으면 특좀 적용기(mutantspawn.mark)에
 --     넘긴다 -- 스프린터 포함 전 특좀이 도네 특좀과 같은 경로로 능력/이름표를 받는다.
 --
--- 낙하 데미지는 엔진 DoLand가 착지 순간 소유 클라에서 넣는다 (fallTime>50 시
--- 체력 감소, 한 층당 fallTime 약 48). 7층이면 최대 약 1.0이라 약함(0.5~0.8)
--- 좀비가 즉사할 수 있어 원복이 아니라 발생 자체를 막는다. 자유낙하의 착지
--- 넘어짐은 bHardFall을 직접 세워 그대로 유지한다. 공중 감지는
+-- [B42 낙하 판정] 착지 데미지·넘어짐은 fallTime 이 아니라 착지 순간 속도로 정한다.
+-- IsoGameCharacter.updateFalling 이 매 틱 lastFallSpeed 에 중력(5.0 층/초^2)을 더하고
+-- fallTime 도 그 속도에서 다시 계산하므로 setFallTime(0) 은 효과가 없다(B41 방식).
+-- 착지 시 IsoZombie.handleLandingImpact 가 속도로 등급을 나눈다 (FallingConstants):
+--   2.24 미만 = 데미지 없음 / 3.87 이상 = 넘어짐 + 50% 죽은척(FakeDead)
+--   5.00 이상 = 확률로 기어다니는 좀비 / 데미지 = 속도/14.14 비례 x 샌드박스 좀비 낙하 데미지
+-- 7층 자유낙하는 약 8.4 라 기어다니는 좀비·즉사가 나오고, z 만 붙잡는 감속은
+-- 속도가 계속 쌓여 착지 속도가 더 커진다(낙하산 좀비가 대부분 즉사한 원인).
+-- 그래서 소유 클라가 공중에 있는 동안 lastFallSpeed 를 매 틱 직접 정한다. 공중 감지는
 -- OnZombieUpdate가 아닌 좀비 리스트 스캔을 쓴다 -- OnZombieUpdate는
 -- ZombieFallDownState 동안 발화가 배제되므로(IsoZombie:2096) 놓칠 수 있다.
 --
@@ -82,8 +87,8 @@ end
 -- ── 낙하 애니메이션 고정 ────────────────────────────────────────────────────
 -- 바닐라 낙하 자세(fall_loop = Bob_FallIdle, 두 팔을 든 Y자)는 액션 상태가 "falling"일
 -- 때만 나온다. 그런데 스폰 직후 좀비는 idle 상태이고 idle에는 falling 전이가 없으며,
--- falling 전이 조건 bFalling(z>0 and fallTime>2)도 소유 클라가 낙하 데미지 방지로
--- 매 틱 fallTime=0 을 넣어 거의 서지 않는다 -> 서 있는 자세/걷기/돌아보기 등이 나왔다.
+-- falling 전이 조건 bFalling 도 낙하산 속도(PARA_DESCENT)에서는 서지 않는다
+-- -> 서 있는 자세/걷기/돌아보기 등이 나왔다.
 -- 해결: 공중에 있는 동안 전 클라가 로컬로 FALL_ANIM_VAR 를 세우고, 모드 AnimSets
 -- (media/AnimSets/zombie/<상태>/PongDuRainFall.xml)가 그 변수가 참이면 어느 상태에서든
 -- Bob_FallIdle 을 고른다 (조건 개수가 가장 많은 노드가 선택되므로 조건을 반복해 둠).
@@ -113,7 +118,8 @@ end
 --    바꾸므로(IsoZombie.DoZombieInventory) OnZombieDead에서 비주얼+아이템을 지운다.
 --  * 감속: 소유 클라가 좀비별 목표 높이(p.pz)를 PARA_DESCENT(층/초)로 매 틱 내리고,
 --    실제 z를 그 값에 고정한다. 엔진 낙하와 무관하게 일정 속도로 내려오며 절대
---    처음 높이보다 올라가지 않는다. fallTime도 매 틱 0 -> 착지 시 DoLand가 20
+--    처음 높이보다 올라가지 않는다. lastFallSpeed 도 매 틱 PARA_DESCENT 로 고정해 착지 데미지가 없다.
+--    (아래 2줄은 B41 기록) fallTime도 매 틱 0 -> 착지 시 DoLand가 20
 --    미만이라 넘어짐/낙하 데미지 없음.
 --    (구버전은 매 틱 lastFallSpeed의 70%를 되올렸는데, 엔진이 그 틱에 실제로 안
 --     떨어뜨린 경우에도 lastFallSpeed가 남아 있어 좀비가 계속 위로 떠올랐다 ->
@@ -123,7 +129,15 @@ end
 --    남아 있는지 확인하고 없으면 다시 씌운다.
 local PARA_ITEM      = "t3chzzkDonation.PongDuZombieParachute"
 local PARA_CLOTHING  = "PongDu_ZombieParachute"
-local PARA_DESCENT   = 1.2      -- 낙하산 하강 속도 (층/초). 4층에서 약 3.3초
+local PARA_DESCENT   = 1.2      -- 낙하산 하강 속도 (층/초). 4층에서 약 3.3초.
+                                -- lastFallSpeed 로도 쓴다: 2.24(데미지 기준) 미만이라 착지 데미지·넘어짐 없음
+-- 자유낙하 속도 상한 (층/초). 3.87(넘어짐 기준) 이상 5.00(기어다니는 좀비 기준) 미만으로
+-- 둬서 넘어짐/죽은척 연출만 남긴다. 이 구간의 데미지(약 0.5 x 샌드박스 배율)는 착지 직후
+-- 공중에서 기록한 체력으로 되돌린다 -- 체력은 서버 설정 그대로 둔다는 원칙.
+local FREE_FALL_CAP  = 4.2
+local LAND_LOG_MAX   = 3        -- 공습 1회당 체력 원복 상세 로그 상한
+local _landLogLeft   = LAND_LOG_MAX
+local _landRestored  = 0
 local PARA_LOG_MAX   = 5        -- 공습 1회당 부착/재부착 상세 로그 상한
 local _paraScriptOk  = nil      -- 아이템 스크립트 존재 여부 캐시
 local _paraLogLeft   = PARA_LOG_MAX
@@ -496,7 +510,10 @@ end)
 -- 낙하산 공습 결과 요약 (대기열이 비는 시점에 1회)
 local function paraStatsFlush()
     if _fallAnimCount > 0 then
-        print("[PongDuRain] fall anim summary set=" .. _fallAnimCount)
+        print("[PongDuRain] fall anim summary set=" .. _fallAnimCount
+            .. " landHpRestored=" .. _landRestored)
+        _landRestored    = 0
+        _landLogLeft     = LAND_LOG_MAX
         _fallAnimCount   = 0
         _fallAnimLogLeft = FALL_ANIM_LOG_MAX
     end
@@ -543,13 +560,9 @@ local function onTick()
                     -- 방향 고정 (전 클라): 처음 본 방향을 매 틱 되돌린다
                     if not p.ang then p.ang = z:getDirectionAngle() end
                     z:setDirectionAngle(p.ang)
-                    -- 낙하 데미지 방지 (소유 클라). fallTime=0이면 DoLand가 데미지와
-                    -- 넘어짐(bHardFall)을 둘 다 건너뛰므로, 자유낙하는 넘어짐만 직접 세운다.
-                    -- land_heavy(AnimSets/zombie/falling)는 착지 순간 bFalling+bHardFall로
-                    -- 선택되므로 착지 전(공중)에 세워둬야 한다. 바닐라도 fallTime>80(약 2층
-                    -- 이상)이면 100% 넘어지므로 7층 낙하에서 항상 세우는 게 바닐라와 같다.
-                    -- 낙하산은 사뿐히 내려오므로 넘어짐 없음. 기어다니는 좀비는 바닐라도 제외
-                    -- (crawler 애님셋에 land_heavy 가 없다).
+                    -- 낙하 속도 고정 (소유 클라, 위 [B42 낙하 판정] 절). 낙하산은 PARA_DESCENT,
+                    -- 자유낙하는 FREE_FALL_CAP 을 넘지 않게 한다. 넘어짐(bHardFall)·죽은척은
+                    -- 엔진이 착지 속도로 직접 정하므로 Lua 가 변수를 세우지 않는다.
                     -- 기어다니는 좀비·로치도 공중에서는 Y자 낙하 자세라 낙하산을 그대로 씌운다.
                     local crawl = z:isCrawling() or p.k == "roach"
                     local usePara = p.para
@@ -567,10 +580,11 @@ local function onTick()
                         end
                     end
                     if not PongDuZombieId.IsRemote(z) then
-                        z:setFallTime(0)
-                        if not usePara and not p.hard and not crawl then
-                            z:setVariable("bHardFall", true)
-                            p.hard = true
+                        if not p.hp then p.hp = z:getHealth() end
+                        if usePara then
+                            z:setLastFallSpeed(PARA_DESCENT)
+                        elseif z:getLastFallSpeed() > FREE_FALL_CAP then
+                            z:setLastFallSpeed(FREE_FALL_CAP)
                         end
                     end
                     if usePara then
@@ -606,6 +620,17 @@ local function onTick()
                 else
                     -- ── 착지 또는 사망 ──
                     fallAnimOff(z, p)
+                    -- 자유낙하 넘어짐 구간의 착지 데미지 원복 (소유 클라, FREE_FALL_CAP 참고)
+                    if p.hp and not z:isDead() and not PongDuZombieId.IsRemote(z)
+                        and z:getHealth() < p.hp then
+                        if _landLogLeft > 0 then
+                            _landLogLeft = _landLogLeft - 1
+                            print(string.format("[PongDuRain] landing hp restored zid=%d %.2f -> %.2f para=%s",
+                                id, z:getHealth(), p.hp, tostring(p.para)))
+                        end
+                        z:setHealth(p.hp)
+                        _landRestored = _landRestored + 1
+                    end
                     if p.chute then
                         chuteDetach(z)
                         p.chute = false
