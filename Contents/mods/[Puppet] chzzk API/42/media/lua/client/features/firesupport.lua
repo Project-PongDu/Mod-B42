@@ -416,7 +416,7 @@ local function grazeZombie(z, id, kdChance, kdForced)
     pcall(function() z:splatBlood(2, 0.3) end)
     -- 상태 변경(넉다운/리액션)은 소유 클라에서만. 원격 좀비에 걸면
     -- 소유 클라 sync 패킷에 덮여서 무효다.
-    if z:isRemoteZombie() then return end
+    if PongDuZombieId.IsRemote(z) then return end
     local down
     if kdForced ~= nil then
         down = kdForced
@@ -537,7 +537,7 @@ local function fsApplyShot(z, id, hp, crit, kd, tag, own)
     pcall(function() z:playSound("BulletHitBody") end)
     pcall(function() z:splatBlood(2, 0.3) end)
     -- 원격 좀비에 Hit 하면 소유 클라 sync 에 덮인다 -- 연출만 하고 끝.
-    if z:isRemoteZombie() then return end
+    if PongDuZombieId.IsRemote(z) then return end
 
     local ok, err = pcall(function()
         local now    = getTimestampMs()
@@ -2036,7 +2036,7 @@ local function dronePickTarget(d, cx, cy, now)
             local d2 = dx * dx + dy * dy
             -- 우호 히트맨(공수부대원)은 쏘지 않는다
             if d2 <= dr2 then
-                local remote = z:isRemoteZombie()
+                local remote = PongDuZombieId.IsRemote(z)
                 local st = droneZombieState(z, remote)
                 local h = hold[z]   -- 객체 키: SP 는 onlineID 가 전부 -1 이라 id 키면 충돌
                 local held = (h and now < h) and true or false
@@ -2139,7 +2139,7 @@ local function droneFireTick(d, now)
         local crit = ZombRand(100) < d.kc
         local kd   = (not crit) and ZombRand(100) < d.kd
         local id   = z:getOnlineID()
-        local remote = z:isRemoteZombie()
+        local remote = PongDuZombieId.IsRemote(z)
 
         -- 로컬 즉시 적용(서버 왕복 없음). 원격 소유 좀비면 연출만 되고
         -- 데미지는 중계를 받은 소유 클라가 넣는다(fsApplyShot 참조).
@@ -2342,7 +2342,7 @@ Events.OnServerCommand.Add(function(module, command, args)
     if not okS then print("[PongDu] fire_support/sniper: shot sound failed") end
 
     if z and not z:isDead() then
-        if z:isRemoteZombie() then
+        if PongDuZombieId.IsRemote(z) then
             -- 소유 클라가 아님 -> 연출만. 킬은 소유 클라가 수행한다.
             pcall(function() z:playSound("BulletHitBody") end)
         else
@@ -2366,7 +2366,7 @@ Events.OnServerCommand.Add(function(module, command, args)
             local eid = tonumber(args.ex[k])
             local ez  = eid and findZombieById(eid) or nil
             if ez and not ez:isDead() then
-                if ez:isRemoteZombie() then
+                if PongDuZombieId.IsRemote(ez) then
                     pcall(function() ez:playSound("BulletHitBody") end)
                 else
                     local ok2, err2 = pcall(function() killZombieNow(ez) end)

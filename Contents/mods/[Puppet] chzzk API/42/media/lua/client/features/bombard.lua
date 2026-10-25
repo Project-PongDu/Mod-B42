@@ -172,7 +172,7 @@ local function killZombiesAround(cx, cy, radius)
     if not zl then return end
     for i = zl:size() - 1, 0, -1 do
         local z = zl:get(i)
-        if z and not z:isDead() and not z:isRemoteZombie() and z:isOutside() then
+        if z and not z:isDead() and not PongDuZombieId.IsRemote(z) and z:isOutside() then
             local dist = math.sqrt(math.pow(z:getX() - cx, 2) + math.pow(z:getY() - cy, 2))
             if dist < radius then
                 z:setCrawler(true)

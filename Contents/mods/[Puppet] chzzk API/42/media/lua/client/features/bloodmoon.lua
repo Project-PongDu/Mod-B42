@@ -117,9 +117,10 @@ end
 -- 정작 효과는 소유 클라가 자기 스윕에서 이미 적용하고 있다.
 -- RandomZombies 는 이 검사를 일부러 뺐지만(자기 카운터 정확도 목적) 우리는
 -- 카운터가 아니라 상태 변경이 목적이라 반대 판단이 맞다.
--- SP 에서는 항상 false 라 전량 통과한다.
+-- SP 에서는 항상 false 라 전량 통과한다 (PongDuZombieId.IsRemote 참고 -- B42 엔진의
+-- isRemoteZombie() 는 SP 에서 true 를 돌려준다).
 local function isForeign(zed)
-    local ok, remote = pcall(function() return zed:isRemoteZombie() end)
+    local ok, remote = pcall(function() return PongDuZombieId.IsRemote(zed) end)
     return ok and remote == true
 end
 

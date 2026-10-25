@@ -142,7 +142,7 @@ local function aggroScan()
                     local zid = z:getOnlineID()
                     if w.ids[zid] and not _handoff[zid] then
                         local remote = false
-                        pcall(function() remote = z:isRemoteZombie() end)
+                        pcall(function() remote = PongDuZombieId.IsRemote(z) end)
                         if not remote then
                             local tgt
                             pcall(function() tgt = z:getTarget() end)

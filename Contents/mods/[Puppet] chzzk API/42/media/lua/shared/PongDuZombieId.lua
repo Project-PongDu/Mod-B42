@@ -58,3 +58,13 @@ function PongDuZombieId.GetString(character)
     if id == nil then return nil end
     return tostring(id)
 end
+
+--- True when another client owns this zombie (MP client only).
+--- B42 IsoZombie:isRemoteZombie() = NetworkZombieComponent.authOwner == null,
+--- and in singleplayer nobody sets authOwner, so it returns TRUE for every zombie.
+--- Vanilla always pairs it with GameClient.client (IsoZombie.java:980/2065/2451),
+--- so do the same: SP -> false, server -> false (server code keeps its own checks).
+function PongDuZombieId.IsRemote(zombie)
+    if not zombie or not isClient() then return false end
+    return zombie:isRemoteZombie()
+end

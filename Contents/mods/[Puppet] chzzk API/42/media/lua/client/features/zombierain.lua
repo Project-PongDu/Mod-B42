@@ -563,10 +563,10 @@ local function onTick()
                             _fallAnimLogLeft = _fallAnimLogLeft - 1
                             print(string.format("[PongDuRain] fall anim on zid=%d z=%.2f state=%s crawl=%s remote=%s",
                                 id, zz, tostring(z:getActionStateName()), tostring(crawl),
-                                tostring(z:isRemoteZombie())))
+                                tostring(PongDuZombieId.IsRemote(z))))
                         end
                     end
-                    if not z:isRemoteZombie() then
+                    if not PongDuZombieId.IsRemote(z) then
                         z:setFallTime(0)
                         if not usePara and not p.hard and not crawl then
                             z:setVariable("bHardFall", true)
@@ -586,14 +586,14 @@ local function onTick()
                                     _paraLogLeft = _paraLogLeft - 1
                                     print(string.format("[PongDuRain] parachute %s zid=%d z=%.2f remote=%s",
                                         p.chute and "REATTACH" or "attach", id, zz,
-                                        tostring(z:isRemoteZombie())))
+                                        tostring(PongDuZombieId.IsRemote(z))))
                                 end
                                 p.chute = true
                             end
                         end
                         -- 감속 (소유 클라만): 목표 높이를 일정 속도로 내리고 z를 그 이하로 고정.
                         -- 목표는 절대 올라가지 않으므로 좀비가 떠오를 수 없다.
-                        if not z:isRemoteZombie() then
+                        if not PongDuZombieId.IsRemote(z) then
                             if not p.pz or p.pz > zz + 1 then p.pz = zz end
                             p.pz = p.pz - PARA_DESCENT * dtMs / 1000
                             if p.pz < 0 then p.pz = 0 end
