@@ -38,32 +38,19 @@ local PARACHUTE_HARNESS_GAP = 2.05
 -- 낙하산 메쉬의 기준 방향 보정값 (도). 로컬 +x(하네스 쪽)가 차량 중심을 향하게 한다.
 local PARACHUTE_MODEL_ANGLE_OFFSET = 180
 
+-- 바닥에서 띄울 높이 (AddWorldInventoryItem 의 height = 월드 아이템 zoff).
+-- B42 는 바닥 아이템 3D 모델을 칸 깊이값과 깊이 비교해서 그린다 (ItemModelRenderer.renderModel
+-- 의 squareDepth/targetDepth). 이 메시는 두께가 거의 없고 절반이 원점 아래라 zoff 0 이면
+-- 지면(잔디 포함) 깊이에 통째로 가려져 아무것도 안 보인다. B41 은 깊이 비교 없이 바닥 위에
+-- 덧그려서 문제가 없었다. 0.2 는 인게임 아이템 배치 UI 로 맞춰 본 값.
+local PARACHUTE_Z_OFFSET = 0.2
+
 -- AddWorldInventoryItem의 x/y는 칸 안 오프셋(0~1)이다. 정확히 0이면
 -- IsoWorldInventoryObject 생성자가 무작위 값으로 바꿔버리므로(생성자 xoff == 0 분기) 살짝 띄운다.
 local function clampTileOffset(v)
     if v < 0.001 then return 0.001 end
     if v > 0.999 then return 0.999 end
     return v
-end
-
--- [3D 진단] 바닥 낙하산이 3D 대신 2D 아이콘으로 보이는 원인 분리용 (배치당 1회).
--- B42 FBO 렌더러는 바닥 아이템을 3D 바닥 아이템 옵션이 켜져 있고
--- ItemModelRenderer.itemHasModel(= getModelScript(getWorldStaticItem()) ~= nil) 일 때만
--- 3D 로 그리고, 아니면 2D 스프라이트로 그린다 (FBORenderCell.renderWorldInventoryObject).
--- modelScript=true 인데도 2D 면 메시/텍스처 로드 실패 쪽이다.
-local function logParachuteModelDiag(item)
-    local ok, err = pcall(function()
-        local wsm = item:getWorldStaticItem()
-        local ms = wsm and getScriptManager():getModelScript(wsm)
-        local opt3d = "n/a"
-        pcall(function() opt3d = tostring(getCore():isOption3DGroundItem()) end)
-        print("[t3VehicleDrop] parachute model diag worldStatic=" .. tostring(wsm)
-            .. " modelScript=" .. tostring(ms ~= nil)
-            .. " mesh=" .. tostring(ms and ms:getMeshName())
-            .. " tex=" .. tostring(ms and ms:getTextureName())
-            .. " opt3DGround=" .. opt3d)
-    end)
-    if not ok then print("[t3VehicleDrop] parachute model diag failed: " .. tostring(err)) end
 end
 
 local function scatterParachutes(centerX, centerY, z)
@@ -91,9 +78,8 @@ local function scatterParachutes(centerX, centerY, z)
             local item = instanceItem(PARACHUTE_TYPE)
             if item then
                 item:setWorldZRotation(math.floor((angleDeg + PARACHUTE_MODEL_ANGLE_OFFSET) % 360))
-                sq:AddWorldInventoryItem(item, clampTileOffset(px - tx), clampTileOffset(py - ty), 0)
+                sq:AddWorldInventoryItem(item, clampTileOffset(px - tx), clampTileOffset(py - ty), PARACHUTE_Z_OFFSET)
                 placed[#placed + 1] = sq:getX() .. "," .. sq:getY() .. "," .. sq:getZ()
-                if #placed == 1 then logParachuteModelDiag(item) end
                 print(string.format("[t3VehicleDrop] Parachute %d placed at %.2f,%.2f (angle %d, center %.2f,%.2f)",
                     i + 1, px, py, math.floor(angleDeg), centerX, centerY))
             else
