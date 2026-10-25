@@ -138,6 +138,15 @@ local FREE_FALL_CAP  = 4.2
 local LAND_LOG_MAX   = 3        -- 공습 1회당 체력 원복 상세 로그 상한
 local _landLogLeft   = LAND_LOG_MAX
 local _landRestored  = 0
+
+-- 공중 수평 위치 고정 (소유 클라). 스폰 직후 좀비는 플레이어를 노리며(setTarget/lunger)
+-- 걷는 상태인데, 방향 고정 때문에 처음 바라본 무작위 방향으로 공중에서 계속 걸어
+-- 컬럼(반경 안)에서 벗어난 곳에 착지했다. 낙하산으로 체공이 몇 초로 길어지며 드러남.
+-- 공중에 있는 동안 처음 본 x,y 로 매 틱 되돌린다 (setForceX/Y = x/next/last 동시 설정).
+-- 반경 검증용: 좀비 레인 방식은 발동 위치·반경을 기억해 착지 위치가 원 밖이면 센다.
+local _rainCenter    = nil      -- { x, y, r } (좀비 레인 방식만)
+local _landCount     = 0
+local _landOutside   = 0
 local PARA_LOG_MAX   = 5        -- 공습 1회당 부착/재부착 상세 로그 상한
 local _paraScriptOk  = nil      -- 아이템 스크립트 존재 여부 캐시
 local _paraLogLeft   = PARA_LOG_MAX
@@ -511,8 +520,11 @@ end)
 local function paraStatsFlush()
     if _fallAnimCount > 0 then
         print("[PongDuRain] fall anim summary set=" .. _fallAnimCount
-            .. " landHpRestored=" .. _landRestored)
+            .. " landHpRestored=" .. _landRestored
+            .. " landed=" .. _landCount .. " landOutsideRadius=" .. _landOutside)
         _landRestored    = 0
+        _landCount       = 0
+        _landOutside     = 0
         _landLogLeft     = LAND_LOG_MAX
         _fallAnimCount   = 0
         _fallAnimLogLeft = FALL_ANIM_LOG_MAX
@@ -581,6 +593,12 @@ local function onTick()
                     end
                     if not PongDuZombieId.IsRemote(z) then
                         if not p.hp then p.hp = z:getHealth() end
+                        -- 수평 위치 고정 (위 _rainCenter 절)
+                        if not p.ax then p.ax, p.ay = z:getX(), z:getY() end
+                        if z:getX() ~= p.ax or z:getY() ~= p.ay then
+                            z:setForceX(p.ax)
+                            z:setForceY(p.ay)
+                        end
                         if usePara then
                             z:setLastFallSpeed(PARA_DESCENT)
                         elseif z:getLastFallSpeed() > FREE_FALL_CAP then
@@ -620,6 +638,20 @@ local function onTick()
                 else
                     -- ── 착지 또는 사망 ──
                     fallAnimOff(z, p)
+                    -- 착지 위치 검증 (좀비 레인 방식, 공중에서 위치를 잡아둔 좀비만)
+                    if p.ax and _rainCenter and not z:isDead() then
+                        _landCount = _landCount + 1
+                        local dx, dy = z:getX() - _rainCenter.x, z:getY() - _rainCenter.y
+                        local lim = _rainCenter.r + 1
+                        if dx * dx + dy * dy > lim * lim then
+                            _landOutside = _landOutside + 1
+                            if _landLogLeft > 0 then
+                                _landLogLeft = _landLogLeft - 1
+                                print(string.format("[PongDuRain] WARN landed outside radius zid=%d d=%.1f r=%d air=(%.1f,%.1f) land=(%.1f,%.1f)",
+                                    id, math.sqrt(dx * dx + dy * dy), _rainCenter.r, p.ax, p.ay, z:getX(), z:getY()))
+                            end
+                        end
+                    end
                     -- 자유낙하 넘어짐 구간의 착지 데미지 원복 (소유 클라, FREE_FALL_CAP 참고)
                     if p.hp and not z:isDead() and not PongDuZombieId.IsRemote(z)
                         and z:getHealth() < p.hp then
@@ -695,6 +727,8 @@ function _a.b(player, sender)
     -- 반경 표시는 Rain_ShowRadius 를 따르고(꺼져 있으면 markerRadius=0 -> 아무에게도
     -- 안 뜸), 마커는 낙하가 이어지는 지속시간 내내 유지된다.
     local px, py, pz = player:getX(), player:getY(), player:getZ()
+    -- 착지 위치 검증용 (좀비 레인 방식만. 서버 pickRainColumn 도 이 위치·반경으로 고른다)
+    _rainCenter = (style == STYLE_RAIN) and { x = px, y = py, r = r } or nil
     -- 투하 모드는 원형 반경이 실제 낙하 범위(경로 띠)와 달라 마커를 띄우지 않는다.
     -- 그림자가 범위 표시를 대신한다.
     local showRadius = showRadiusEnabled() and style == STYLE_RAIN
