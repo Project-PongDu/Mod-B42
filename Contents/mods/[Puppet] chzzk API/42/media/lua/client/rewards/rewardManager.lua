@@ -45,8 +45,9 @@ end
 -- giveSupply(itemId, sender, label) -> InventoryItem | nil
 -- 인벤토리에 아이템을 직접 꽂아주는 보급 계열 기능(백신/스킬혈청/무기상자/
 -- 차량키트/인벤세이브권)의 공통 처리. 지급 -> 후원자 각인 -> 보급음 순서다.
---   * label 을 주면 표시명 대신 그 문자열을 쓴다(백신: 아이템명이 "Zomboxivir"라
---     후원자 각인 시 "Vaccine"으로 바꿔 쓰던 기존 동작 유지).
+--   * label 을 주면 표시명 대신 그 문자열을 쓴다. 지금은 쓰는 곳이 없다.
+--     (B41 백신은 아이템명이 번역되지 않은 "Zomboxivir Ampule"이라 "Vaccine"으로
+--     바꿔 썼지만, B42는 ItemName.json 에 한글명이 있어 표시명을 그대로 쓴다.)
 --   * pongdu_supply 는 getSoundManager():PlaySound() 로 재생하는 클라 로컬
 --     사운드다. 월드 사운드(addSound)가 아니므로 좀비 어그로가 붙지 않는다.
 --   * AddItem 이 nil 을 반환하는 경우(아이템 스크립트 오타/미등록 등)엔 사운드를
@@ -132,7 +133,7 @@ local rewardHandlers = {
     ["vaccine"] = {
         immediate = true,
         fn = function(sender)
-            giveSupply("Zomboxivir", sender, "Vaccine")    -- Vaccine
+            giveSupply("Zomboxivir", sender)    -- Vaccine
             global.processingEvent = false
         end,
     },
