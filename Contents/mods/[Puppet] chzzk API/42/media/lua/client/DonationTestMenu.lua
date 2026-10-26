@@ -190,15 +190,45 @@ local function displayLabel(featureId)
     return featureId
 end
 
-function DonationTestMenu.WorldContextMenuPre(playerID, context, worldobjects, test)
-    if not (isAdmin() or isDebugEnabled()) then return end
+-- ── 메뉴 노출 권한 ───────────────────────────────────────────────────────────
+-- B42 isAdmin() 은 "GameClient.connection.getRole() == Roles.getDefaultForAdmin()" 객체 동일성
+-- 비교다 (LuaManager.java isAdmin). 멀티 서버에 grantadmin 으로 관리자가 돼서 이름표에
+-- admin 이 떠도 false 가 나오는 경우가 있다 -- 2026-10-26 멀티 실측: 관리자 표시 상태에서
+-- 이 메뉴도, 같은 isAdmin() 게이트를 쓰는 바닐라 AdminContextMenu("Tools")도 안 떴고,
+-- 역할 권한으로 게이트되는 바닐라 디버그 메뉴만 떴다.
+-- 그래서 역할 권한(Capability.UseDebugContextMenu)도 같이 본다. 바닐라 스코어보드 등도
+-- getPlayer():getRole():hasCapability(...) 로 판정한다.
+-- 표시용 판정이다. 남에게 꽂는 경로는 서버가 isAccessLevel("admin") 으로 다시 본다(server.lua Inject).
+local _denyLogged = false
 
+local function canUseTestMenu(player)
+    if isDebugEnabled() then return true end
+    if isAdmin() then return true end
+    local role = player and player:getRole()
+    if role and Capability and Capability.UseDebugContextMenu
+        and role:hasCapability(Capability.UseDebugContextMenu) then
+        return true
+    end
+    if not _denyLogged then
+        _denyLogged = true
+        print("[PongDuTestMenu] menu hidden: no permission (isAdmin=" .. tostring(isAdmin())
+            .. " access=" .. tostring(player and player:getAccessLevel())
+            .. " role=" .. tostring(role and role:getName()) .. ")")
+    end
+    return false
+end
+
+function DonationTestMenu.WorldContextMenuPre(playerID, context, worldobjects, test)
     local player = getSpecificPlayer(playerID)
     if not player then return end
+    if not canUseTestMenu(player) then return end
 
     -- 플레이어를 우클릭한 게 아니면 메뉴 자체를 만들지 않는다.
     local target = findClickedPlayer()
-    if not target then return end
+    if not target then
+        print("[PongDuTestMenu] menu skipped: no player within 1 tile of the clicked square")
+        return
+    end
 
     -- 분류표에 없는 featureId 추적용. CATEGORY_LIST를 훑어 뺀 나머지가
     -- getFeatureIds() 결과에 남으면 분류를 깜빡한 신규 기능이다.
