@@ -819,12 +819,61 @@ end
 local SYNC_TTL_MS = 8000
 local _syncLogged = 0
 
+-- ── 스폰 직후 클라 수신 진단 ─────────────────────────────────────────────────
+-- 2026-10-27 멀티: 서버는 특좀을 스폰(MutantSpawn OK)하고 MutantMark 도 클라에 도착했는데,
+-- 클라 좀비 목록에 그 zid 가 아예 없어 능력이 안 붙는 사례가 절반쯤 나왔다(어그로 handoff=0/1).
+-- 서버에 좀비가 있는데 클라로 안 넘어온 건지, 다른 zid 로 넘어온 건지 가리기 위해
+-- 3초 뒤 스폰 좌표 주변(SPAWN_CHECK_R 칸)의 클라 좀비를 기록한다.
+local _spawnChecks = {}
+local SPAWN_CHECK_MS = 3000
+local SPAWN_CHECK_R  = 3
+
+local function runSpawnChecks()
+    if #_spawnChecks == 0 then return end
+    local now = getTimestampMs()
+    local cell = getCell()
+    local zl = cell and cell:getZombieList()
+    for i = #_spawnChecks, 1, -1 do
+        local c = _spawnChecks[i]
+        if now >= c.at then
+            table.remove(_spawnChecks, i)
+            local found, near, nearIds = false, 0, ""
+            if zl then
+                for j = 0, zl:size() - 1 do
+                    local z = zl:get(j)
+                    if z:getOnlineID() == c.zid then found = true end
+                    local dx, dy = z:getX() - c.x, z:getY() - c.y
+                    if dx * dx + dy * dy <= SPAWN_CHECK_R * SPAWN_CHECK_R then
+                        near = near + 1
+                        if near <= 5 then
+                            nearIds = nearIds .. tostring(z:getOnlineID())
+                                .. (z:getModData()["PuppetMutant"] and "*" or "") .. " "
+                        end
+                    end
+                end
+            end
+            print(string.format("[PuppetMutant] spawn check zid=%s kind=%s found=%s near=%d ids=[%s] clientZombies=%d at %.1f,%.1f",
+                tostring(c.zid), tostring(c.kind), tostring(found), near, nearIds,
+                zl and zl:size() or -1, c.x, c.y))
+        end
+    end
+end
+Events.OnTick.Add(runSpawnChecks)
+
 Events.OnServerCommand.Add(function(module, command, args)
     if module ~= "PongDuMutant" then return end
     if command == "MutantMark" then
         print("[PuppetMutant] mark received zid=" .. tostring(args and args["zedId"])
             .. " kind=" .. tostring(args and args["kind"]))
         _a.mark(args and tonumber(args["zedId"]), args and args["kind"], args and args["sender"])
+        -- 스폰 마크(좌표 포함)만 3초 뒤 클라에 그 좀비가 있는지 확인한다.
+        if args and args["x"] and args["y"] and isClient() then
+            _spawnChecks[#_spawnChecks + 1] = {
+                zid = tonumber(args["zedId"]), kind = args["kind"],
+                x = tonumber(args["x"]), y = tonumber(args["y"]), z = tonumber(args["z"]) or 0,
+                at = getTimestampMs() + SPAWN_CHECK_MS,
+            }
+        end
     elseif command == "MutantSync" then
         local list = args and args["zeds"]
         if type(list) ~= "table" then return end

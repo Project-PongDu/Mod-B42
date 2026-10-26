@@ -181,6 +181,8 @@ local function spawnSpecialZombie(x, y, z, kind, sender)
         ["zedId"]  = zed:getOnlineID(),
         ["kind"]   = kind,
         ["sender"] = sender or "",
+        -- 스폰 직후 클라에 좀비가 안 보이는 사례 진단용 좌표 (클라 mutantspawn 이 3초 뒤 확인)
+        ["x"] = zed:getX(), ["y"] = zed:getY(), ["z"] = zed:getZ(),
     })
     registerMutant(zed, kind, sender) -- 부활 유지용 영속 등록 (후원자 포함)
     return zed:getOnlineID()   -- 어그로 스코프용 (실패 경로는 위에서 false)
