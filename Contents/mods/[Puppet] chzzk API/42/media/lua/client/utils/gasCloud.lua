@@ -183,10 +183,28 @@ end
 -- drawFlights 주석 참고). OnPreUIDraw 로 옮기고 UI 좌표로 그린다. 기저는 바닐라
 -- isoToScreenX/Y(줌·화면 원점 반영)로 프레임당 세 번만 구한다: 월드 (0,0) 의 화면 위치
 -- (offX/offY 자리) + x 한 칸당 화면 이동량(bx/by).
+-- 일시정지 보정 (zombierain.lua 와 같은 방식). OnTick 은 일시정지 중 멈추므로, 틱 간격이
+-- PAUSE_GAP_MS 를 넘으면 그 공백만큼 구름 시작 시각을 뒤로 민다. 그리기(OnPreUIDraw)는
+-- 일시정지 중에도 돌므로 마지막 틱 시각에 멈춰 그린다 -- 정지 중 가스가 퍼지거나 걷히지 않는다.
+local PAUSE_GAP_MS = 500
+local _lastTickAt  = nil
+
+local function onTick()
+    local now = getTimestampMs()
+    local gap = _lastTickAt and (now - _lastTickAt) or 0
+    _lastTickAt = now
+    if gap > PAUSE_GAP_MS and #_clouds > 0 then
+        for i = 1, #_clouds do _clouds[i].t0 = _clouds[i].t0 + gap end
+        print(string.format("[PongDu][Gas] tick gap %dms (pause?) -> %d cloud(s) shifted", gap, #_clouds))
+    end
+end
+Events.OnTick.Add(onTick)
+
 local function drawClouds()
     if #_clouds == 0 then return end
 
     local now = getTimestampMs()
+    if _lastTickAt and now - _lastTickAt > PAUSE_GAP_MS then now = _lastTickAt end
     local renderer = getRenderer()
     local ox0, oy0 = isoToScreenX(0, 0, 0, 0), isoToScreenY(0, 0, 0, 0)
     local bx = isoToScreenX(0, 1, 0, 0) - ox0   -- = 32 * TileScale / zoom

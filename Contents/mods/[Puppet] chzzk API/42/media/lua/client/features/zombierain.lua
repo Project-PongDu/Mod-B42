@@ -306,7 +306,10 @@ end
 local function drawFlights()
     if #_flights == 0 then return end
     if not SHADOW_TEX then return end
+    -- OnPreUIDraw 는 일시정지 중에도 매 프레임 불린다. 마지막 틱 이후 PAUSE_GAP_MS 가 지났으면
+    -- (일시정지 중, 또는 재개 직후 OnTick 이 시각을 밀기 전) 마지막 틱 시각에 멈춰 그린다.
     local now = getTimestampMs()
+    if _lastTickAt and now - _lastTickAt > PAUSE_GAP_MS then now = _lastTickAt end
     local renderer = getRenderer()
     for i = 1, #_flights do
         local f = _flights[i]
