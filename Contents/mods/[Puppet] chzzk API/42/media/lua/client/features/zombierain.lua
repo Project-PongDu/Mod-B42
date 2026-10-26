@@ -387,6 +387,9 @@ local function planeTick()
         return
     end
     local now = getTimestampMs()
+    -- 재개 직후 첫 틱: 이 핸들러가 onTick(시각 보정)보다 먼저 돌아 보정 전 시각으로
+    -- 비행이 끝난 것으로 판정돼 지워졌다. 간격이 크면 이번 틱은 건너뛴다(_lastTickAt 은 아직 이전 틱 값).
+    if _lastTickAt and now - _lastTickAt > PAUSE_GAP_MS then return end
     local pl = getSpecificPlayer(0)
     local px, py = 0, 0
     if pl then px, py = pl:getX(), pl:getY() end
