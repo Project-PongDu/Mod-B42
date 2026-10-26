@@ -14,8 +14,9 @@ local colorMap = require("utils/colorMap")
 --     "시스템 범위표시"로 읽히지 "가스가 퍼졌다"로는 안 읽힌다.
 --   · 애니메이션 프레임을 못 먹인다.
 --  그래서 좀비 공습의 수송기 그림자(features/zombierain.lua)와 같은 경로를
---  쓴다 -- OnPostFloorLayerDraw(z=0) + renderPoly. 바닥 타일 위, 물체/캐릭터
---  아래에 깔리므로 가스 안에서 일어나는 시체가 가스에 가려지지 않는다.
+--  쓴다 -- OnPreUIDraw + renderPoly (B42: OnPostFloorLayerDraw 는 FBO 렌더러에서 발화하지
+--  않는다). B41 때는 바닥 위·캐릭터 아래에 깔렸지만, 지금은 월드 전체 위에 덮여 가스 안의
+--  캐릭터도 반투명 가스에 살짝 가려진다.
 --
 --  왜 IsoObject + setSprite 가 아닌가:
 --   스퀘어에 더미 오브젝트를 심는 방식은 청크 언로드/세이브에 얽히고 MP 에서
@@ -178,14 +179,19 @@ end
 -- 뽑을 수 있다. 퍼프마다 네 번씩 IsoUtils 를 부르면 (퍼프 40개 = 320 호출/프레임)
 -- Kahlua Java 호출 오버헤드가 그대로 프레임에 실린다.
 -- renderPoly UV: 1=좌상, 2=우상, 3=우하, 4=좌하 (수송기 그림자와 동일).
-local function drawClouds(z)
-    if z ~= 0 or #_clouds == 0 then return end
+-- [B42] OnPostFloorLayerDraw 는 B42 기본 FBO 렌더러에서 발화하지 않는다 (zombierain.lua
+-- drawFlights 주석 참고). OnPreUIDraw 로 옮기고 UI 좌표로 그린다. 기저는 바닐라
+-- isoToScreenX/Y(줌·화면 원점 반영)로 프레임당 세 번만 구한다: 월드 (0,0) 의 화면 위치
+-- (offX/offY 자리) + x 한 칸당 화면 이동량(bx/by).
+local function drawClouds()
+    if #_clouds == 0 then return end
 
     local now = getTimestampMs()
     local renderer = getRenderer()
-    local offX, offY = IsoCamera.getOffX(), IsoCamera.getOffY()
-    local bx = IsoUtils.XToScreen(1, 0, 0, 0)   -- = 32 * TileScale
-    local by = IsoUtils.YToScreen(1, 0, 0, 0)   -- = 16 * TileScale
+    local ox0, oy0 = isoToScreenX(0, 0, 0, 0), isoToScreenY(0, 0, 0, 0)
+    local bx = isoToScreenX(0, 1, 0, 0) - ox0   -- = 32 * TileScale / zoom
+    local by = isoToScreenY(0, 1, 0, 0) - oy0   -- = 16 * TileScale / zoom
+    local offX, offY = -ox0, -oy0
 
     local pl = getSpecificPlayer(0)
     local plx, ply = 0, 0
@@ -238,6 +244,6 @@ local function drawClouds(z)
         end
     end
 end
-Events.OnPostFloorLayerDraw.Add(drawClouds)
+Events.OnPreUIDraw.Add(drawClouds)
 
 return _gas

@@ -41,8 +41,8 @@ local mutantspawn = require("features/mutantspawn")
 -- 표시명은 "좀비 공습"(IGUI_donation_zombie_rain). 공습 방식은 Rain_Style 드롭다운:
 -- 1 = 좀비 레인(플레이어 중심 원), 2 = 수송기 투하. 투하는 서버가 보내는 비행
 -- 정보(Flight, A->B)로 바닥에 수송기 그림자를 그린다 (실제 차량 없음, 렌더만).
--- 그림자는 OnPostFloorLayerDraw(z=0)에서 그려 바닥 위, 물체/캐릭터 아래에 깔린다
--- (IsoCell 타일 렌더에서 WorldMarkers 바닥 마커 직후, IsoMarkers 직전에 발화).
+-- 그림자는 OnPreUIDraw 에서 월드 위에 반투명으로 그린다 (B42 FBO 렌더러는
+-- OnPostFloorLayerDraw 를 발화하지 않는다 -- drawFlights 주석).
 --
 -- [알려진 엣지] 낙하 도중 뒤늦게 스트림인한 클라는 컬럼 청크가 로드 전이라
 -- 스퀘어 생성이 스킵될 수 있다 -> 해당 좀비는 착지(z=0) 후 패킷부터 정상
@@ -278,9 +278,9 @@ local SHADOW_TAIL   = 2500   -- 마지막 투하 후 화면 밖으로 빠져나�
 local FLIGHT_CULL   = 100    -- 경로 중점에서 (경로 절반 길이 + 이 값)보다 멀면 수신 무시 (타일)
 local _flights = {}
 
+-- [B42] UI 좌표(OnPreUIDraw). 월드 -> 화면 변환은 바닐라 isoToScreenX/Y(줌·화면 원점 반영).
 local function toScreen(x, y)
-    return IsoUtils.XToScreen(x, y, 0, 0) - IsoCamera.getOffX(),
-           IsoUtils.YToScreen(x, y, 0, 0) - IsoCamera.getOffY()
+    return isoToScreenX(0, x, y, 0), isoToScreenY(0, x, y, 0)
 end
 
 -- 수송기 현재 위치와 페이드 계수(0~1). 비행이 끝났으면 nil.
@@ -298,8 +298,13 @@ local function flightState(f, now)
     return f.ax + (f.bx - f.ax) * frac, f.ay + (f.by - f.ay) * frac, k
 end
 
-local function drawFlights(z)
-    if z ~= 0 or #_flights == 0 then return end
+-- [B42] OnPostFloorLayerDraw 는 구 렌더러(IsoCell.renderInternal)에서만 발화하고, B42 기본
+-- FBO 렌더러(FBORenderCell.renderInternal, PerformanceSettings.fboRenderChunk=true)에서는
+-- 아예 불리지 않아 그림자가 안 그려졌다. OnPreUIDraw(월드 렌더 후, UI 전)로 옮긴다.
+-- 대가: 바닥 위가 아니라 월드 전체 위에 그려져 캐릭터·차량도 그림자에 덮인다
+-- (반투명 그림자라 실제 그림자처럼 보인다).
+local function drawFlights()
+    if #_flights == 0 then return end
     if not SHADOW_TEX then return end
     local now = getTimestampMs()
     local renderer = getRenderer()
@@ -319,7 +324,7 @@ local function drawFlights(z)
         end
     end
 end
-Events.OnPostFloorLayerDraw.Add(drawFlights)
+Events.OnPreUIDraw.Add(drawFlights)
 
 -- ── 투하 모드: 수송기 엔진음 ─────────────────────────────────────────────────
 -- 화력지원 헬기 로터음(firesupport.lua)과 같은 방식:
