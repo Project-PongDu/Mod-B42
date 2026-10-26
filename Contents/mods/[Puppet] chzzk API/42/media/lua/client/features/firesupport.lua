@@ -4,6 +4,8 @@ local global = require("global")
 local timerStack = require("utils/timerStack")
 local colorMap = require("utils/colorMap")
 local timerText = require("utils/timerText")
+-- 저격·헬기·드론 남은시간 패널은 동시에 여럿 뜰 수 있어 한 줄에 가로로 놓는다 (utils/timerStack).
+local FS_TIMER_GROUP = "fire_support"
 
 -- ═══════════════════════════════════════════════════════════════════════════
 --  화력 지원 (fire_support): 저격 / 드론 / 헬기 / 공수 중 1종 랜덤 발동.
@@ -542,7 +544,7 @@ local function fsApplyShot(z, id, hp, crit, kd, tag, own)
     -- 통계 키: MP 는 onlineID, SP 는 객체(onlineID 가 전부 -1 이라 한 항목에 섞인다).
     local sk = (isClient() or isServer()) and id or z
     local ok, err = pcall(function()
-        local now    = getTimestampMs()
+        local now    = PongDuClock.now()
         local st     = fsStatsGet(sk, z, now)
         local verify = fsVerifyTick(tag, now)
         local before = z:getHealth()
@@ -804,7 +806,7 @@ end
 
 function SniperTimerDisplay:render()
     if not _sniperEndAt then return end
-    local ms = _sniperEndAt - getTimestampMs()
+    local ms = _sniperEndAt - PongDuClock.now()
     if ms < 0 then ms = 0 end
     local totalSec = math.floor(ms / 1000)
     local col = colorMap.get("fire_support")
@@ -812,7 +814,7 @@ function SniperTimerDisplay:render()
 end
 
 function SniperTimerDisplay:update()
-    if not _sniperEndAt or _sniperEndAt - getTimestampMs() <= 0 then
+    if not _sniperEndAt or _sniperEndAt - PongDuClock.now() <= 0 then
         timerStack.unregister(self)
         self:removeFromUIManager()
         _sniperPanel = nil
@@ -820,12 +822,12 @@ function SniperTimerDisplay:update()
 end
 
 local function sniperTimerShow(remainMs)
-    _sniperEndAt = getTimestampMs() + (tonumber(remainMs) or 0)
+    _sniperEndAt = PongDuClock.now() + (tonumber(remainMs) or 0)
     if not _sniperPanel then
         _sniperPanel = SniperTimerDisplay:new()
         _sniperPanel:addToUIManager()
         _sniperPanel:setVisible(true)
-        timerStack.register(_sniperPanel)
+        timerStack.register(_sniperPanel, FS_TIMER_GROUP)
     end
 end
 
@@ -864,7 +866,7 @@ end
 
 function HeliTimerDisplay:render()
     if not _heliEndAt then return end
-    local ms = _heliEndAt - getTimestampMs()
+    local ms = _heliEndAt - PongDuClock.now()
     if ms < 0 then ms = 0 end
     local totalSec = math.floor(ms / 1000)
     local col = colorMap.get("fire_support")
@@ -872,7 +874,7 @@ function HeliTimerDisplay:render()
 end
 
 function HeliTimerDisplay:update()
-    if not _heliEndAt or _heliEndAt - getTimestampMs() <= 0 then
+    if not _heliEndAt or _heliEndAt - PongDuClock.now() <= 0 then
         timerStack.unregister(self)
         self:removeFromUIManager()
         _heliPanel = nil
@@ -880,12 +882,12 @@ function HeliTimerDisplay:update()
 end
 
 local function heliTimerShow(remainMs)
-    _heliEndAt = getTimestampMs() + (tonumber(remainMs) or 0)
+    _heliEndAt = PongDuClock.now() + (tonumber(remainMs) or 0)
     if not _heliPanel then
         _heliPanel = HeliTimerDisplay:new()
         _heliPanel:addToUIManager()
         _heliPanel:setVisible(true)
-        timerStack.register(_heliPanel)
+        timerStack.register(_heliPanel, FS_TIMER_GROUP)
     end
 end
 
@@ -940,7 +942,7 @@ local HELI_LOST_LOG_MS     = 3000   -- 유실 상태 반복 로그 주기
 
 local function heliPathPos(h)
     if not h or not h.total then return nil end
-    local t = (getTimestampMs() - h.t0) / h.total
+    local t = (PongDuClock.now() - h.t0) / h.total
     if t < 0 then t = 0 elseif t > 1 then t = 1 end
     return h.ax + (h.bx - h.ax) * t, h.ay + (h.by - h.ay) * t, h.oz
 end
@@ -998,7 +1000,7 @@ end
 -- 차량을 못 잡고 있는 동안의 처리(파일럿 클라 전용).
 -- 유실 시각을 기록하고, 조건이 맞으면 서버에 재스폰을 요청한다.
 local function heliLostTick(h)
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     if not h.lostAt then
         h.lostAt    = now
         h.lostLogAt = 0
@@ -1043,7 +1045,7 @@ local function heliPilotTick(h)
         -- 최초 스폰 직후에도 한 번 찍힌다 = 차량 스트리밍에 걸린 실제 시간.
         print(string.format(
             "[PongDu] fire_support/heli: vehicle acquired own=%s vid=%s after %dms",
-            tostring(h.own), tostring(h.vid), getTimestampMs() - h.lostAt))
+            tostring(h.own), tostring(h.vid), PongDuClock.now() - h.lostAt))
         h.lostAt = nil
     end
     local wx, wy = heliPathPos(h)
@@ -1265,7 +1267,7 @@ local function heliUpsert(args)
         h.yawSet = false   -- 새 경로마다 파일럿이 기수 방향 재설정
         -- 로컬 시계 기준 시작점: 이미 elapsed만큼 진행된 상태에서 이어받는다
         -- (급선회로 갈아끼워질 때도 elapsed=0으로 오므로 자동으로 t0=now).
-        h.t0 = getTimestampMs() - (tonumber(args.elapsed) or 0)
+        h.t0 = PongDuClock.now() - (tonumber(args.elapsed) or 0)
     end
 
     -- 실차량 연동: 서버가 스폰한 VehicleID와 물리 권한 대상(pilot).
@@ -1282,14 +1284,14 @@ local function heliUpsert(args)
         and (tonumber(args.pilot) == me)
 
     -- 유실 대비 자체 데드라인. 서버 HeliStop이 정상 도착하면 그쪽이 먼저 끈다.
-    h.stopAt = getTimestampMs() + (tonumber(args.remain) or 30000) + 2000
+    h.stopAt = PongDuClock.now() + (tonumber(args.remain) or 30000) + 2000
     -- 사격 파라미터/사격 마감. 대상 플레이어 클라만 쓴다(heliFireTick).
     -- 급선회(재후원)마다 HeliStart 가 다시 오므로 여기서 매번 갱신한다.
     if args.r  then h.r  = tonumber(args.r)  or h.r  end
     if args.iv then h.iv = tonumber(args.iv) or h.iv end
     if args.kc then h.kc = tonumber(args.kc) or h.kc end
-    h.fireUntil = getTimestampMs() + (tonumber(args.remain) or 30000)
-    h.firstAt = h.firstAt or getTimestampMs()
+    h.fireUntil = PongDuClock.now() + (tonumber(args.remain) or 30000)
+    h.firstAt = h.firstAt or PongDuClock.now()
 
     print(string.format(
         "[PongDu] fire_support/heli: start own=%s vid=%s pilot=%s amPilot=%s count=%d",
@@ -1363,7 +1365,7 @@ end
 
 function DroneTimerDisplay:render()
     if not _droneEndAt then return end
-    local ms = _droneEndAt - getTimestampMs()
+    local ms = _droneEndAt - PongDuClock.now()
     if ms < 0 then ms = 0 end
     local totalSec = math.floor(ms / 1000)
     local col = colorMap.get("fire_support")
@@ -1371,7 +1373,7 @@ function DroneTimerDisplay:render()
 end
 
 function DroneTimerDisplay:update()
-    if not _droneEndAt or _droneEndAt - getTimestampMs() <= 0 then
+    if not _droneEndAt or _droneEndAt - PongDuClock.now() <= 0 then
         timerStack.unregister(self)
         self:removeFromUIManager()
         _dronePanel = nil
@@ -1380,12 +1382,12 @@ end
 
 -- 카운터는 공전 진입 시점부터. 접근 1초는 제외한다.
 local function droneTimerShow(orbitMs)
-    _droneEndAt = getTimestampMs() + DRONE_APPROACH_MS + (tonumber(orbitMs) or 0)
+    _droneEndAt = PongDuClock.now() + DRONE_APPROACH_MS + (tonumber(orbitMs) or 0)
     if not _dronePanel then
         _dronePanel = DroneTimerDisplay:new()
         _dronePanel:addToUIManager()
         _dronePanel:setVisible(true)
-        timerStack.register(_dronePanel)
+        timerStack.register(_dronePanel, FS_TIMER_GROUP)
     end
 end
 
@@ -1416,7 +1418,7 @@ local function droneComputePos(d)
     local cx, cy = droneCenter(d)
     if not cx then return nil end
 
-    local el = getTimestampMs() - d.t0
+    local el = PongDuClock.now() - d.t0
     if el < 0 then el = 0 end
 
     if el < DRONE_APPROACH_MS then
@@ -1673,7 +1675,7 @@ local function droneUpsert(args)
         orbitR   = tonumber(args.orbitR) or 4,
         orbitMs  = tonumber(args.orbitMs) or 60000,
         periodMs = tonumber(args.periodMs) or 6000,
-        t0       = getTimestampMs(),
+        t0       = PongDuClock.now(),
         vid      = args.vid and tonumber(args.vid) or nil,
         target   = args.target,
         bladeStep = 0,
@@ -1688,7 +1690,7 @@ local function droneUpsert(args)
     d.amPilot = (me ~= nil) and (args.pilot ~= nil)
         and (tonumber(args.pilot) == me)
     -- 유실 대비 자체 데드라인. 서버 DroneStop이 정상 도착하면 그쪽이 먼저 끈다.
-    d.stopAt = getTimestampMs() + DRONE_APPROACH_MS + d.orbitMs + DRONE_DEPART_MS + 2000
+    d.stopAt = PongDuClock.now() + DRONE_APPROACH_MS + d.orbitMs + DRONE_DEPART_MS + 2000
 
     _drones[own] = d
     print(string.format(
@@ -1795,7 +1797,7 @@ local function fsReceiveShots(kind, args)
         print("[PongDu] fire_support/" .. kind .. ": fire packet without shots")
         return
     end
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     for i = 1, n do
         local sh = shots[i]
         if sh then
@@ -2182,7 +2184,7 @@ local _expired = {}
 
 Events.OnTick.Add(function()
     fsSweepStaleLoops()
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
 
     local meH = myOnlineID()
     local n = 0
@@ -2407,7 +2409,7 @@ end)
 -- (SniperStart/HeliStart/DroneStart 수신부), 다른 플레이어가 받은 화력 지원은
 -- 여기 걸리지 않는다.
 function _a.c()
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     if _sniperEndAt and _sniperEndAt > now then return true end
     if _heliEndAt   and _heliEndAt   > now then return true end
     if _droneEndAt  and _droneEndAt  > now then return true end

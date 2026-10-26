@@ -435,7 +435,7 @@ local _fsResults = {}   -- { own, kind, kills, sendAt }
 local function fsQueueResult(own, kind, kills)
     _fsResults[#_fsResults + 1] = {
         own = own, kind = kind, kills = kills or 0,
-        sendAt = getTimestampMs() + FS_RESULT_GRACE_MS,
+        sendAt = PongDuClock.now() + FS_RESULT_GRACE_MS,
     }
 end
 
@@ -476,7 +476,7 @@ local function fsZKey(z)
 end
 
 local function sniperBroadcastStart(job)
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     fsSendAll("SniperStart", { own = job.own, remain = job.expireAt - now })
 end
 
@@ -495,7 +495,7 @@ DOServer["PongDuFireSupport"]["Sniper"] = function(player, data)
     for i = 1, #_sniperJobs do
         local job = _sniperJobs[i]
         if job.player == player then
-            local now2 = getTimestampMs()
+            local now2 = PongDuClock.now()
             job.r, job.iv, job.pierce, job.pcChan, job.kdChan, job.sender =
                 r, iv, pierce, pcChan, kdChan, sender
             job.expireAt = math.max(job.expireAt, now2) + dur
@@ -516,7 +516,7 @@ DOServer["PongDuFireSupport"]["Sniper"] = function(player, data)
     local oy     = cy + math.sin(ang) * odist
     local oz     = player:getZ()
 
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     local job = {
         player = player, own = player:getOnlineID(),
         r = r, iv = iv, sender = sender,
@@ -622,7 +622,7 @@ end
 
 local function processSniperJobs()
     if #_sniperJobs == 0 then return end
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     for i = #_sniperJobs, 1, -1 do
         local job = _sniperJobs[i]
         if now >= job.expireAt then
@@ -883,7 +883,7 @@ local function heliNewLeg(job, fx, fy, turn)
     local curAng = math.atan2(fy - pcy, fx - pcx)
     local newAng = curAng + turn
 
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     job.ax, job.ay = fx, fy
     job.bx, job.by = pcx + math.cos(newAng) * D, pcy + math.sin(newAng) * D
     job.oz         = pz
@@ -894,7 +894,7 @@ end
 
 -- 현재 leg 위의 헬기 위치(A->B 선형 보간).
 local function heliCurrentPos(job)
-    local t = (getTimestampMs() - job.startAt) / math.max(job.endAt - job.startAt, 1)
+    local t = (PongDuClock.now() - job.startAt) / math.max(job.endAt - job.startAt, 1)
     if t < 0 then t = 0 elseif t > 1 then t = 1 end
     return job.ax + (job.bx - job.ax) * t, job.ay + (job.by - job.ay) * t
 end
@@ -950,7 +950,7 @@ end
 -- 사운드 자체 데드라인이 리셋되지 않는다.
 -- vid/pilot: 파일럿 클라가 어느 차량을 몰지 식별하는 키.
 local function heliBroadcastStart(job)
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     local payload = {
         remain = job.expireAt - now,
         ax = job.ax, ay = job.ay, bx = job.bx, by = job.by, oz = job.oz,
@@ -976,7 +976,7 @@ DOServer["PongDuFireSupport"]["Heli"] = function(player, data)
     for i = 1, #_heliJobs do
         local job = _heliJobs[i]
         if job.player == player then
-            local now2 = getTimestampMs()
+            local now2 = PongDuClock.now()
 
             -- 기존 leg 보간으로 "현재 위치"를 구해 새 leg의 시작점 A'로 삼는다.
             local curX, curY = heliCurrentPos(job)
@@ -1017,7 +1017,7 @@ DOServer["PongDuFireSupport"]["Heli"] = function(player, data)
     local ax, ay = cx + math.cos(ang)  * D, cy + math.sin(ang)  * D
     local bx, by = cx + math.cos(ang2) * D, cy + math.sin(ang2) * D
 
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     local job = {
         player = player, own = player:getOnlineID(),
         r = r, iv = iv, kc = kc, sender = sender,
@@ -1123,7 +1123,7 @@ DOServer["PongDuFireSupport"]["HeliRespawn"] = function(player, data)
             .. tostring(player and player:getUsername()))
         return
     end
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     if job.respawnAt and now - job.respawnAt < HELI_RESPAWN_COOL_MS then return end
     job.respawnAt = now
 
@@ -1143,7 +1143,7 @@ end
 
 local function processHeliJobs()
     if #_heliJobs == 0 then return end
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     for i = #_heliJobs, 1, -1 do
         local job = _heliJobs[i]
         local okP, px, py = pcall(function()
@@ -1853,7 +1853,7 @@ DOServer["PongDuFireSupport"]["Drone"] = function(player, data)
     local sy     = cy + math.sin(ang) * odist
     local oz     = player:getZ()
 
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
 
     -- 중첩: 같은 플레이어의 job 이 이미 있으면 새 드론을 띄우지 않고 공전
     -- 시간만 연장한다(헬기와 동일 정책). 예전에는 그냥 새 job 을 밀어 넣어서
@@ -2047,7 +2047,7 @@ end
 
 local function processDroneJobs()
     if #_droneJobs == 0 then return end
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
 
     for i = #_droneJobs, 1, -1 do
         local job = _droneJobs[i]
@@ -2105,7 +2105,7 @@ end
 
 local function fsResultTick()
     if #_fsResults == 0 then return end
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     for i = #_fsResults, 1, -1 do
         local r = _fsResults[i]
         if now >= r.sendAt then
@@ -2176,7 +2176,7 @@ local function sweepOrphanFireSupportVehicles()
 end
 
 local function orphanSweepTick()
-    local now = getTimestampMs()
+    local now = PongDuClock.now()
     if now - _lastOrphanSweep < ORPHAN_SWEEP_INTERVAL_MS then return end
     _lastOrphanSweep = now
     sweepOrphanFireSupportVehicles()
