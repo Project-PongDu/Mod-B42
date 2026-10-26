@@ -822,6 +822,8 @@ local _syncLogged = 0
 Events.OnServerCommand.Add(function(module, command, args)
     if module ~= "PongDuMutant" then return end
     if command == "MutantMark" then
+        print("[PuppetMutant] mark received zid=" .. tostring(args and args["zedId"])
+            .. " kind=" .. tostring(args and args["kind"]))
         _a.mark(args and tonumber(args["zedId"]), args and args["kind"], args and args["sender"])
     elseif command == "MutantSync" then
         local list = args and args["zeds"]

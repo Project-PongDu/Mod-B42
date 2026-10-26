@@ -1643,27 +1643,74 @@ end
 -- 시체까지 소급 무효화한다.
 
 -- ── 특좀 표식 유지 + 클라 재통지 (B42) ────────────────────────────────────────
--- [B41 -> B42 에서 바뀐 것]
---   B41 은 죽은 좀비의 IsoZombie 객체를 풀에 돌려 재사용할 때 modData 를 안 지워서,
---   "md 의 PuppetMutantZid 가 현재 onlineID 와 다르면 재활용 껍데기"로 보고 md 를 지웠다.
---   B42 는 재사용 시 엔진이 직접 modData 를 지운다 (IsoZombie.resetForReuse ->
---   getModData().wipe(), onlineId = -1, IsoZombie.java:4543). 그래서 B42 에서 zid 불일치는
---   재활용이 아니라 "청크 언로드 후 다시 로드돼 새 onlineID 를 받은 진짜 특좀"이거나
---   "RiseUp 으로 부활한 특좀"이다. 예전처럼 지우면 다시 만난 특좀이 일반 좀비가 되고
---   (2026-10-26 멀티 4C), 그 시체도 특좀으로 부활하지 못한다. -> 지우지 않고 새 zid 로 재스탬프.
+-- [B42 에서 특좀 표식이 사라지는 두 경로]
+--   1) 좀비 객체 재사용: B42 는 재사용 시 엔진이 modData 를 지운다 (IsoZombie.resetForReuse ->
+--      getModData().wipe(), IsoZombie.java:4543). B41 처럼 "zid 불일치 = 재활용 껍데기"로 보고
+--      지울 필요가 없다. zid 불일치는 RiseUp 부활 등으로 새 onlineID 를 받은 진짜 특좀이다.
+--   2) 청크 언로드(가상화): 플레이어가 멀어지면 좀비는 ZombiePopulationManager 로 넘어가
+--      위치·방향·persistentOutfitID·상태 플래그·경로 목표만 남고 IsoZombie(와 modData)는 버려진다
+--      (popman/ZombiePopulationManager.java n_addZombie). 다시 다가가면 그 값으로 새 IsoZombie 를
+--      만든다. 그래서 modData 표식은 청크를 나갔다 오면 무조건 사라진다 (2026-10-27 멀티 5C).
+--      내부 고유 ID(persistentId)는 Lua 에서 읽을 수 없다(getter 없음).
+--   -> 서버가 로드된 특좀을 추적해 두다가(_live) 사라지면 _lost 로 옮기고, 이후 표식 없는 좀비 중
+--      persistentOutfitID 가 같고 마지막 위치에서 LOST_MATCH_R 안에 있는 좀비가 나타나면 그 좀비에
+--      표식을 되살린다. 옷 ID 단독은 같은 옷을 입은 일반좀비와 겹쳐서(B41 pid 레지스트리 오탐)
+--      쓰지 않고, 거리 조건을 반드시 같이 본다.
 --
---   클라는 좀비 modData 를 서버에서 받지 못한다(적용기 주석 참고). 그래서 서버가 특좀의
---   zid 를 MutantMark 로 알려줘야 클라가 능력을 붙인다. 이 통지가 스폰 때 1회뿐이라
---   클라가 청크를 나갔다 오거나(클라 좀비 객체 재생성) 서버에서 zid 가 바뀌면 끊겼다.
---   -> 재스탬프한 좀비는 즉시 MutantMark, 그리고 MUTANT_SYNC_MS 마다 로드된 특좀 전체를
---      MutantSync 로 다시 알려준다 (클라는 짧은 만료로 받아 그 사이 보이는 좀비에 재적용).
+--   클라는 좀비 modData 를 서버에서 받지 못한다(적용기 주석 참고). 서버가 MutantMark 로 zid 를
+--   알려줘야 클라가 능력을 붙인다. 재스탬프·복구한 좀비는 즉시 MutantMark, 그리고 MUTANT_SYNC_MS
+--   마다 로드된 특좀 전체를 MutantSync 로 다시 알려준다 (클라 좀비 객체가 새로 만들어진 경우 대비).
 --
 -- 왜 폴링인가: OnZombieUpdate 는 MP 에서 클라 권한 좀비(플레이어 근처)엔 서버측 발화를
 -- 안 한다. getCell():getZombieList() 는 권한과 무관하게 셀의 전 좀비를 포함한다.
 local _lastStaleSweep = 0
-local STALE_SWEEP_MS = 500       -- 0.5초. zid 변경을 빨리 잡아 즉시 재통지.
+local STALE_SWEEP_MS = 500       -- 0.5초
 local _lastMutantSync = 0
 local MUTANT_SYNC_MS = 3000      -- 로드된 특좀 목록 재통지 주기 (MP 만)
+local _syncLogCount = 0
+local _lastSyncLog = 0
+
+local _live = {}                 -- [IsoZombie] = { k, s, pid, x, y, z }  (객체 키: SP 는 zid 가 전부 -1)
+local _lost = {}                 -- { {k, s, pid, x, y, z, t}, ... }
+local LOST_MATCH_R  = 60         -- 가상 좀비는 경로 목표로 계속 걸어가므로 넉넉히
+local LOST_KEEP_MS  = 6 * 60 * 60 * 1000
+local LOST_MAX      = 300
+
+Events.OnZombieDead.Add(function(z)
+    if z and _live[z] then _live[z] = nil end
+end)
+
+local function markToClients(zid, kind, sender)
+    if not isServer() then return end
+    sendServerCommand("PongDuMutant", "MutantMark", {
+        ["zedId"]  = zid,
+        ["kind"]   = kind,
+        ["sender"] = sender or "",
+    })
+end
+
+-- 표식 없는 좀비 z 에 맞는 _lost 항목을 찾는다 (같은 옷 ID + 가장 가까운 것).
+local function matchLost(z)
+    if #_lost == 0 then return nil end
+    local pid = z:getPersistentOutfitID()
+    if not pid or pid == 0 then return nil end
+    local zx, zy = z:getX(), z:getY()
+    local best, bestD = nil, nil
+    for i = 1, #_lost do
+        local e = _lost[i]
+        if e.pid == pid then
+            local dx, dy = zx - e.x, zy - e.y
+            local d = math.sqrt(dx * dx + dy * dy)
+            if d <= LOST_MATCH_R and (bestD == nil or d < bestD) then
+                best, bestD = i, d
+            end
+        end
+    end
+    if not best then return nil end
+    local e = table.remove(_lost, best)
+    return e, bestD
+end
+
 local function staleSweep()
     local now = getTimestampMs()
     if now - _lastStaleSweep < STALE_SWEEP_MS then return end
@@ -1671,6 +1718,9 @@ local function staleSweep()
     -- 만료된 부활 마크 정리 (로그 구분용으로만 남긴다)
     for i = #_reviveRestamp, 1, -1 do
         if now > _reviveRestamp[i].expire then table.remove(_reviveRestamp, i) end
+    end
+    for i = #_lost, 1, -1 do
+        if now - _lost[i].t > LOST_KEEP_MS then table.remove(_lost, i) end
     end
     local cell = getCell()
     if not cell then return end
@@ -1682,50 +1732,79 @@ local function staleSweep()
     if doSync then _lastMutantSync = now end
     local syncList = doSync and {} or nil
 
-    local reloaded, revived = 0, 0
+    local seen = {}
+    local restamped, restored = 0, 0
     for i = 0, zeds:size() - 1 do
         local z = zeds:get(i)
-        local md = z:getModData()
-        local kind = md["PuppetMutant"]
-        if kind then
+        if not z:isDead() then
+            local md = z:getModData()
+            local kind = md["PuppetMutant"]
             local zid = z:getOnlineID()
-            if md["PuppetMutantZid"] ~= zid then
-                local zx, zy = z:getX(), z:getY()
-                local isRevive = false
-                for _, m in ipairs(_reviveRestamp) do
-                    if kind == m.kind
-                        and math.abs(zx - m.x) <= 2 and math.abs(zy - m.y) <= 2 then
-                        isRevive = true
-                        break
-                    end
+            if not kind then
+                local e, d = matchLost(z)
+                if e then
+                    md["PuppetMutant"] = e.k
+                    md["PuppetMutantZid"] = zid
+                    if e.s and e.s ~= "" then md["PuppetMutantSender"] = e.s end
+                    kind = e.k
+                    restored = restored + 1
+                    print(string.format("[PongDu][MutantTrack] restored kind=%s zid=%s pid=%s dist=%.1f lostFor=%dms",
+                        tostring(e.k), tostring(zid), tostring(e.pid), d, now - e.t))
+                    markToClients(zid, kind, e.s)
                 end
-                print("[PongDu][StaleSweep] re-stamp kind=" .. tostring(kind)
-                    .. " oldZid=" .. tostring(md["PuppetMutantZid"]) .. " newZid=" .. tostring(zid)
-                    .. " reason=" .. (isRevive and "revive" or "reload"))
+            elseif md["PuppetMutantZid"] ~= zid then
+                print("[PongDu][MutantTrack] re-stamp kind=" .. tostring(kind)
+                    .. " oldZid=" .. tostring(md["PuppetMutantZid"]) .. " newZid=" .. tostring(zid))
                 md["PuppetMutantZid"] = zid
-                if isRevive then revived = revived + 1 else reloaded = reloaded + 1 end
-                if mp then
-                    sendServerCommand("PongDuMutant", "MutantMark", {
-                        ["zedId"]  = zid,
-                        ["kind"]   = kind,
-                        ["sender"] = md["PuppetMutantSender"] or "",
-                    })
-                end
+                restamped = restamped + 1
+                markToClients(zid, kind, md["PuppetMutantSender"])
             end
-            if syncList then
-                syncList[#syncList + 1] = {
-                    ["id"] = zid,
-                    ["k"]  = kind,
-                    ["s"]  = md["PuppetMutantSender"] or "",
+            if kind then
+                seen[z] = true
+                _live[z] = {
+                    k = kind, s = md["PuppetMutantSender"] or "",
+                    pid = z:getPersistentOutfitID(),
+                    x = z:getX(), y = z:getY(), z = z:getZ(),
                 }
+                if syncList then
+                    syncList[#syncList + 1] = {
+                        ["id"] = zid,
+                        ["k"]  = kind,
+                        ["s"]  = md["PuppetMutantSender"] or "",
+                    }
+                end
             end
         end
     end
-    if reloaded + revived > 0 then
-        print("[PongDu][StaleSweep] re-stamped reloaded=" .. reloaded .. " revived=" .. revived)
+
+    -- 지난 스윕에 있던 특좀이 이번에 없으면 = 가상화(청크 언로드) 또는 객체 재사용. 위치를 남긴다.
+    -- (죽은 특좀은 OnZombieDead 에서 _live 에서 빠진다.)
+    local lostNow = 0
+    for z, info in pairs(_live) do
+        if not seen[z] then
+            _live[z] = nil
+            if info.pid and info.pid ~= 0 then
+                _lost[#_lost + 1] = { k = info.k, s = info.s, pid = info.pid,
+                                      x = info.x, y = info.y, z = info.z, t = now }
+                lostNow = lostNow + 1
+                if #_lost > LOST_MAX then table.remove(_lost, 1) end
+            end
+        end
+    end
+    if lostNow > 0 then
+        print("[PongDu][MutantTrack] unloaded mutants=" .. lostNow .. " (tracking " .. #_lost .. ")")
+    end
+    if restamped + restored > 0 then
+        print("[PongDu][MutantTrack] sweep restamped=" .. restamped .. " restored=" .. restored)
     end
     if syncList and #syncList > 0 then
         sendServerCommand("PongDuMutant", "MutantSync", { ["zeds"] = syncList })
+        -- 처음 몇 번 + 이후 1분마다만 기록
+        if _syncLogCount < 3 or now - _lastSyncLog > 60000 then
+            _syncLogCount = _syncLogCount + 1
+            _lastSyncLog = now
+            print("[PongDu][MutantTrack] sync sent mutants=" .. #syncList)
+        end
     end
 end
 addServerTick(staleSweep)
