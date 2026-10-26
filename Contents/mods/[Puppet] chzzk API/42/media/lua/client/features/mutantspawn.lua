@@ -804,16 +804,45 @@ local REVIVE_MARK_MS = 20000
 -- 만료시각 포함: OnZombieDead가 안 뜨고 죽은 좀비의 스테일 항목이
 -- onlineID 재활용으로 새 좀비를 하이재킹하는 것을 차단.
 -- 만료 뒤 스트림-인 재적용은 레지스트리(pid)가 담당한다.
-function _a.mark(zid, kind, sender)
+-- ttlMs 를 주면 그 시간만 유효 (MutantSync 처럼 주기적으로 다시 오는 통지용).
+function _a.mark(zid, kind, sender, ttlMs)
     if not zid or not kind then return end
     _pending[zid] = { ["k"] = kind, ["s"] = sender,
-                      ["e"] = getTimestampMs() + PENDING_MS }
+                      ["e"] = getTimestampMs() + (ttlMs or PENDING_MS) }
 end
+
+-- 서버 MutantSync (server.lua staleSweep, MP 만): 서버에 로드된 특좀 전체 목록.
+-- 클라 좀비 객체는 청크를 나갔다 오면 새로 만들어져 modData 가 비고, 스폰 때 받은
+-- MutantMark 는 이미 소비/만료돼 있다. 주기 목록으로 다시 표시해 두면 보이는 순간
+-- 적용기가 능력을 다시 붙인다. 만료는 주기보다 조금 길게만 잡아 onlineID 재활용
+-- 하이재킹 창을 짧게 한다 (서버 목록이 매번 새로 덮어쓴다).
+local SYNC_TTL_MS = 8000
+local _syncLogged = 0
 
 Events.OnServerCommand.Add(function(module, command, args)
     if module ~= "PongDuMutant" then return end
     if command == "MutantMark" then
         _a.mark(args and tonumber(args["zedId"]), args and args["kind"], args and args["sender"])
+    elseif command == "MutantSync" then
+        local list = args and args["zeds"]
+        if type(list) ~= "table" then return end
+        local n = 0
+        for _, e in pairs(list) do
+            if type(e) == "table" then
+                local zid = tonumber(e["id"])
+                local p = zid and _pending[zid]
+                -- 스폰 직후의 긴 MutantMark 는 짧은 동기화 항목으로 덮지 않는다.
+                if zid and e["k"] and not (p and p["e"] and p["e"] - getTimestampMs() > SYNC_TTL_MS) then
+                    _a.mark(zid, e["k"], e["s"], SYNC_TTL_MS)
+                end
+                n = n + 1
+            end
+        end
+        -- 첫 몇 번만 기록 (3초마다 와서 매번 찍으면 로그가 덮인다)
+        if _syncLogged < 3 then
+            _syncLogged = _syncLogged + 1
+            print("[PuppetMutant] sync received mutants=" .. tostring(n))
+        end
     elseif command == "MutantRevive" then
         local x, y = tonumber(args and args["x"]), tonumber(args and args["y"])
         local kind = args and args["kind"]

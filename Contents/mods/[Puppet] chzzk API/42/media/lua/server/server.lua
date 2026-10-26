@@ -1642,25 +1642,33 @@ end
 -- reanimateTime(올바른 필드)을 0으로 밀어서 이미 세이브에 예약이 박힌 오염
 -- 시체까지 소급 무효화한다.
 
--- ── stale md 정리 (서버 풀 재활용 방어) ──────────────────────────────────────
--- B41은 죽은 좀비의 IsoZombie 객체를 풀에 반환 후 재사용하는데 modData를
--- 안 지운다. 죽은 특좀 객체가 호드매니저 등으로 재활용되면 PuppetMutant가
--- 딸려와 그 좀비 시체가 특좀으로 부활한다.
+-- ── 특좀 표식 유지 + 클라 재통지 (B42) ────────────────────────────────────────
+-- [B41 -> B42 에서 바뀐 것]
+--   B41 은 죽은 좀비의 IsoZombie 객체를 풀에 돌려 재사용할 때 modData 를 안 지워서,
+--   "md 의 PuppetMutantZid 가 현재 onlineID 와 다르면 재활용 껍데기"로 보고 md 를 지웠다.
+--   B42 는 재사용 시 엔진이 직접 modData 를 지운다 (IsoZombie.resetForReuse ->
+--   getModData().wipe(), onlineId = -1, IsoZombie.java:4543). 그래서 B42 에서 zid 불일치는
+--   재활용이 아니라 "청크 언로드 후 다시 로드돼 새 onlineID 를 받은 진짜 특좀"이거나
+--   "RiseUp 으로 부활한 특좀"이다. 예전처럼 지우면 다시 만난 특좀이 일반 좀비가 되고
+--   (2026-10-26 멀티 4C), 그 시체도 특좀으로 부활하지 못한다. -> 지우지 않고 새 zid 로 재스탬프.
 --
--- 왜 폴링인가(설계 근거): 바닐라엔 좀비/시체 '생성 순간' 훅이 없고
--- (OnZombieCreate 부재, OnObjectAdded는 플레이어 설치물 전용), OnZombieUpdate는
--- MP에서 '클라 권한' 좀비(플레이어 근처)엔 서버측 발화를 안 한다(로그로 확인:
--- 스트리머 근처 재활용 5마리가 새어나감). getCell():getZombieList()만이 권한과
--- 무관하게 셀의 전 좀비를 포함하므로, 이 리스트를 촘촘히 순회하는 것이 서버가
--- 재활용 좀비를 잡을 수 있는 유일한 신뢰 경로다. 좀비가 죽기 전에 정리되면
--- 시체가 깨끗해져 RiseUp이 일반좀비로 판정한다.
+--   클라는 좀비 modData 를 서버에서 받지 못한다(적용기 주석 참고). 그래서 서버가 특좀의
+--   zid 를 MutantMark 로 알려줘야 클라가 능력을 붙인다. 이 통지가 스폰 때 1회뿐이라
+--   클라가 청크를 나갔다 오거나(클라 좀비 객체 재생성) 서버에서 zid 가 바뀌면 끊겼다.
+--   -> 재스탬프한 좀비는 즉시 MutantMark, 그리고 MUTANT_SYNC_MS 마다 로드된 특좀 전체를
+--      MutantSync 로 다시 알려준다 (클라는 짧은 만료로 받아 그 사이 보이는 좀비에 재적용).
+--
+-- 왜 폴링인가: OnZombieUpdate 는 MP 에서 클라 권한 좀비(플레이어 근처)엔 서버측 발화를
+-- 안 한다. getCell():getZombieList() 는 권한과 무관하게 셀의 전 좀비를 포함한다.
 local _lastStaleSweep = 0
-local STALE_SWEEP_MS = 500       -- 0.5초. 스폰~사살 사이에 1회 이상 걸리게.
+local STALE_SWEEP_MS = 500       -- 0.5초. zid 변경을 빨리 잡아 즉시 재통지.
+local _lastMutantSync = 0
+local MUTANT_SYNC_MS = 3000      -- 로드된 특좀 목록 재통지 주기 (MP 만)
 local function staleSweep()
     local now = getTimestampMs()
     if now - _lastStaleSweep < STALE_SWEEP_MS then return end
     _lastStaleSweep = now
-    -- 만료된 부활 마크 정리
+    -- 만료된 부활 마크 정리 (로그 구분용으로만 남긴다)
     for i = #_reviveRestamp, 1, -1 do
         if now > _reviveRestamp[i].expire then table.remove(_reviveRestamp, i) end
     end
@@ -1668,40 +1676,56 @@ local function staleSweep()
     if not cell then return end
     local zeds = cell:getZombieList()
     if not zeds then return end
-    local wiped, restamped = 0, 0
+
+    local mp = isServer()
+    local doSync = mp and (now - _lastMutantSync >= MUTANT_SYNC_MS)
+    if doSync then _lastMutantSync = now end
+    local syncList = doSync and {} or nil
+
+    local reloaded, revived = 0, 0
     for i = 0, zeds:size() - 1 do
         local z = zeds:get(i)
         local md = z:getModData()
-        if md["PuppetMutant"] and md["PuppetMutantZid"] ~= z:getOnlineID() then
-            -- zid 불일치: 부활 좀비인가(마크 근처) vs 풀 재활용인가(마크 없음).
-            local zx, zy = z:getX(), z:getY()
-            local reviveHit = nil
-            for _, m in ipairs(_reviveRestamp) do
-                if md["PuppetMutant"] == m.kind
-                    and math.abs(zx - m.x) <= 2 and math.abs(zy - m.y) <= 2 then
-                    reviveHit = m
-                    break
+        local kind = md["PuppetMutant"]
+        if kind then
+            local zid = z:getOnlineID()
+            if md["PuppetMutantZid"] ~= zid then
+                local zx, zy = z:getX(), z:getY()
+                local isRevive = false
+                for _, m in ipairs(_reviveRestamp) do
+                    if kind == m.kind
+                        and math.abs(zx - m.x) <= 2 and math.abs(zy - m.y) <= 2 then
+                        isRevive = true
+                        break
+                    end
+                end
+                print("[PongDu][StaleSweep] re-stamp kind=" .. tostring(kind)
+                    .. " oldZid=" .. tostring(md["PuppetMutantZid"]) .. " newZid=" .. tostring(zid)
+                    .. " reason=" .. (isRevive and "revive" or "reload"))
+                md["PuppetMutantZid"] = zid
+                if isRevive then revived = revived + 1 else reloaded = reloaded + 1 end
+                if mp then
+                    sendServerCommand("PongDuMutant", "MutantMark", {
+                        ["zedId"]  = zid,
+                        ["kind"]   = kind,
+                        ["sender"] = md["PuppetMutantSender"] or "",
+                    })
                 end
             end
-            if reviveHit then
-                -- 정상 부활 좀비: 새 zid로 재스탬프 -> 이후 다회차 부활 정상.
-                md["PuppetMutantZid"] = z:getOnlineID()
-                restamped = restamped + 1
-            else
-                -- 풀 재활용 껍데기: 특좀 md 제거.
-                md["PuppetMutant"] = nil
-                md["PuppetMutantSender"] = nil
-                md["PuppetMutantZid"] = nil
-                md["_cs"] = nil
-                wiped = wiped + 1
+            if syncList then
+                syncList[#syncList + 1] = {
+                    ["id"] = zid,
+                    ["k"]  = kind,
+                    ["s"]  = md["PuppetMutantSender"] or "",
+                }
             end
         end
     end
-    if wiped > 0 then
-        print("[PongDu][StaleSweep] wiped stale PuppetMutant from " .. wiped .. " recycled zombies")
+    if reloaded + revived > 0 then
+        print("[PongDu][StaleSweep] re-stamped reloaded=" .. reloaded .. " revived=" .. revived)
     end
-    if restamped > 0 then
-        print("[PongDu][StaleSweep] re-stamped " .. restamped .. " reanimated mutants")
+    if syncList and #syncList > 0 then
+        sendServerCommand("PongDuMutant", "MutantSync", { ["zeds"] = syncList })
     end
 end
 addServerTick(staleSweep)
