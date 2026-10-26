@@ -43,7 +43,8 @@ local function onServerCommand(module, command, args)
         key:setCustomColor(true)
     end
 
-    -- 키 이름: "{후원자}의 {차종별 키 이름}" (차종 번역은 클라 로케일 기준)
+    -- 키 이름: "{후원자}'s {차종} 열쇠" (차종 번역은 클라 로케일 기준).
+    -- scriptName 은 서버가 보낸 차종 키(carModelName 우선, 바닐라 keyNamerVehicle 과 동일).
     local baseName = key:getDisplayName()
     local scriptName = args.scriptName
     if scriptName and scriptName ~= "" then
@@ -53,7 +54,7 @@ local function onServerCommand(module, command, args)
         end
     end
     local sender = args.sender
-    local keyName = (sender and sender ~= "" and (sender .. "'s '") or "") .. baseName
+    local keyName = (sender and sender ~= "" and (sender .. "'s ") or "") .. baseName
     key:setName(keyName)
 
     player:getInventory():AddItem(key)

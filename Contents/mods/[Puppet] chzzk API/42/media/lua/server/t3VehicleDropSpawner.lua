@@ -747,11 +747,21 @@ function t3VehicleDrop.spawnVehicle(player, x, y, z, vehicleType, sender)
     -- 50~100타일이라 차량이 클라 스트리밍 범위 밖이면 조회 실패 -> 키 미지급 버그가 있었다.
     -- 이제 서버가 keyId/차종/색상만 뽑아 보내고, 클라(VehicleDropKeyGrant.lua)가
     -- 차량 조회 없이 로컬에서 키를 직접 생성한다.
+    -- 키 표시명의 차종 키. 바닐라 keyNamerVehicle 과 같이 carModelName 이 있으면 그걸 쓴다
+    -- (IGUI_VehicleName<키>). MP 는 클라 로케일로 번역하도록 키만 보낸다.
+    local vscript   = vehicle:getScript()
+    local modelName = vscript:getCarModelName() or vscript:getName()
     if not isClient() and not isServer() then
         -- 솔로: 같은 프로세스이므로 바로 생성+지급해도 동기화 문제 없음
         local key = vehicle:createVehicleKey()
         if key then
-            local keyName = (sender and sender ~= "" and (sender .. "의 ") or "") .. key:getDisplayName()
+            -- B42 바닐라 키 이름은 "차 열쇠 - <차종>" 이다(keyNamerVehicle). MP 클라
+            -- (VehicleDropKeyGrant.lua)와 같은 "<후원자>'s <차종> 열쇠" 로 맞춘다.
+            -- 예전엔 여기만 한글 리터럴 "의 " 를 붙였는데 게임에서 글자가 빠져
+            -- "<후원자> 차 열쇠 - <차종>" 으로 보였다(번역 파일 밖 한글 리터럴 금지).
+            local vehName  = getTextOrNull("IGUI_VehicleName" .. tostring(modelName))
+            local baseName = vehName and getText("IGUI_CarKey", vehName) or key:getDisplayName()
+            local keyName  = (sender and sender ~= "" and (sender .. "'s ") or "") .. baseName
             key:setName(keyName)
             player:getInventory():AddItem(key)
             print("[t3VehicleDrop] Solo key granted: " .. keyName)
@@ -769,7 +779,7 @@ function t3VehicleDrop.spawnVehicle(player, x, y, z, vehicleType, sender)
 
         sendServerCommand(player, "PongDuVehicleDrop", "GrantKey", {
             keyId      = vehicle:getKeyId(),
-            scriptName = vehicle:getScript():getName(),
+            scriptName = modelName,
             colR = colR, colG = colG, colB = colB,
             sender = sender,
             vehicleId = vehicleId, -- 로그 추적용
