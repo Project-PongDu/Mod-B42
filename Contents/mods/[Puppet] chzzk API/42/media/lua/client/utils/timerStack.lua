@@ -15,10 +15,15 @@ require("ISUI/ISPanel")
 --      줄 전체를 화면 가운데에 맞춘다. 그룹 패널 폭은 GROUP_W 로 줄인다.
 local _a = {}
 
-local ROW_GAP      = 6    -- 슬롯 간 여백. 슬롯 높이는 패널마다 getHeight()로 잰다
-                           -- (timerText 카운터는 2줄이라 randomteleport 1줄 패널보다 높다).
+-- 줄 간 여백 = 글자 한 줄 높이(Medium). 6px 일 땐 위아래 타이머가 붙어 보였다.
+-- 슬롯 높이는 패널마다 getHeight()로 잰다 (timerText 카운터는 2줄이라 1줄 패널보다 높다).
+local ROW_GAP      = getTextManager():getFontHeight(UIFont.Medium)
+local FIRST_GAP    = 6    -- 맨 아래 줄과 바닥선 사이 (예전 줄 간 여백 그대로)
 local TOOLTIP_GAP  = 3    -- 큐박스 툴팁과의 최소 간격
-local COL_GAP      = 24   -- 같은 줄(그룹) 안 패널 사이 가로 여백
+local COL_GAP      = 24   -- 처음 배치(패널 폭 + 24)의 패널 사이 여백. GAP_RATIO 의 기준값
+local GAP_RATIO    = 0.25 -- 그룹 줄 글자 블록 사이 빈 공간 = 처음 배치 때 빈 공간 x 이 값.
+                          -- 처음엔 패널 폭이 글자보다 넓어 너무 벌어졌다(실측 후 1/4 로).
+                          -- 패널은 배경이 없어 겹쳐도 글자만 안 겹치면 된다.
 local GROUP_W      = 240  -- 그룹 패널 폭. 기능명(Large)·"남은시간 MM:SS"(Medium)가 들어가는 폭
 local FALLBACK_PAD = 210  -- DonationReceiver 미로드 등 극단적 상황에서만 쓰이는 안전망.
                            -- 큐박스 기본 앵커(핫바 바로 위) 위치를 대략 근사한 값.
@@ -58,24 +63,27 @@ end
 local function relayout()
     local y  = baseY()
     local sw = getCore():getScreenWidth()
-    for _, row in ipairs(buildRows()) do
+    for ri, row in ipairs(buildRows()) do
         local h = 0
         for i = 1, #row do
             local ph = row[i]:getHeight()
             if ph > h then h = ph end
         end
-        y = y - h - ROW_GAP
+        y = y - h - (ri == 1 and FIRST_GAP or ROW_GAP)
         if not row.group then
             row[1]:setY(y)
         else
-            local total = 0
-            for i = 1, #row do total = total + row[i]:getWidth() end
-            total = total + COL_GAP * (#row - 1)
+            -- 그룹 패널은 폭·글자 폭이 모두 같다(register 에서 같은 식으로 잡는다).
+            -- 중심 간격 = 글자 폭 + (처음 배치의 빈 공간 x GAP_RATIO)
+            local w     = row[1]:getWidth()
+            local textW = row[1].pdTextW or w
+            local step  = textW + math.floor((w + COL_GAP - textW) * GAP_RATIO)
+            local total = w + step * (#row - 1)
             local x = (sw - total) / 2
             for i = 1, #row do
                 row[i]:setX(x)
                 row[i]:setY(y)
-                x = x + row[i]:getWidth() + COL_GAP
+                x = x + step
             end
         end
     end
@@ -91,6 +99,8 @@ function _a.register(panel, group)
             getText("IGUI_donation_timer_remain") .. " 00:00") + 40
         if tw > w then w = tw end
         panel:setWidth(w)
+        -- 실제 글자 블록 폭 (윗줄 기능명은 이보다 짧다). 가로 간격 계산용
+        panel.pdTextW = tw - 40
     end
     table.insert(stack, { panel = panel, group = group })
     relayout()
