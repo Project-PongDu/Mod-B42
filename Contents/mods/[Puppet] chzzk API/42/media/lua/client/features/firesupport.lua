@@ -539,9 +539,11 @@ local function fsApplyShot(z, id, hp, crit, kd, tag, own)
     -- 원격 좀비에 Hit 하면 소유 클라 sync 에 덮인다 -- 연출만 하고 끝.
     if PongDuZombieId.IsRemote(z) then return end
 
+    -- 통계 키: MP 는 onlineID, SP 는 객체(onlineID 가 전부 -1 이라 한 항목에 섞인다).
+    local sk = (isClient() or isServer()) and id or z
     local ok, err = pcall(function()
         local now    = getTimestampMs()
-        local st     = fsStatsGet(id, z, now)
+        local st     = fsStatsGet(sk, z, now)
         local verify = fsVerifyTick(tag, now)
         local before = z:getHealth()
         st.hits = st.hits + 1
@@ -620,7 +622,7 @@ local function fsApplyShot(z, id, hp, crit, kd, tag, own)
             else
                 print("[PongDu] fire_support/" .. tag .. " KILL without own -- not reported")
             end
-            _fsStats[id] = nil
+            _fsStats[sk] = nil
             _fsStatsN = _fsStatsN - 1
         end
     end)
@@ -2328,7 +2330,9 @@ Events.OnServerCommand.Add(function(module, command, args)
         return
     end
 
-    local z = findZombieById(id)
+    -- SP: 서버 SP 브리지(server.lua fsSendAll)가 좀비 객체를 obj 로 실어 보낸다
+    -- (onlineID 가 전부 -1 이라 id 로 찾으면 엉뚱한 좀비가 잡힌다).
+    local z = args.obj or findZombieById(id)
     -- 서버가 보낸 좌표는 선정 시점 값이라 좀비가 그 사이 움직였을 수 있다.
     -- 살아있으면 현재 좌표로 조준한다.
     local tx, ty, tz = tonumber(args.x) or 0, tonumber(args.y) or 0, tonumber(args.z) or 0
@@ -2364,7 +2368,7 @@ Events.OnServerCommand.Add(function(module, command, args)
     if args.ex then
         for k = 1, #args.ex do
             local eid = tonumber(args.ex[k])
-            local ez  = eid and findZombieById(eid) or nil
+            local ez  = (args.exo and args.exo[k]) or (eid and findZombieById(eid)) or nil
             if ez and not ez:isDead() then
                 if PongDuZombieId.IsRemote(ez) then
                     pcall(function() ez:playSound("BulletHitBody") end)
@@ -2387,7 +2391,8 @@ Events.OnServerCommand.Add(function(module, command, args)
         local kd = tonumber(args.kd) or 50
         for k = 1, #args.gz do
             local gid = tonumber(args.gz[k])
-            grazeZombie(gid and findZombieById(gid) or nil, gid, kd)
+            local gzz = (args.gzo and args.gzo[k]) or (gid and findZombieById(gid)) or nil
+            grazeZombie(gzz, gid, kd)
         end
     end
 end)

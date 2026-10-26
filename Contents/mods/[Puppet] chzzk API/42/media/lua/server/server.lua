@@ -441,13 +441,43 @@ end
 
 local _sniperJobs = {}
 
+-- [B42 SP 브리지] Lua sendServerCommand 는 GameServer.server 일 때만 패킷을 보낸다
+-- (LuaManager.sendServerCommand). SP 에선 getOnlinePlayers() 도 비어 있어 화력지원
+-- 시작/사격/종료 명령이 클라에 한 번도 안 닿았다(헬기·드론·저격 전부 SP 무동작).
+-- SP 는 서버·클라 Lua 가 한 VM 이므로 클라 OnServerCommand 핸들러를 직접 발화시킨다
+-- (PongDuRainServer.lua toClients 와 같은 방식).
+local function fsIsSP()
+    return not isClient() and not isServer()
+end
+
+-- exclude: 이 플레이어에게는 보내지 않는다(발사 클라가 이미 로컬로 처리한 중계).
+-- SP 는 플레이어가 하나뿐이라 exclude 가 있으면 보낼 대상이 없다.
+local function fsSendAll(command, payload, exclude)
+    if fsIsSP() then
+        if exclude then return end
+        triggerEvent("OnServerCommand", "PongDuFireSupport", command, payload)
+        return
+    end
+    local players = getOnlinePlayers()
+    if not players then return end
+    for k = 0, players:size() - 1 do
+        local p = players:get(k)
+        if p ~= exclude then
+            sendServerCommand(p, "PongDuFireSupport", command, payload)
+        end
+    end
+end
+
+-- 좀비 식별 키. MP 는 onlineID, SP 는 좀비 객체 자체.
+-- SP 는 onlineID 가 전부 -1 이라 키로 쓰면 첫 발 뒤 모든 좀비가 "이미 쏜 좀비"가 된다.
+local function fsZKey(z)
+    if fsIsSP() then return z end
+    return z:getOnlineID()
+end
+
 local function sniperBroadcastStart(job)
     local now = getTimestampMs()
-    local payload = { own = job.own, remain = job.expireAt - now }
-    local players = getOnlinePlayers()
-    for k = 0, players:size() - 1 do
-        sendServerCommand(players:get(k), "PongDuFireSupport", "SniperStart", payload)
-    end
+    fsSendAll("SniperStart", { own = job.own, remain = job.expireAt - now })
 end
 
 DOServer["PongDuFireSupport"]["Sniper"] = function(player, data)
@@ -519,7 +549,7 @@ local function pickSniperTarget(job)
     local best, bd, bm = nil, nil, -1
     for i = 0, zl:size() - 1 do
         local z = zl:get(i)
-        if z and not z:isDead() and not job.shotZids[z:getOnlineID()] then
+        if z and not z:isDead() and not job.shotZids[fsZKey(z)] then
             local dx, dy = z:getX() - cx, z:getY() - cy
             local d2 = dx * dx + dy * dy
             if d2 <= r2 then
@@ -542,27 +572,30 @@ end
 --
 -- 사살 확률 굴림은 반드시 서버에서 한다 -- 클라마다 굴리면 같은 탄인데도
 -- 클라별로 죽는 놈이 갈린다. 죽을 놈(ex)과 맞고 살아남은 놈(gz)을 나눠 보낸다.
+-- SP 는 onlineID 가 전부 -1 이라 객체 목록(exo/gzo)을 같이 돌려준다 (MP 는 빈 표).
 local PIERCE_THR2 = 0.7 * 0.7   -- 선분에서 이 수직거리(제곱) 안이면 명중
-local function collectPierced(job, mainZid, tx, ty)
-    local ex, gz = {}, {}
-    if not job.pierce then return ex, gz end
+local function collectPierced(job, mainKey, tx, ty)
+    local ex, gz, exo, gzo = {}, {}, {}, {}
+    if not job.pierce then return ex, gz, exo, gzo end
 
     local ok, cell = pcall(function() return job.player:getCell() end)
-    if not ok then return ex, gz end
+    if not ok then return ex, gz, exo, gzo end
     local zl = cell and cell:getZombieList()
-    if not zl then return ex, gz end
+    if not zl then return ex, gz, exo, gzo end
 
     local vx, vy = tx - job.ox, ty - job.oy
     local len2 = vx * vx + vy * vy
-    if len2 <= 0.0001 then return ex, gz end
+    if len2 <= 0.0001 then return ex, gz, exo, gzo end
+    local sp = fsIsSP()
 
     for i = 0, zl:size() - 1 do
         local z = zl:get(i)
         if z and not z:isDead() then
             local zid = z:getOnlineID()
+            local zk  = fsZKey(z)
             -- 주 표적과 이미 사살된 놈은 제외. 맞고 살아남은 놈은 shotZids에
             -- 넣지 않으므로 다음 탄에 다시 관통당할 수 있다(아직 살아있으니까).
-            if zid ~= mainZid and not job.shotZids[zid] then
+            if zk ~= mainKey and not job.shotZids[zk] then
                 local wx, wy = z:getX() - job.ox, z:getY() - job.oy
                 local t = (wx * vx + wy * vy) / len2
                 -- t 하한/상한으로 저격수 뒤쪽과 주 표적 너머를 제외한다.
@@ -573,16 +606,18 @@ local function collectPierced(job, mainZid, tx, ty)
                     if (dx * dx + dy * dy) <= PIERCE_THR2 then
                         if ZombRand(100) < job.pcChan then
                             ex[#ex + 1] = zid
-                            job.shotZids[zid] = true
+                            if sp then exo[#exo + 1] = z end
+                            job.shotZids[zk] = true
                         else
                             gz[#gz + 1] = zid
+                            if sp then gzo[#gzo + 1] = z end
                         end
                     end
                 end
             end
         end
     end
-    return ex, gz
+    return ex, gz, exo, gzo
 end
 
 local function processSniperJobs()
@@ -592,10 +627,7 @@ local function processSniperJobs()
         local job = _sniperJobs[i]
         if now >= job.expireAt then
             table.remove(_sniperJobs, i)
-            local players = getOnlinePlayers()
-            for k = 0, players:size() - 1 do
-                sendServerCommand(players:get(k), "PongDuFireSupport", "SniperStop", { own = job.own })
-            end
+            fsSendAll("SniperStop", { own = job.own })
             fsQueueResult(job.own, "sniper", job.nKill + job.nPierce)
             print(string.format(
                 "[PongDu][Sniper] job finished own=%s shots=%d kills=%d (main=%d pierce=%d) grazed=%d",
@@ -606,11 +638,16 @@ local function processSniperJobs()
             local payload = { ox = job.ox, oy = job.oy, oz = job.oz, sender = job.sender }
             if target then
                 local zid = target:getOnlineID()
-                job.shotZids[zid] = true
+                local zk  = fsZKey(target)
+                job.shotZids[zk] = true
                 payload.id = zid
+                -- SP: 클라가 onlineID(-1)로 못 찾으므로 객체를 직접 싣는다 (triggerEvent 는
+                -- 같은 VM 이라 그대로 전달된다. MP 패킷에는 싣지 않는다).
+                if fsIsSP() then payload.obj = target end
                 payload.x, payload.y, payload.z = target:getX(), target:getY(), target:getZ()
-                local ex, gz = collectPierced(job, zid, payload.x, payload.y)
+                local ex, gz, exo, gzo = collectPierced(job, zk, payload.x, payload.y)
                 payload.ex, payload.gz, payload.kd = ex, gz, job.kdChan
+                if fsIsSP() then payload.exo, payload.gzo = exo, gzo end
                 job.nShot   = job.nShot + 1
                 job.nKill   = job.nKill + 1
                 job.nPierce = job.nPierce + #ex
@@ -622,10 +659,7 @@ local function processSniperJobs()
                 print("[PongDu][Sniper] shot MISS: no target in radius r=" .. job.r)
             end
 
-            local players = getOnlinePlayers()
-            for k = 0, players:size() - 1 do
-                sendServerCommand(players:get(k), "PongDuFireSupport", "SniperFire", payload)
-            end
+            fsSendAll("SniperFire", payload)
 
             job.nextAt = now + job.iv
         end
@@ -885,6 +919,10 @@ local FS_FIRE_SEND_RADIUS = 55
 -- exclude: 이 플레이어에게는 보내지 않는다(드론 -- 발사한 클라가 이미 로컬로
 -- 처리했으므로 되돌려 보내면 연출/데미지가 두 번 들어간다).
 local function fsBroadcastFire(command, payload, exclude)
+    if fsIsSP() then
+        fsSendAll(command, payload, exclude)
+        return
+    end
     local r2 = FS_FIRE_SEND_RADIUS * FS_FIRE_SEND_RADIUS
     local ox, oy = payload.ox, payload.oy
     local tx, ty = payload.tx or payload.x, payload.ty or payload.y
@@ -921,10 +959,7 @@ local function heliBroadcastStart(job)
         -- 사격 파라미터. 대상 플레이어 클라가 조준/사격한다(HeliShots 주석 참조).
         r = job.r, iv = job.iv, kc = job.kc,
     }
-    local players = getOnlinePlayers()
-    for k = 0, players:size() - 1 do
-        sendServerCommand(players:get(k), "PongDuFireSupport", "HeliStart", payload)
-    end
+    fsSendAll("HeliStart", payload)
 end
 
 DOServer["PongDuFireSupport"]["Heli"] = function(player, data)
@@ -1058,13 +1093,7 @@ DOServer["PongDuFireSupport"]["HeliEngaged"] = function(player, data)
     local job = heliJobOf(player)
     if not job then return end
     local cmd = (tonumber(data and data.on) == 1) and "HeliEngage" or "HeliClear"
-    local players = getOnlinePlayers()
-    for k = 0, players:size() - 1 do
-        local p = players:get(k)
-        if p ~= player then
-            sendServerCommand(p, "PongDuFireSupport", cmd, { own = job.own })
-        end
-    end
+    fsSendAll(cmd, { own = job.own }, player)
 end
 
 -- ── 실차량 재스폰: 클라 요청 ───────────────────────────────────────────────
@@ -1144,22 +1173,14 @@ local function processHeliJobs()
             local why = teleported and "owner teleported" or lost
             heliRemoveVehicle(job, why)
             table.remove(_heliJobs, i)
-            local playersT = getOnlinePlayers()
-            if playersT then
-                for k = 0, playersT:size() - 1 do
-                    sendServerCommand(playersT:get(k), "PongDuFireSupport", "HeliStop", { own = job.own })
-                end
-            end
+            fsSendAll("HeliStop", { own = job.own })
             fsQueueResult(job.own, "heli", job.nKill)
             print(string.format("[PongDu][Heli] job aborted (%s) shots=%d crits=%d batches=%d kills(so far)=%d",
                 tostring(why), job.nShot or 0, job.nCrit or 0, job.nBatch or 0, job.nKill or 0))
         elseif now >= job.expireAt then
             heliRemoveVehicle(job, "job finished")
             table.remove(_heliJobs, i)
-            local players = getOnlinePlayers()
-            for k = 0, players:size() - 1 do
-                sendServerCommand(players:get(k), "PongDuFireSupport", "HeliStop", { own = job.own })
-            end
+            fsSendAll("HeliStop", { own = job.own })
             fsQueueResult(job.own, "heli", job.nKill)
             print(string.format("[PongDu][Heli] job finished shots=%d crits=%d batches=%d kills(so far)=%d",
                 job.nShot or 0, job.nCrit or 0, job.nBatch or 0, job.nKill or 0))
@@ -1860,12 +1881,9 @@ DOServer["PongDuFireSupport"]["Drone"] = function(player, data)
                 end
             end
 
-            local pl2 = getOnlinePlayers()
-            for k = 0, pl2:size() - 1 do
-                sendServerCommand(pl2:get(k), "PongDuFireSupport", "DroneExtend",
-                    { addMs = dur * 1000, own = ex.own,
-                      dr = detR, iv = iv, kc = kc, kd = kd })
-            end
+            fsSendAll("DroneExtend",
+                { addMs = dur * 1000, own = ex.own,
+                  dr = detR, iv = iv, kc = kc, kd = kd })
             print(string.format(
                 "[PongDu][Drone] job EXTENDED +%ds (orbit total %ds) sender=%s",
                 dur, math.floor(ex.orbitMs / 1000), tostring(sender)))
@@ -1923,10 +1941,7 @@ DOServer["PongDuFireSupport"]["Drone"] = function(player, data)
         target = player:getUsername(), sender = sender,
         dr = detR, iv = iv, kc = kc, kd = kd,
     }
-    local players = getOnlinePlayers()
-    for k = 0, players:size() - 1 do
-        sendServerCommand(players:get(k), "PongDuFireSupport", "DroneStart", payload)
-    end
+    fsSendAll("DroneStart", payload)
 
     print(string.format(
         "[PongDu][Drone] job queued dur=%ds orbitR=%d detR=%d iv=%d crit=%d%% kd=%d%% period=%ds spawn=%d,%d vid=%s sender=%s",
@@ -2004,13 +2019,7 @@ DOServer["PongDuFireSupport"]["DroneEngaged"] = function(player, data)
     local job = droneJobOf(player)
     if not job then return end
     local cmd = (tonumber(data and data.on) == 1) and "DroneEngage" or "DroneClear"
-    local players = getOnlinePlayers()
-    for k = 0, players:size() - 1 do
-        local p = players:get(k)
-        if p ~= player then
-            sendServerCommand(p, "PongDuFireSupport", cmd, { own = job.own })
-        end
-    end
+    fsSendAll(cmd, { own = job.own }, player)
 end
 
 local function droneFinish(job, reason)
@@ -2028,10 +2037,7 @@ local function droneFinish(job, reason)
             end
         end
     end
-    local players = getOnlinePlayers()
-    for k = 0, players:size() - 1 do
-        sendServerCommand(players:get(k), "PongDuFireSupport", "DroneStop", { own = job.own })
-    end
+    fsSendAll("DroneStop", { own = job.own })
     fsQueueResult(job.own, "drone", job.nKill)
     print(string.format(
         "[PongDu][Drone] job finished (%s) shots=%d crits=%d knockdowns=%d batches=%d kills(so far)=%d",
