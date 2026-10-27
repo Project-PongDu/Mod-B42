@@ -1257,6 +1257,21 @@ DOServer["PongDuBombard"]["Kaboom"] = function(player, data)
         srvlog("vehicle damage disabled by sandbox option")
     end
 
+    -- 폭발 부상: B42 MP 는 몸 상태가 서버 권위라 서버가 반경 안 실외 접속자 전원(후원자 포함)에게
+    -- 입히고 syncBodyPart 로 내려보낸다 (shared/PongDuBody.lua blastInjury). 클라는 넘어지는 연출만.
+    if isServer() then
+        local hurt = 0
+        local all = getOnlinePlayers()
+        for i = 0, all:size() - 1 do
+            local p = all:get(i)
+            if p and not p:isDead() then
+                local d = math.sqrt(math.pow(p:getX() - cx, 2) + math.pow(p:getY() - cy, 2))
+                if d < r and PongDuBody.blastInjury(p) then hurt = hurt + 1 end
+            end
+        end
+        srvlog("Kaboom blast injury applied=" .. hurt .. " r=" .. tostring(r))
+    end
+
     -- 좀비 킬은 서버에서 하지 않는다.
     -- B41 멀티에서 좀비는 클라이언트 권한(client-authoritative)이므로 서버사이드
     -- setHealth/becomeCorpse는 소유 클라의 동기화에 덮여 저장에 반영되지 않는다

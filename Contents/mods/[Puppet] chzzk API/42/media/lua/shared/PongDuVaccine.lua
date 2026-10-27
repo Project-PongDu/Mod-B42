@@ -28,12 +28,22 @@ function OnEat_Zomboxivir(food, player, percent)
     bodyDamage:setInfectionTime(-1)
     PongDuStats.applyLocal(player, { { op = "set", stat = "ZOMBIE_INFECTION", v = 0 } }, "vaccine")
 
+    -- 부위 감염 플래그는 서버에서 바꾼 뒤 syncBodyPart 로 내려보내야 클라에 반영된다
+    -- (PongDuBody.syncPart: isServer 일 때만 동작). BodyDamage 전체 플래그(setInfected 등)는
+    -- BodyPartSyncPacket 에 없지만(BodyPart.sync 는 1~41번 필드뿐), 클라도 EatOnClient 로 이 함수를
+    -- 한 번 더 돌려 같은 값이 된다. 부위 플래그가 서버에 남아 있으면 BodyDamage.Update 가
+    -- 전체 플래그를 다시 켜므로(isInfected 가 false 일 때 부위를 훑어 setInfected(true)) 부위 sync 가 핵심이다.
     local bodyParts = bodyDamage:getBodyParts()
+    local synced = 0
     for i = bodyParts:size() - 1, 0, -1 do
         local bodyPart = bodyParts:get(i)
         bodyPart:SetInfected(false)
+        if isServer() then
+            PongDuBody.syncPart(bodyPart)
+            synced = synced + 1
+        end
     end
 
     print("[PongDu] vaccine: Zomboxivir applied, infection cleared (server=" .. tostring(isServer())
-        .. ", client=" .. tostring(isClient()) .. ")")
+        .. ", client=" .. tostring(isClient()) .. ", syncedParts=" .. synced .. ")")
 end

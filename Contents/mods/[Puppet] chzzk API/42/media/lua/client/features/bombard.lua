@@ -109,11 +109,14 @@ function _a.a(a)
     end
 end
 
--- Activate the timed bomb on the player.
--- Blast injury applied LOCALLY on each affected client (donee + nearby players
--- in range). Only injures a player who is outside; shared so everyone caught in
--- the blast takes the same damage.
+-- 폭발 부상. 부위 상처는 shared/PongDuBody.lua 의 PongDuBody.blastInjury 가 한다.
+-- B42 MP 는 몸 상태(BodyPart)가 서버 권위라 클라에서 입힌 상처는 서버 값에 덮여 사라진다.
+--   SP : 여기서 PongDuBody.blastInjury
+--   MP : 서버 Kaboom 처리(server/server.lua)가 반경 안 실외 접속자 전원(후원자 포함)에게 적용
+-- 넘어지는 연출은 로컬 플레이어 애니메이션이라 양쪽 다 여기서 한다.
 -- 부상 스위치: PongDu.Bombard_Injure. SandboxVars는 사용 시점에 읽는다.
+require "PongDuBody"
+
 local function injureEnabled()
     return SandboxVars.PongDu.Bombard_Injure
 end
@@ -125,39 +128,8 @@ local function applyBlastInjury(p)
     p:setBumpType("stagger")
     p:setBumpFall(true)
     p:setBumpFallType("pushedBehind")
-    local bodyParts = {
-        "Foot_L", "Foot_R",
-        "ForeArm_L", "ForeArm_R",
-        "Groin",
-        "Hand_L", "Hand_R",
-        "LowerLeg_L", "LowerLeg_R",
-        "Torso_Lower", "Torso_Upper",
-        "UpperArm_L", "UpperArm_R",
-        "UpperLeg_L", "UpperLeg_R",
-    }
-    local bd = p:getBodyDamage()
-    local function pickParts(n)
-        local out, seen = {}, {}
-        while #out < n do
-            local name = bodyParts[ZombRand(1, #bodyParts + 1)]
-            if not seen[name] then
-                seen[name] = true
-                out[#out + 1] = name
-            end
-        end
-        return out
-    end
-    local head = bd:getBodyPart(BodyPartType.Head)
-    head:setBurned()
-    head:setAdditionalPain(100)
-    for _, name in ipairs(pickParts(4)) do
-        bd:getBodyPart(BodyPartType[name]):setScratched(true, true)
-    end
-    for _, name in ipairs(pickParts(1)) do
-        bd:getBodyPart(BodyPartType[name]):generateDeepWound()
-    end
-    for _, name in ipairs(pickParts(1)) do
-        bd:getBodyPart(BodyPartType[name]):setCut(true, true)
+    if not isClient() then
+        PongDuBody.blastInjury(p)
     end
 end
 

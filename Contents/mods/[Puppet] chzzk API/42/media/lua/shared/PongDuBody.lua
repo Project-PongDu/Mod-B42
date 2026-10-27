@@ -263,4 +263,71 @@ function PongDuBody.instantHeal(player, sender)
     return result
 end
 
+-- ── 폭격 부상 (missile 폭발) ─────────────────────────────────────────────────
+--
+-- 머리 화상 + 통증, 머리 제외 15부위 중 긁힘 4 / 깊은 상처 1 / 베임 1 (감염 없음).
+-- 실외에 있는 플레이어만. 넘어지는 연출(setBumpType 등)은 로컬 플레이어 애니메이션이라
+-- 클라(features/bombard.lua)가 따로 한다.
+--   SP : 클라가 직접 호출
+--   MP : 서버 Kaboom 처리(server/server.lua)가 반경 안 접속자 전원에게 호출 -> 부위마다 syncBodyPart
+-- 반환: 적용했으면 true
+local BLAST_PARTS = {
+    "Foot_L", "Foot_R",
+    "ForeArm_L", "ForeArm_R",
+    "Groin",
+    "Hand_L", "Hand_R",
+    "LowerLeg_L", "LowerLeg_R",
+    "Torso_Lower", "Torso_Upper",
+    "UpperArm_L", "UpperArm_R",
+    "UpperLeg_L", "UpperLeg_R",
+}
+
+function PongDuBody.blastInjury(player)
+    if not SandboxVars.PongDu.Bombard_Injure then return false end
+    if not player or not player:isOutside() then return false end
+    local bd = player:getBodyDamage()
+    if not bd then return false end
+
+    local function pickParts(n)
+        local out, seen = {}, {}
+        while #out < n do
+            local name = BLAST_PARTS[ZombRand(1, #BLAST_PARTS + 1)]
+            if not seen[name] then
+                seen[name] = true
+                out[#out + 1] = name
+            end
+        end
+        return out
+    end
+
+    local touched = {}
+    local head = bd:getBodyPart(BodyPartType.Head)
+    head:setBurned()
+    head:setAdditionalPain(100)
+    touched[#touched + 1] = head
+    for _, name in ipairs(pickParts(4)) do
+        local part = bd:getBodyPart(BodyPartType[name])
+        part:setScratched(true, true)
+        touched[#touched + 1] = part
+    end
+    for _, name in ipairs(pickParts(1)) do
+        local part = bd:getBodyPart(BodyPartType[name])
+        part:generateDeepWound()
+        touched[#touched + 1] = part
+    end
+    for _, name in ipairs(pickParts(1)) do
+        local part = bd:getBodyPart(BodyPartType[name])
+        part:setCut(true, true)
+        touched[#touched + 1] = part
+    end
+    for _, part in ipairs(touched) do
+        PongDuBody.syncPart(part)
+    end
+
+    print("[PongDu][BlastInjury] applied parts=" .. #touched
+        .. " server=" .. tostring(isServer())
+        .. " player=" .. tostring(player:getUsername()))
+    return true
+end
+
 return PongDuBody
