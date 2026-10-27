@@ -1,13 +1,19 @@
--- ── 좀비 레인 (zombie_rain) 서버 ── [프로토타입: 런타임 스퀘어 생성 방식] ──────
--- B41 MP에서 야외 공중(z>0) 컬럼은 그리드 스퀘어가 존재하지 않아,
---  ① 클라 재생성 관문(NetworkZombieSimulator.parseZombie: getGridSquare(realZ)==null → 스킵)
---  ② 낙하물리(updateFalling: 현재 z 스퀘어 없으면 지상 폴백 → 유령 바닥 착지)
--- 두 지점에서 z 리프트 방식이 전부 막힌다.
+-- ── 좀비 레인 (zombie_rain) 서버 ── [z 리프트 + 클라 최상층 스퀘어 1칸] ────────
+-- 야외 공중(z>0)에는 그리드 스퀘어가 없다. B42.21 소스 기준으로 막히는 곳은 한 군데뿐이다.
+--  ① 클라 생성 관문: NetworkZombieSimulator.parseZombie 가 처음 보는 좀비를
+--     getGridSquare(realX, realY, realZ) 가 있을 때만 만든다 (realZ = floor(좀비 z),
+--     NetworkZombieAI). 한 번 만들어진 뒤의 갱신 패킷은 스퀘어를 보지 않는다.
+--  (B41 의 ② 낙하 물리 문제는 B42 에 없다: IsoMovingObject.findCurrentGridSquare 가 없는 층을
+--   아래로 내려가며 찾고, getHeightAboveFloor 도 아래층 바닥을 찾는다. 카오스모드(ChaosMod)
+--   EffectZombiesRain 이 스퀘어 없이 setZ(+3) 만으로 떨어뜨리는 것도 이 덕분이다.)
 --
--- 해결: 스폰 전에 서버+전체 클라가 해당 컬럼에 z=1..4 "빈 스퀘어"를
--- createNewGridSquare로 실제 생성해 둔다 (바닐라 건축 시스템이 쓰는 API,
--- IsoCell.createNewGridSquare -- 멱등: 이미 있으면 그대로 반환).
--- 스퀘어가 실존하면 ①②가 모두 바닐라 경로 그대로 성립한다.
+-- 그래서 (2026-10-27 개량, 이전엔 서버·클라 모두 z=1..DROP_Z 전 층을 만들었다)
+--  - 서버: 스퀘어를 만들지 않는다. 지면(z=0)에 스폰한 뒤 바로 setZ(dropZ). 서버가 만든
+--    스퀘어는 월드 저장에 남고 지울 API 가 없어서, 이전엔 발동마다 저장이 커졌다.
+--  - MP 클라: Prep 을 받으면 컬럼마다 낙하 시작 층(dropZ) 1칸만 만든다(관문 ① 통과용).
+--    클라 스퀘어는 서버 저장에 안 들어간다. createNewGridSquare 는 멱등.
+--  - SP: 네트워크 관문이 없어 스퀘어가 필요 없다(Prep 도 안 보냄).
+-- 대가: 낙하 도중 처음 범위에 들어온 클라는 그 층 스퀘어가 없어 착지 후에 좀비가 보인다.
 --
 -- 플로우:
 --  Start 수신 → 컬럼 일괄 선정 → 서버 스퀘어 생성 → Prep 브로드캐스트(클라 생성)
@@ -37,7 +43,7 @@ local RAIN_KINDS = { "normal", "sprinter", "screamer", "brute", "roach", "tracer
 local RAIN_DROP_Z        = 7                                -- 좀비 레인 낙하 시작 높이 (층)
 -- 수송기 투하 낙하 시작 높이 (층). 수송기 고도(클라 zombierain.lua PLANE_FLY_ALT = 12층) 바로 아래라
 -- 화면에서 좀비가 기체 배 밑에서 떨어져 나온다. B42 IsoCell.maxHeight = 32 라 11층 스퀘어 생성 가능.
--- 대가: 컬럼당 생성 스퀘어가 레인의 11/7 배, 낙하산 하강 시간 약 9초(1.2층/초).
+-- 대가: 낙하산 하강 시간 약 9초(1.2층/초). 스퀘어는 층수와 무관하게 클라 컬럼당 1칸.
 local AIRDROP_DROP_Z     = 11
 local RAIN_MIN_DIST      = 3                                -- 플레이어 직격 방지 최소 거리
 local SPAWN_CAP_PER_TICK = 5                                -- 랙 스파이크 후 몰아치기 상한
@@ -159,14 +165,17 @@ local function buildKindList(kinds)
     return list, requested
 end
 
--- 1마리 스폰: z=session.dropZ 스퀘어에 직접 생성. 랜덤 아웃핏(outfit=nil),
+-- 1마리 스폰: 지면(z=0)에 생성 후 바로 z=session.dropZ 로 올린다(파일 머리 주석). 랜덤 아웃핏(outfit=nil),
 -- 체력 캡처 후 세션 배치에 적재. 특좀 종류는 서버 modData에 마킹만 하고
 -- 스탯/행동 적용은 RainMark를 받은 클라가 특좀 적용기(mutantspawn)에 넘겨
 -- 처리한다 (B41 MP 좀비는 클라 권한).
 local function spawnRainZombie(session, col, kind)
-    local zeds = addZombiesInOutfit(col.x, col.y, session.dropZ, 1, nil, nil)
+    -- addZombiesInOutfit 는 해당 z 스퀘어가 있어야 스폰한다(LuaManager). 지면은 isRainColumn 이 보장.
+    local zeds = addZombiesInOutfit(col.x, col.y, 0, 1, nil, nil)
     if not zeds or zeds:size() == 0 then return false end
     local zed = zeds:get(0)
+    zed:setZ(session.dropZ)
+    zed:setLastZ(session.dropZ)
     zed:DoZombieStats()
     -- 후원받은 플레이어 쪽으로 어그로
     local p = session.player
@@ -567,20 +576,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     -- 컬럼이 모자라면 종류 목록도 같은 길이로 자른다 (이미 셔플돼 있어 무작위 탈락)
     for i = #kindList, #cols + 1, -1 do kindList[i] = nil end
 
-    local createdSq, reusedSq = 0, 0
-    for _, c in ipairs(cols) do
-        for zz = 1, dropZ do
-            if cell:getGridSquare(c.x, c.y, zz) then
-                reusedSq = reusedSq + 1
-            else
-                cell:createNewGridSquare(c.x, c.y, zz, true)
-                createdSq = createdSq + 1
-            end
-        end
-    end
-    local tSquares1 = getTimestampMs()
-
-    -- SP 는 서버와 클라가 같은 셀을 쓰므로 위에서 만든 스퀘어가 곧 클라 스퀘어다
+    -- SP 는 네트워크 생성 관문이 없어 스퀘어가 필요 없다 (파일 머리 주석)
     if isSP() then
         print("[PongDuRain] SP bridge on (Prep skipped, shared cell)")
     else
@@ -617,9 +613,9 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     })
 
     print("[PongDuRain] prep pickMs=" .. tostring(tPick1 - tPick0)
-        .. " squareMs=" .. tostring(tSquares1 - tPick1)
+        .. " serverSquares=0"
         .. " cols=" .. tostring(#cols) .. " missedPick=" .. tostring(missedPick)
-        .. " sqCreated=" .. tostring(createdSq) .. " sqReused=" .. tostring(reusedSq))
+        .. " clientSquaresPerCol=1")
 
     _sessions[#_sessions + 1] = {
         player     = player,

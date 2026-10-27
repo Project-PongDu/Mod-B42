@@ -9,13 +9,14 @@ local deltaTime = require("utils/deltaTime")
 local mutantspawn = require("features/mutantspawn")
 local vxf = require("utils/vehtransform")
 
--- ── 좀비 레인 (zombie_rain) 클라이언트 ── [프로토타입: 런타임 스퀘어 생성] ─────
+-- ── 좀비 레인 (zombie_rain) 클라이언트 ── [z 리프트 + 최상층 스퀘어 1칸] ─────────
 -- 역할 4가지:
 --  ① 시작: 샌드박스 반경/지속시간/종류별 마리수를 읽어 서버에 세션 시작 요청
---  ② 컬럼 준비: 서버 Prep(컬럼 좌표) 수신 시 z=1..dropZ 빈 스퀘어를 로컬 생성.
---     클라 재생성 관문(NetworkZombieSimulator.parseZombie)이 "이 클라"의
---     getGridSquare(realZ)를 보므로, 스퀘어가 없으면 서버 좀비가 아예 생성되지
---     않는다. createNewGridSquare는 멱등(있으면 그대로 반환) -- 중복 안전.
+--  ② 컬럼 준비: 서버 Prep(컬럼 좌표) 수신 시 낙하 시작 층(dropZ) 빈 스퀘어 1칸만 로컬 생성.
+--     클라 생성 관문(NetworkZombieSimulator.parseZombie)이 "이 클라"의
+--     getGridSquare(realZ)를 처음 생성할 때만 보므로 시작 층만 있으면 된다. 중간 층은
+--     B42 낙하 물리가 아래층을 찾아 내려가 필요 없다(서버 PongDuRainServer.lua 머리 주석).
+--     createNewGridSquare는 멱등(있으면 그대로 반환) -- 중복 안전.
 --  ③ 남은시간 UI: 폭격 타이머와 동일 스타일의 30초 카운트다운 패널
 --  ④ 낙하 처리: 서버 RainMark(zedId+종류)를 받아 공중에 있는 동안
 --     - 소유 클라: 낙하 속도(lastFallSpeed)를 매 틱 직접 정한다 (아래 낙하 속도 절).
@@ -541,16 +542,14 @@ Events.OnServerCommand.Add(function(module, command, args)
             local x = c and tonumber(c["x"])
             local y = c and tonumber(c["y"])
             if x and y then
-                for zz = 1, dropZ do
-                    if cell:getGridSquare(x, y, zz) then
-                        reused = reused + 1
+                if cell:getGridSquare(x, y, dropZ) then
+                    reused = reused + 1
+                else
+                    local ok = pcall(function() cell:createNewGridSquare(x, y, dropZ, true) end)
+                    if ok and cell:getGridSquare(x, y, dropZ) then
+                        created = created + 1
                     else
-                        local ok = pcall(function() cell:createNewGridSquare(x, y, zz, true) end)
-                        if ok and cell:getGridSquare(x, y, zz) then
-                            created = created + 1
-                        else
-                            failed = failed + 1
-                        end
+                        failed = failed + 1
                     end
                 end
             end
