@@ -860,6 +860,25 @@ local function runSpawnChecks()
 end
 Events.OnTick.Add(runSpawnChecks)
 
+-- 클라 좀비 수 급감 감시: 1초마다 세어 3마리 이상 한 번에 줄면 기록한다.
+-- (2026-10-27 멀티 5E: 제자리에서 클라 좀비가 9 -> 4 -> 0 으로 통째로 사라졌다가 돌아옴)
+local _zcLast, _zcAt = -1, 0
+Events.OnTick.Add(function()
+    if not isClient() then return end
+    local now = getTimestampMs()
+    if now - _zcAt < 1000 then return end
+    _zcAt = now
+    local cell = getCell()
+    local zl = cell and cell:getZombieList()
+    local n = zl and zl:size() or -1
+    if _zcLast >= 0 and _zcLast - n >= 3 then
+        local p = getPlayer()
+        print(string.format("[PuppetMutant] client zombies dropped %d -> %d player=%.1f,%.1f",
+            _zcLast, n, p and p:getX() or -1, p and p:getY() or -1))
+    end
+    _zcLast = n
+end)
+
 Events.OnServerCommand.Add(function(module, command, args)
     if module ~= "PongDuMutant" then return end
     if command == "MutantMark" then

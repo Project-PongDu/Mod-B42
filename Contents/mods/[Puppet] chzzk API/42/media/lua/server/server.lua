@@ -185,6 +185,11 @@ local function spawnSpecialZombie(x, y, z, kind, sender)
         ["x"] = zed:getX(), ["y"] = zed:getY(), ["z"] = zed:getZ(),
     })
     registerMutant(zed, kind, sender) -- 부활 유지용 영속 등록 (후원자 포함)
+    PongDuSpawnFate = PongDuSpawnFate or {}
+    PongDuSpawnFate[#PongDuSpawnFate + 1] = {
+        zid = zed:getOnlineID(), kind = kind, x = zed:getX(), y = zed:getY(),
+        at = getTimestampMs() + 2000,
+    }
     return zed:getOnlineID()   -- 어그로 스코프용 (실패 경로는 위에서 false)
 end
 
@@ -1728,6 +1733,32 @@ local function staleSweep()
     if not cell then return end
     local zeds = cell:getZombieList()
     if not zeds then return end
+
+    -- 스폰 2초 뒤 서버에 그 좀비가 남아 있는지 진단 (클라 미수신 사례 원인 분리용)
+    if PongDuSpawnFate and #PongDuSpawnFate > 0 then
+        for i = #PongDuSpawnFate, 1, -1 do
+            local f = PongDuSpawnFate[i]
+            if now >= f.at then
+                table.remove(PongDuSpawnFate, i)
+                local present = false
+                for j = 0, zeds:size() - 1 do
+                    if zeds:get(j):getOnlineID() == f.zid then present = true break end
+                end
+                local nearest = -1
+                local players = getOnlinePlayers()
+                if players then
+                    for j = 0, players:size() - 1 do
+                        local p = players:get(j)
+                        local dx, dy = p:getX() - f.x, p:getY() - f.y
+                        local d = math.sqrt(dx * dx + dy * dy)
+                        if nearest < 0 or d < nearest then nearest = d end
+                    end
+                end
+                print(string.format("[PongDu][SpawnFate] zid=%s kind=%s present=%s serverZombies=%d nearestPlayer=%.1f",
+                    tostring(f.zid), tostring(f.kind), tostring(present), zeds:size(), nearest))
+            end
+        end
+    end
 
     local mp = isServer()
     local doSync = mp and (now - _lastMutantSync >= MUTANT_SYNC_MS)
