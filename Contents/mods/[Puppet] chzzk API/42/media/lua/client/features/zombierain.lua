@@ -7,6 +7,7 @@ local timerText = require("utils/timerText")
 local fx = require("utils/fx")
 local deltaTime = require("utils/deltaTime")
 local mutantspawn = require("features/mutantspawn")
+local vxf = require("utils/vehtransform")
 
 -- ── 좀비 레인 (zombie_rain) 클라이언트 ── [프로토타입: 런타임 스퀘어 생성] ─────
 -- 역할 4가지:
@@ -428,6 +429,76 @@ local function planeTick()
 end
 Events.OnTick.Add(planeTick)
 
+-- ── 투하 모드: 실체 수송기 (Base.PongDuC17) ─────────────────────────────────
+-- 서버(PongDuRainServer.lua planeSpawn)가 플레이어 근처 구간에서만 차량을 띄우고 PlaneStart 로
+-- vid / 파일럿(onlineID) / 경로(A->B) / 현재 진행률(frac) / 비행시간(dur) 을 보낸다.
+-- 파일럿 클라만 매 틱 경로 좌표로 옮긴다(화력지원 헬기 heliMoveTo 와 같은 setWorldTransform).
+-- 다른 클라는 엔진 차량 보간으로 받는다. 진행률 식은 그림자(flightState)와 같아서
+-- 기체와 그림자가 같은 지점을 지난다.
+-- 고도: 물리 y 단위, iso 층 = y / 2.46 (firesupport.lua HELI_FLY_ALT 주석). 좀비 낙하 시작
+-- 높이(서버 RAIN_DROP_Z = 7층)보다 한 층 위.
+local PLANE_SCRIPT   = "Base.PongDuC17"
+local PLANE_FLY_ALT  = 8 * 2.46
+local PLANE_YAW_OFF  = 0        -- fbx 기수 방향 보정(도). 기수가 거꾸로 보이면 180
+local _planes = {}              -- [vid] = { pilot, ax, ay, bx, by, frac0, dur, f1, t0, amPilot }
+
+local function planeFind(vid)
+    local ok, v = pcall(function() return getVehicleById(vid) end)
+    if not ok or not v then return nil end
+    -- VehicleID 는 재활용되므로 스크립트명으로 거른다 (firesupport.lua findHeliVehicle 참고)
+    local okS, sn = pcall(function() return v:getScriptName() end)
+    if okS and sn == PLANE_SCRIPT then return v end
+    return nil
+end
+
+local function planePilotTick()
+    local now = getTimestampMs()
+    local expired = nil
+    for vid, pl in pairs(_planes) do
+        local frac = pl.frac0 + (now - pl.t0) / pl.dur
+        if frac > pl.f1 + 0.2 then
+            -- 서버 PlaneStop 유실 대비 자체 정리 (차량 제거는 서버 몫). 순회 중 삭제를 피해 모아 둔다.
+            expired = expired or {}
+            expired[#expired + 1] = vid
+        elseif pl.amPilot then
+            local v = planeFind(vid)
+            if v then
+                if pl.lostAt then
+                    print(string.format("[PongDuRain] plane vehicle acquired vid=%s after %dms", tostring(vid), now - pl.lostAt))
+                    pl.lostAt = nil
+                end
+                local wx = pl.ax + (pl.bx - pl.ax) * frac
+                local wy = pl.ay + (pl.by - pl.ay) * frac
+                if not pl.yawSet then
+                    pl.yawSet = true
+                    local yaw = math.deg(math.atan2(pl.bx - pl.ax, pl.by - pl.ay)) + PLANE_YAW_OFF
+                    local okY, errY = pcall(function() v:setAngles(0, yaw, 0) end)
+                    print(string.format("[PongDuRain] plane yaw %.1f ok=%s", yaw, tostring(okY))
+                        .. (okY and "" or (" err=" .. tostring(errY))))
+                end
+                local ok, err = pcall(function()
+                    local tr, origin = vxf.get(v)
+                    origin:set(origin:x() + (wx - v:getX()), PLANE_FLY_ALT, origin:z() + (wy - v:getY()))
+                    v:setWorldTransform(tr)
+                end)
+                if not ok and not pl.moveErr then
+                    pl.moveErr = true
+                    print("[PongDuRain] plane move FAILED vid=" .. tostring(vid) .. " err=" .. tostring(err))
+                end
+            elseif not pl.lostAt then
+                pl.lostAt = now
+            end
+        end
+    end
+    if expired then
+        for _, vid in ipairs(expired) do
+            _planes[vid] = nil
+            print("[PongDuRain] plane local entry expired vid=" .. tostring(vid))
+        end
+    end
+end
+Events.OnTick.Add(planePilotTick)
+
 -- ── 착지 처리 대기열 ──────────────────────────────────────────────────────────
 -- [onlineID] = { k=특좀 종류(nil=일반), e=만료(ms), para=낙하산 대상,
 --               chute=낙하산 부착 여부, pz=감속 목표 높이, ang=고정할 방향(도) }
@@ -514,6 +585,32 @@ Events.OnServerCommand.Add(function(module, command, args)
         return
     end
 
+    if command == "PlaneStart" then
+        local vid = tonumber(args and args["vid"])
+        if not vid then return end
+        local me = getPlayer()
+        local myId = me and me:getOnlineID()
+        local pilot = tonumber(args["pilot"])
+        _planes[vid] = {
+            ax = tonumber(args["ax"]), ay = tonumber(args["ay"]),
+            bx = tonumber(args["bx"]), by = tonumber(args["by"]),
+            frac0 = tonumber(args["frac"]) or 0, dur = tonumber(args["dur"]) or 30000,
+            f1 = tonumber(args["f1"]) or 1, t0 = getTimestampMs(),
+            amPilot = (myId ~= nil and pilot ~= nil and pilot == myId),
+        }
+        print(string.format("[PongDuRain] plane start vid=%d pilot=%s amPilot=%s frac=%.2f",
+            vid, tostring(pilot), tostring(_planes[vid].amPilot), _planes[vid].frac0))
+        return
+    end
+    if command == "PlaneStop" then
+        local vid = tonumber(args and args["vid"])
+        if vid and _planes[vid] then
+            _planes[vid] = nil
+            print("[PongDuRain] plane stop vid=" .. tostring(vid))
+        end
+        return
+    end
+
     if command ~= "RainMark" then return end
     local zeds = args and args["zeds"]
     if type(zeds) ~= "table" then return end
@@ -576,6 +673,7 @@ local function onTick()
     if gap > PAUSE_GAP_MS and (_pendingCount > 0 or #_flights > 0) then
         for _, p in pairs(_pending) do p.e = p.e + gap end
         for i = 1, #_flights do _flights[i].t0 = _flights[i].t0 + gap end
+        for _, pl in pairs(_planes) do pl.t0 = pl.t0 + gap end
         print(string.format("[PongDuRain] tick gap %dms (pause?) -> pending/flights shifted", gap))
     end
     -- ① 타이머 감산 (패널 update()가 0에서 자가 제거). 프레임 수가 아닌 실제 경과시간.

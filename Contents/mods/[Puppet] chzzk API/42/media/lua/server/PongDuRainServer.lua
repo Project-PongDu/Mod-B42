@@ -286,6 +286,190 @@ local function onTick()
 end
 Events.OnTick.Add(onTick)
 
+-- ── 투하 모드: 실체 수송기 (Base.PongDuC17 차량) ─────────────────────────────
+-- 화력지원 헬기(server.lua heliSpawnVehicle)와 같은 방식이다:
+--   서버가 addVehicleDebug 로 스폰 -> 요청 플레이어에 Local 물리 권한(authorizationChanged)
+--   -> 그 클라(파일럿)가 매 틱 경로 좌표로 setWorldTransform -> 엔진이 전 클라에 보간 전파.
+--   종료는 서버 permanentlyRemove (제거 패킷 브로드캐스트 + VehiclesDB 삭제).
+-- 헬기와 다른 점: 경로 전체를 날지 않고 플레이어 근처 구간(PLANE_VIS_R 안)만 띄운다.
+--   경로 양끝(D = 반경 + 50 타일)은 클라 차량 전송 판정(UdpConnection.RelevantTo) 경계라
+--   헬기에서 "차량이 안 오거나 도중에 회수"되는 문제가 있었고, 그 구간은 어차피 화면 밖이다.
+--   지면 그림자는 지금처럼 클라가 경로 전체에 그린다.
+-- 스폰이 실패해도 그림자·엔진음·좀비 투하는 그대로라 후원은 죽지 않는다.
+local PLANE_SCRIPT   = "Base.PongDuC17"
+local PLANE_VIS_R    = 45      -- 플레이어(발동 시점 위치)에서 이 거리 안 구간만 실체를 띄운다 (타일)
+local PLANE_TAIL_MS  = 500     -- 구간 끝 이후 제거까지 여유
+local _planes = {}
+
+-- 경로 진행률 f(0=A, 1=B) 중 (px,py) 에서 R 안에 드는 구간 [f0, f1]. 없으면 nil.
+local function planeWindow(fl, px, py, R)
+    local dx, dy = fl.bx - fl.ax, fl.by - fl.ay
+    local ox, oy = fl.ax - px, fl.ay - py
+    local a = dx * dx + dy * dy
+    if a <= 0 then return nil end
+    local b = 2 * (ox * dx + oy * dy)
+    local c = ox * ox + oy * oy - R * R
+    local disc = b * b - 4 * a * c
+    if disc <= 0 then return nil end
+    local sq = math.sqrt(disc)
+    local f0 = (-b - sq) / (2 * a)
+    local f1 = (-b + sq) / (2 * a)
+    if f0 < 0 then f0 = 0 end
+    if f1 > 1 then f1 = 1 end
+    if f1 <= f0 then return nil end
+    return f0, f1
+end
+
+local function planeRemove(pl, reason)
+    if pl.vehicle then
+        local ok, err = pcall(function() pl.vehicle:permanentlyRemove() end)
+        print("[PongDuRain] plane vehicle removed vid=" .. tostring(pl.vid) .. " ok=" .. tostring(ok)
+            .. (ok and "" or (" err=" .. tostring(err))) .. " (" .. tostring(reason) .. ")")
+        toClients("PlaneStop", { ["vid"] = pl.vid })
+    end
+    pl.vehicle = nil
+end
+
+local function planeSpawn(pl, frac)
+    local x = pl.fl.ax + (pl.fl.bx - pl.fl.ax) * frac
+    local y = pl.fl.ay + (pl.fl.by - pl.fl.ay) * frac
+    local okP, px, py = pcall(function() return pl.player:getX(), pl.player:getY() end)
+    if not okP then return false end
+    -- 스폰 칸이 서버에 로드돼 있어야 한다. 없으면 플레이어 쪽으로 10%씩 당긴다(헬기와 같음).
+    -- 파일럿 클라가 첫 틱에 경로 좌표로 옮기므로 스폰 칸 위치는 보이지 않는다.
+    local sq = nil
+    for step = 0, 9 do
+        local t = step * 0.1
+        sq = getSquare(math.floor(x + (px - x) * t), math.floor(y + (py - y) * t), 0)
+        if sq then break end
+    end
+    if not sq then
+        print("[PongDuRain] plane spawn FAILED: no loaded square near " .. math.floor(x) .. "," .. math.floor(y))
+        return false
+    end
+    local ok, v = pcall(function() return addVehicleDebug(PLANE_SCRIPT, IsoDirections.N, 0, sq) end)
+    if not ok or not v then
+        print("[PongDuRain] plane spawn FAILED err=" .. tostring(v))
+        return false
+    end
+    pl.vehicle = v
+    pl.vid = v:getId()
+    local pilot = nil
+    local okA, errA = pcall(function()
+        pilot = pl.player:getOnlineID()
+        v:authorizationChanged(pl.player)
+    end)
+    if not okA then print("[PongDuRain] plane authorization FAILED err=" .. tostring(errA)) end
+    toClients("PlaneStart", {
+        ["vid"] = pl.vid, ["pilot"] = pilot,
+        ["ax"] = pl.fl.ax, ["ay"] = pl.fl.ay, ["bx"] = pl.fl.bx, ["by"] = pl.fl.by,
+        ["frac"] = frac, ["dur"] = pl.durMs, ["f1"] = pl.f1,
+    })
+    print(string.format("[PongDuRain] plane spawned vid=%s at %d,%d frac=%.2f..%.2f pilot=%s",
+        tostring(pl.vid), sq:getX(), sq:getY(), frac, pl.f1, tostring(pilot)))
+    return true
+end
+
+-- 투하 세션 시작 시 호출. startAt = 수송기가 A 에 있는 시각(= 발동 + PREP_DELAY_MS).
+local function planeQueue(player, fl, durMs, startAt)
+    local px, py = player:getX(), player:getY()
+    local f0, f1 = planeWindow(fl, px, py, PLANE_VIS_R)
+    if not f0 then
+        print("[PongDuRain] plane skipped: path never within " .. PLANE_VIS_R .. " tiles of player")
+        return
+    end
+    _planes[#_planes + 1] = {
+        player = player, fl = fl, durMs = durMs,
+        f0 = f0, f1 = f1,
+        spawnAt  = startAt + f0 * durMs,
+        removeAt = startAt + f1 * durMs + PLANE_TAIL_MS,
+    }
+    print(string.format("[PongDuRain] plane queued window frac=%.2f..%.2f (in %dms, out %dms)",
+        f0, f1, math.floor(f0 * durMs), math.floor(f1 * durMs)))
+end
+
+local _planeLastTick = nil
+local function planeTick()
+    local now = getTimestampMs()
+    local gap = _planeLastTick and (now - _planeLastTick) or 0
+    _planeLastTick = now
+    if #_planes == 0 then return end
+    if gap > 500 then
+        for _, pl in ipairs(_planes) do
+            pl.spawnAt = pl.spawnAt + gap
+            pl.removeAt = pl.removeAt + gap
+        end
+    end
+    for i = #_planes, 1, -1 do
+        local pl = _planes[i]
+        local okP, dead = pcall(function() return pl.player:isDead() end)
+        if not okP or dead then
+            planeRemove(pl, "owner gone")
+            table.remove(_planes, i)
+        elseif now >= pl.removeAt then
+            planeRemove(pl, "window end")
+            table.remove(_planes, i)
+        elseif not pl.tried and now >= pl.spawnAt then
+            pl.tried = true
+            local frac = pl.f0 + (now - pl.spawnAt) / pl.durMs
+            local ok, res = pcall(planeSpawn, pl, frac)
+            if not ok then print("[PongDuRain] plane spawn error: " .. tostring(res)) end
+        end
+    end
+end
+Events.OnTick.Add(planeTick)
+
+-- ── 남은 수송기 정리 (고아 차량) ─────────────────────────────────────────────
+-- _planes 는 서버 메모리에만 있다. 비행 중에 서버가 꺼지면(정상 종료 포함 -- 종료 훅이 없다)
+-- 목록은 사라지지만 addVehicleDebug 로 스폰한 차량은 VehiclesDB 에 남아 재시작 후 그 자리에
+-- 굳어 있고, 아무도 옮기거나 지우지 않는다. 화력지원 헬기·드론(server.lua
+-- sweepOrphanFireSupportVehicles)과 같은 방식으로, 로드된 셀의 차량 중 스크립트가
+-- PongDuC17 인데 _planes 어디에도 vid 가 없는 것을 permanentlyRemove 한다.
+-- 첫 틱에 바로 1회 돌아서 재시작 전 잔존물도 곧바로 지운다. 이후 10초 간격.
+-- 셀이 로드돼 있지 않은 잔존물은 그 셀이 로드된 뒤의 다음 주기에 지워진다.
+-- 서버와 SP 에서만 돈다(MP 클라의 _planes 는 항상 비어 있어 살아 있는 기체를 지울 수 있다).
+local PLANE_ORPHAN_INTERVAL_MS = 10000
+local _planeOrphanAt = nil
+
+local function planeIsTracked(vid)
+    for i = 1, #_planes do
+        if _planes[i].vid == vid then return true end
+    end
+    return false
+end
+
+local function planeSweepOrphans()
+    local okC, cell = pcall(getCell)
+    if not okC or not cell then return end
+    -- B42: getVehicles() 는 Set 이라 get(int) 가 없다. toArray() 사본이라 순회 중 제거해도 안전
+    local okV, vehicles = pcall(function() return cell:getVehicles():toArray() end)
+    if not okV or not vehicles then return end
+    for _, v in ipairs(vehicles) do
+        if v then
+            local okS, sn = pcall(function() return v:getScriptName() end)
+            if okS and sn == PLANE_SCRIPT then
+                local vid = v:getId()
+                if not planeIsTracked(vid) then
+                    local okR, err = pcall(function() v:permanentlyRemove() end)
+                    print("[PongDuRain] orphan plane vid=" .. tostring(vid)
+                        .. (okR and " removed" or (" remove FAILED err=" .. tostring(err))))
+                end
+            end
+        end
+    end
+end
+
+local function planeOrphanTick()
+    local now = getTimestampMs()
+    if _planeOrphanAt and now - _planeOrphanAt < PLANE_ORPHAN_INTERVAL_MS then return end
+    _planeOrphanAt = now
+    local ok, err = pcall(planeSweepOrphans)
+    if not ok then print("[PongDuRain] orphan plane sweep error: " .. tostring(err)) end
+end
+if not isClient() then
+    Events.OnTick.Add(planeOrphanTick)
+end
+
 Events.OnClientCommand.Add(function(module, command, player, data)
     if module ~= "PongDuRain" or command ~= "Start" then return end
     if not player then return end
@@ -406,6 +590,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
             ["bx"] = flight.bx, ["by"] = flight.by,
             ["prep"] = PREP_DELAY_MS, ["dur"] = durMs,
         })
+        planeQueue(player, flight, durMs, getTimestampMs() + PREP_DELAY_MS)
         local ldx, ldy = flight.bx - flight.ax, flight.by - flight.ay
         local len = math.sqrt(ldx * ldx + ldy * ldy)
         print(string.format("[PongDuRain] airdrop flight A=(%d,%d) B=(%d,%d) len=%.0f speed=%.2f tiles/s dropR=%d",
