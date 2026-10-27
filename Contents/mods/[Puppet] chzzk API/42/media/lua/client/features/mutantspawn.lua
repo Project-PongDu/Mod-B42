@@ -871,10 +871,69 @@ Events.OnWeaponSwing.Add(function(character, weapon)
     print("[PongDu][KillLog] local attack weapon=" .. tostring(weapon and weapon:getFullType())
         .. " ranged=" .. tostring(weapon and weapon:isRanged()))
 end)
+-- 재활용 객체 진단 (2026-10-27 13:41 멀티): 클라가 좀비를 죽이고 몇 초 뒤 소환된 특좀이
+-- 죽인 수만큼 클라에 안 생겼다. 엔진은 죽은 좀비 객체를 5초 뒤 재활용 풀에 넣고
+-- (VirtualZombieManager.update, removedFromWorldMs + 5000) 다음 좀비 생성 때 꺼내 쓴다.
+-- 객체 고유번호 getID() 는 재활용돼도 그대로라, 사망 때와 생성 때의 getID 를 비교하면
+-- "재활용 객체로 만든 좀비만 사라지는지" 가릴 수 있다.
+local _deadObj = {}              -- [getID] = 사망 시각
+local _createdWatch = {}         -- { {z, obj, at, reusedAgo}, ... }
+local _lastMarkAt = 0
+local DIAG_WINDOW_MS = 20000     -- 마크 수신 후 이 시간 안에 생긴 좀비만 기록 (호드 도배 방지)
+
+local function reusePoolSize()
+    local ok, n = pcall(function() return VirtualZombieManager.instance:reusableZombiesSize() end)
+    if ok then return tostring(n) end
+    return "na"
+end
+
 Events.OnZombieDead.Add(function(z)
     if not isClient() or not z then return end
-    print(string.format("[PongDu][KillLog] client zombie dead zid=%s mutant=%s",
-        tostring(z:getOnlineID()), tostring(z:getModData()["PuppetMutant"])))
+    local now = getTimestampMs()
+    _deadObj[z:getID()] = now
+    for k, t in pairs(_deadObj) do
+        if now - t > 120000 then _deadObj[k] = nil end
+    end
+    print(string.format("[PongDu][KillLog] client zombie dead zid=%s mutant=%s obj=%s",
+        tostring(z:getOnlineID()), tostring(z:getModData()["PuppetMutant"]), tostring(z:getID())))
+end)
+
+Events.OnZombieCreate.Add(function(z)
+    if not isClient() or not z then return end
+    local now = getTimestampMs()
+    if now - _lastMarkAt > DIAG_WINDOW_MS then return end
+    local obj = z:getID()
+    local deadAt = _deadObj[obj]
+    local ago = deadAt and (now - deadAt) or -1
+    print(string.format("[PuppetMutant] client zombie created obj=%s reusedFromDead=%s deadAgo=%d pool=%s",
+        tostring(obj), tostring(deadAt ~= nil), ago, reusePoolSize()))
+    _createdWatch[#_createdWatch + 1] = { z = z, obj = obj, at = now + 1000, reused = deadAt ~= nil }
+end)
+
+Events.OnTick.Add(function()
+    if #_createdWatch == 0 then return end
+    local now = getTimestampMs()
+    local zl = nil
+    for i = #_createdWatch, 1, -1 do
+        local w = _createdWatch[i]
+        if now >= w.at then
+            table.remove(_createdWatch, i)
+            if not zl then
+                local cell = getCell()
+                zl = cell and cell:getZombieList()
+            end
+            local inList = false
+            if zl then
+                for j = 0, zl:size() - 1 do
+                    if zl:get(j) == w.z then inList = true break end
+                end
+            end
+            local z = w.z
+            print(string.format("[PuppetMutant] created check obj=%s zid=%s reused=%s inList=%s dead=%s square=%s at %.1f,%.1f",
+                tostring(w.obj), tostring(z:getOnlineID()), tostring(w.reused), tostring(inList),
+                tostring(z:isDead()), tostring(z:getCurrentSquare() ~= nil), z:getX(), z:getY()))
+        end
+    end
 end)
 
 -- 클라 좀비 수 급감 감시: 1초마다 세어 3마리 이상 한 번에 줄면 기록한다.
@@ -899,8 +958,9 @@ end)
 Events.OnServerCommand.Add(function(module, command, args)
     if module ~= "PongDuMutant" then return end
     if command == "MutantMark" then
+        _lastMarkAt = getTimestampMs()
         print("[PuppetMutant] mark received zid=" .. tostring(args and args["zedId"])
-            .. " kind=" .. tostring(args and args["kind"]))
+            .. " kind=" .. tostring(args and args["kind"]) .. " pool=" .. reusePoolSize())
         _a.mark(args and tonumber(args["zedId"]), args and args["kind"], args and args["sender"])
         -- 스폰 마크(좌표 포함)만 3초 뒤 클라에 그 좀비가 있는지 확인한다.
         if args and args["x"] and args["y"] and isClient() then
