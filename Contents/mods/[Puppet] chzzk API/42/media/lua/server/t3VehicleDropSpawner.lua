@@ -741,50 +741,36 @@ function t3VehicleDrop.spawnVehicle(player, x, y, z, vehicleType, sender)
     vehicle:transmitEngine()
 
     -- 열쇠 지급.
-    -- 키의 실체는 "CarKey 아이템 + keyId(int) 일치"가 전부라 (BaseVehicle.createVehicleKey
-    -- 디컴파일 확인), 차량 객체 없이도 keyId만 있으면 어디서든 유효한 키를 만들 수 있다.
-    -- 예전 방식(클라가 getVehicleById로 차량을 찾아 createVehicleKey)은 드랍 지점이
-    -- 50~100타일이라 차량이 클라 스트리밍 범위 밖이면 조회 실패 -> 키 미지급 버그가 있었다.
-    -- 이제 서버가 keyId/차종/색상만 뽑아 보내고, 클라(VehicleDropKeyGrant.lua)가
-    -- 차량 조회 없이 로컬에서 키를 직접 생성한다.
-    -- 키 표시명의 차종 키. 바닐라 keyNamerVehicle 과 같이 carModelName 이 있으면 그걸 쓴다
-    -- (IGUI_VehicleName<키>). MP 는 클라 로케일로 번역하도록 키만 보낸다.
+    -- B42 MP 는 아이템이 서버 권위다. 예전처럼 서버가 keyId/차종/색상만 보내고 클라
+    -- (VehicleDropKeyGrant.lua)가 자기 인벤에 키를 만들면 키가 보이기만 하고 쓰이지 않는다
+    -- (서버에 없는 아이템이라 ItemTransactionPacket 이 Reject). 그래서 SP/MP 모두 여기서
+    -- createVehicleKey 로 만든 키를 넣고, 서버면 sendAddItemToContainer 로 소유 클라에 내려보낸다.
+    -- 키의 실체는 "CarKey 아이템 + keyId 일치"라 클라가 차량을 스트리밍 중일 필요가 없다
+    -- (BaseVehicle.createVehicleKey: CreateItem(CarKey) + setKeyId + keyNamerVehicle + 차체색).
+    -- 이름은 "<후원자>'s <차종> 열쇠". 차종 키는 바닐라 keyNamerVehicle 과 같이 carModelName 우선
+    -- (IGUI_VehicleName<키>). MP 는 서버 언어로 번역된다(바닐라 차 열쇠 이름과 같은 방식).
+    -- 번역 파일 밖 한글 리터럴 금지("의 " 를 붙였다가 글자가 빠진 적 있다).
     local vscript   = vehicle:getScript()
     local modelName = vscript:getCarModelName() or vscript:getName()
-    if not isClient() and not isServer() then
-        -- 솔로: 같은 프로세스이므로 바로 생성+지급해도 동기화 문제 없음
-        local key = vehicle:createVehicleKey()
-        if key then
-            -- B42 바닐라 키 이름은 "차 열쇠 - <차종>" 이다(keyNamerVehicle). MP 클라
-            -- (VehicleDropKeyGrant.lua)와 같은 "<후원자>'s <차종> 열쇠" 로 맞춘다.
-            -- 예전엔 여기만 한글 리터럴 "의 " 를 붙였는데 게임에서 글자가 빠져
-            -- "<후원자> 차 열쇠 - <차종>" 으로 보였다(번역 파일 밖 한글 리터럴 금지).
-            local vehName  = getTextOrNull("IGUI_VehicleName" .. tostring(modelName))
-            local baseName = vehName and getText("IGUI_CarKey", vehName) or key:getDisplayName()
-            local keyName  = (sender and sender ~= "" and (sender .. "'s ") or "") .. baseName
-            key:setName(keyName)
-            player:getInventory():AddItem(key)
-            print("[t3VehicleDrop] Solo key granted: " .. keyName)
-        else
-            print("[t3VehicleDrop] Solo key creation failed (vehicleId " .. tostring(vehicleId) .. ")")
+    local key = vehicle:createVehicleKey()
+    if key then
+        local vehName  = getTextOrNull("IGUI_VehicleName" .. tostring(modelName))
+        local baseName = vehName and getText("IGUI_CarKey", vehName) or key:getDisplayName()
+        local keyName  = (sender and sender ~= "" and (sender .. "'s ") or "") .. baseName
+        key:setName(keyName)
+        local inv = player:getInventory()
+        inv:AddItem(key)
+        sendAddItemToContainer(inv, key)
+        if isServer() then
+            sendServerCommand(player, "PongDuVehicleDrop", "KeyGranted", {
+                keyId = vehicle:getKeyId(), vehicleId = vehicleId, sender = sender,
+            })
         end
-    elseif isServer() then
-        -- 서버측 키를 임시 생성해 색상만 추출 (바닐라 키 색 = 차체 색 유지용)
-        local colR, colG, colB
-        local tmpKey = vehicle:createVehicleKey()
-        local col = tmpKey and tmpKey:getColor()
-        if col then
-            colR, colG, colB = col:getR(), col:getG(), col:getB()
-        end
-
-        sendServerCommand(player, "PongDuVehicleDrop", "GrantKey", {
-            keyId      = vehicle:getKeyId(),
-            scriptName = modelName,
-            colR = colR, colG = colG, colB = colB,
-            sender = sender,
-            vehicleId = vehicleId, -- 로그 추적용
-        })
-        print("[t3VehicleDrop] GrantKey sent (keyId " .. tostring(vehicle:getKeyId()) .. ", vehicleId " .. tostring(vehicleId) .. ")")
+        print("[t3VehicleDrop] Key granted: " .. keyName .. " (keyId " .. tostring(vehicle:getKeyId())
+            .. ", itemID " .. tostring(key:getID()) .. ", user " .. tostring(player:getUsername())
+            .. ", server=" .. tostring(isServer()) .. ")")
+    else
+        print("[t3VehicleDrop] Key creation failed (vehicleId " .. tostring(vehicleId) .. ")")
     end
 
     print("[t3VehicleDrop] " .. tostring(vehicleType) .. " spawned (donor: " .. tostring(sender) .. ")")

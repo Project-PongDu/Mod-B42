@@ -1,18 +1,21 @@
 -- ── 의약품 랜덤박스 (medical_box) 서버 ───────────────────────────────────────
 --
 -- 서버 후원 계열. 서버장에게 후원이 들어오면 접속자 전원에게 의약품 보급상자를
--- 1개씩 지급한다. 서버가 하는 일은 두 가지뿐이다:
+-- 1개씩 지급한다. 서버가 하는 일:
 --   ① 서버장 게이트 (PongDuHost.check)
---   ② 전 클라 브로드캐스트
+--   ② 접속자 전원 인벤에 직접 지급 (shared/PongDuGrant.lua, sendAddItemToContainer 로 각 소유 클라 동기화)
+--   ③ 받은 사람마다 "Delivered" 를 돌려보내 보급음 재생
 --
--- 실제 지급(AddItem)은 각 클라가 한다. 서버에서 다른 플레이어의 인벤토리를
--- 직접 건드리면 소유 클라의 sync 에 덮어써지므로, 아이템 계열은 전부 클라가
--- 자기 인벤에 넣는 구조다(rewardManager 의 giveSupply 와 동일).
+-- B42 MP 는 아이템이 서버 권위다. B41 처럼 각 클라가 자기 인벤에 AddItem 하면 아이템이 보이기만
+-- 하고 개봉·버리기가 안 된다(서버에 없는 아이템이라 ItemTransactionPacket 이 Reject).
 --
 -- 이 파일은 media/lua/server/ 에 있어 MP 클라에서도 로드된다. OnClientCommand
 -- 핸들러에 isAuthority() 가드가 반드시 있어야 한다.
 
+require "PongDuGrant"
+
 local LOG = "[PongDuMedBox] "
+local BOX_ITEM = "medical_box"
 
 local function mlog(msg)
     print(LOG .. msg)
@@ -46,6 +49,21 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     end
 
     local sender = tostring(data and data["sender"] or "")
-    mlog("GRANT broadcast sender=" .. sender)
-    sendServerCommand("PongDuMedBox", "Grant", { ["sender"] = sender })
+    local players = getOnlinePlayers()
+    local total = players and players:size() or 0
+    local given = 0
+    for i = 0, total - 1 do
+        local p = players:get(i)
+        if p and not p:isDead() then
+            if PongDuGrant.supply(p, BOX_ITEM, sender) then
+                given = given + 1
+                sendServerCommand(p, PongDuGrant.NET_MODULE, "Delivered", {
+                    ["kind"] = "medical_box", ["item"] = BOX_ITEM, ["count"] = 1, ["sender"] = sender,
+                })
+            else
+                mlog("GRANT FAILED user=" .. tostring(p:getUsername()))
+            end
+        end
+    end
+    mlog("GRANT done sender=" .. sender .. " given=" .. given .. "/" .. total)
 end)

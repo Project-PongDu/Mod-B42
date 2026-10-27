@@ -27,6 +27,7 @@ local global     = require("global")
 local fx         = require("utils/fx")
 -- 외부(서버 전용) 애드온 모드가 등록한 기능. 조회는 전부 getEntry()를 거친다.
 local addon      = require("PongDuAddon")
+require "PongDuGrant"
 
 -- Spawn zombies, queueing the request if the player is still in a safe zone.
 local function handleZombieSpawn(amount, sprint, sender)
@@ -42,42 +43,36 @@ local function handleZombieSpawn(amount, sprint, sender)
     global.b(" handleZombieSpawn FUNCTION END")
 end
 
--- giveSupply(itemId, sender, label) -> InventoryItem | nil
+-- giveSupply(itemId, sender)
 -- 인벤토리에 아이템을 직접 꽂아주는 보급 계열 기능(백신/스킬혈청/무기상자/
 -- 차량키트/인벤세이브권)의 공통 처리. 지급 -> 후원자 각인 -> 보급음 순서다.
---   * label 을 주면 표시명 대신 그 문자열을 쓴다. 지금은 쓰는 곳이 없다.
---     (B41 백신은 아이템명이 번역되지 않은 "Zomboxivir Ampule"이라 "Vaccine"으로
---     바꿔 썼지만, B42는 ItemName.json 에 한글명이 있어 표시명을 그대로 쓴다.)
---   * pongdu_supply 는 getSoundManager():PlaySound() 로 재생하는 클라 로컬
---     사운드다. 월드 사운드(addSound)가 아니므로 좀비 어그로가 붙지 않는다.
---   * AddItem 이 nil 을 반환하는 경우(아이템 스크립트 오타/미등록 등)엔 사운드를
---     재생하지 않는다 -- "소리는 났는데 아이템은 없다"가 제일 추적하기 어렵다.
-local function giveSupply(itemId, sender, label)
+--   * 실제 지급은 shared/PongDuGrant.lua 한 곳에서 한다. B42 MP 는 아이템이 서버 권위라
+--     클라가 AddItem 한 아이템은 보이기만 하고 사용·버리기가 안 된다.
+--       SP : 여기서 바로 PongDuGrant.supply + 보급음
+--       MP : 서버에 요청 -> server/PongDuGrantServer.lua 가 지급 -> "Delivered" 를 받아 보급음
+--   * 표시명은 아이템의 ItemName 번역을 그대로 쓴다. MP 는 서버 언어 기준이다.
+--   * 지급에 실패하면 보급음을 재생하지 않는다 -- "소리는 났는데 아이템은 없다"가
+--     제일 추적하기 어렵다.
+local function giveSupply(itemId, sender)
     local player = global.player
     if not player then
         print("[PongDu] Supply aborted: player is nil (item=" .. tostring(itemId) .. ")")
-        return nil
+        return
     end
 
-    local item = player:getInventory():AddItem("t3chzzkDonation." .. itemId)
-    if not item then
-        print("[PongDu] Supply FAILED: AddItem returned nil (item=" .. tostring(itemId)
-            .. ", sender=" .. tostring(sender) .. ")")
-        return nil
+    if isClient() then
+        PongDuGrant.request("Supply", { ["item"] = itemId, ["sender"] = sender or "" })
+        return
     end
 
-    item:setName((sender or "") .. "'s " .. (label or item:getDisplayName()))
-    item:getModData().t3Donor = sender or ""
-    -- 주의: PlaySound(name, loop, maxGain)의 maxGain은 SoundManager.java 구현상
-    -- 완전히 무시된다(내부에서 baseSoundEmitter.playSound(name)만 호출하고 maxGain
-    -- 파라미터는 쓰지 않음). 볼륨을 실제로 적용하려면 반환된 Audio 핸들에
-    -- setVolume()을 직접 호출해야 한다.
-    local audio = getSoundManager():PlaySound("pongdu_supply", false, 1.0)
-    if audio then audio:setVolume(0.5) end
-
-    print("[PongDu] Supply delivered: item=" .. tostring(itemId)
-        .. ", sender=" .. tostring(sender))
-    return item
+    if PongDuGrant.supply(player, itemId, sender) then
+        PongDuGrant.playSupplySound()
+        print("[PongDu] Supply delivered: item=" .. tostring(itemId)
+            .. ", sender=" .. tostring(sender))
+    else
+        print("[PongDu] Supply FAILED: item=" .. tostring(itemId)
+            .. ", sender=" .. tostring(sender))
+    end
 end
 
 

@@ -396,6 +396,10 @@ end
 
 local function onPlayerDeath(player)
     if not player then return end
+    -- [B42 MP] 사망 처리는 서버(server/PongDuInvSaveServer.lua)가 한다. 아이템이 서버 권위라
+    -- 클라가 여기서 인벤을 비우고 나중에 AddItem 으로 되돌리면, 서버 시체엔 원래 인벤이 남고
+    -- 되돌린 아이템은 서버에 없어 쓰이지 않는다. 클라 파일 스냅샷도 쓰지 않는다(복제 악용 경로).
+    if isClient() then return end
     -- OnPlayerDeath는 소유 클라이언트에서만 발화하지만 방어적으로 한 번 더 확인
     if player.isLocalPlayer and not player:isLocalPlayer() then return end
 
@@ -803,10 +807,86 @@ end
 -- 먼저 지우므로, 같은 스냅샷이 두 번 지급되는 경로가 존재하지 않는다.
 --
 -- 스폰 직후 초기화와의 충돌을 피하려고 3초 지연 후 지급한다.
+-- ── MP: 서버 보관분 복원 ───────────────────────────────────────────────────────
+-- 서버가 사망 시점에 아이템 객체를 붙잡아 두고(server/PongDuInvSaveServer.lua), 리스폰 3초 뒤
+-- 이 클라가 "Restore" 를 요청하면 새 캐릭터 인벤에 넣는다. 착용·손은 서버가 직접 설정하고
+-- (엔진이 SyncClothing / Equip 으로 동기화), 핫바 부착만 여기서 아이템 ID 로 찾아 붙인다.
+-- 서버에 보관분이 없으면 "Nothing" 이 온다(일반 접속·티켓 없이 사망).
+local MP_MODULE = "PongDuInvSave"
+
+local function requestServerRestore()
+    local player = getPlayer()
+    if not player then return end
+    sendClientCommand(player, MP_MODULE, "Restore", {})
+    print("[PongDu] invsave: restore requested from server")
+end
+
+-- 인벤 추가 패킷과 "Restored" 명령의 도착 순서가 보장되지 않으므로, 핫바 대상 아이템이 다
+-- 보일 때까지 0.5초 간격으로 최대 5초 기다린다.
+local function applyServerHotbar(list)
+    local waited, sinceTry = 0, 0
+    local function tryApply()
+        local dt = getGameTime():getTimeDelta() * 1000
+        waited, sinceTry = waited + dt, sinceTry + dt
+        if sinceTry < 500 then return end
+        sinceTry = 0
+        local player = getPlayer()
+        if not player then Events.OnTick.Remove(tryApply) return end
+        local inv = player:getInventory()
+        local found, missing = {}, 0
+        for _, h in ipairs(list) do
+            local it = inv:getItemWithID(tonumber(h["id"]) or -1)
+            if it then
+                found[#found + 1] = { item = it, slotType = h["slotType"], modelAtt = h["model"] }
+            else
+                missing = missing + 1
+            end
+        end
+        if missing > 0 and waited < 5000 then return end
+        Events.OnTick.Remove(tryApply)
+        applyHotbar(player, found)
+        refreshInventoryUI(player)
+        print("[PongDu] invsave: server hotbar applied=" .. #found .. " missing=" .. missing)
+    end
+    Events.OnTick.Add(tryApply)
+end
+
+Events.OnServerCommand.Add(function(module, command, args)
+    if module ~= MP_MODULE then return end
+    if command == "Nothing" then
+        print("[PongDu] invsave: server has no snapshot for this character")
+        return
+    end
+    if command ~= "Restored" or type(args) ~= "table" then return end
+    print("[PongDu] invsave: server restored items=" .. tostring(args["restored"])
+        .. " failed=" .. tostring(args["failed"]))
+    local player = getPlayer()
+    if player then
+        player:Say(getText("IGUI_invsave_restored"))
+        refreshInventoryUI(player)
+    end
+    local hb = args["hotbar"]
+    if type(hb) == "table" and #hb > 0 then applyServerHotbar(hb) end
+end)
+
 Events.OnCreatePlayer.Add(function(index, player)
     -- 리스폰 대기 중 재사망 -> 재리스폰이면 이전 타이머가 아직 살아있을 수 있다.
     -- 여기서 정리해야 타이머가 중복 등록되어 두 번 지급되는 일이 없다.
     cancelPendingRestore()
+
+    if isClient() then
+        local elapsed = 0
+        local function waitAndRequest()
+            elapsed = elapsed + getGameTime():getTimeDelta() * 1000
+            if elapsed < 3000 then return end
+            Events.OnTick.Remove(waitAndRequest)
+            restoreTickFn = nil
+            requestServerRestore()
+        end
+        restoreTickFn = waitAndRequest
+        Events.OnTick.Add(waitAndRequest)
+        return
+    end
 
     local entries, lines = pending, nil
     if not entries then
