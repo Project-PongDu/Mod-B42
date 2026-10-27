@@ -34,7 +34,11 @@ local RAIN_CNT_MAX       = 500                              -- 전 종류 합계
 -- (sprinter = server.lua spawnZombies 뛰좀, 나머지 = features/mutantspawn.lua KINDS).
 -- 순서는 로그 출력 순서일 뿐, 실제 낙하 순서는 셔플된다.
 local RAIN_KINDS = { "normal", "sprinter", "screamer", "brute", "roach", "tracer" }
-local RAIN_DROP_Z        = 7                                -- 낙하 시작 높이 (엔진 한계 z=7, IsoCell.MaxHeight=8)
+local RAIN_DROP_Z        = 7                                -- 좀비 레인 낙하 시작 높이 (층)
+-- 수송기 투하 낙하 시작 높이 (층). 수송기 고도(클라 zombierain.lua PLANE_FLY_ALT = 12층) 바로 아래라
+-- 화면에서 좀비가 기체 배 밑에서 떨어져 나온다. B42 IsoCell.maxHeight = 32 라 11층 스퀘어 생성 가능.
+-- 대가: 컬럼당 생성 스퀘어가 레인의 11/7 배, 낙하산 하강 시간 약 9초(1.2층/초).
+local AIRDROP_DROP_Z     = 11
 local RAIN_MIN_DIST      = 3                                -- 플레이어 직격 방지 최소 거리
 local SPAWN_CAP_PER_TICK = 5                                -- 랙 스파이크 후 몰아치기 상한
 local PICK_TRIES         = 20                               -- 컬럼 후보 탐색 시도 횟수
@@ -87,13 +91,13 @@ end
 --  ③ 물 스퀘어 제외             : 강/호수 수장 방지
 --  ④ 위층(z=1..DROP_Z) 바닥 없음: 플레이어 건축물 지붕/2층 바닥 방지.
 --     스퀘어가 존재해도 바닥이 없으면 통과 (이전 레인이 만든 빈 스퀘어 재사용)
-local function isRainColumn(cell, x, y)
+local function isRainColumn(cell, x, y, dropZ)
     local sq = cell:getGridSquare(x, y, 0)
     if not sq or not sq:isOutside() or sq:getBuilding() ~= nil
         or sq:has(IsoFlagType.water) then
         return false
     end
-    for zz = 1, RAIN_DROP_Z do
+    for zz = 1, dropZ do
         local up = cell:getGridSquare(x, y, zz)
         if up and up:getFloor() ~= nil then return false end
     end
@@ -108,7 +112,7 @@ local function pickRainColumn(cell, px, py, radius)
             + math.sqrt(ZombRand(10000) / 10000.0) * (radius - RAIN_MIN_DIST)
         local x  = math.floor(px + math.cos(angle) * dist)
         local y  = math.floor(py + math.sin(angle) * dist)
-        if isRainColumn(cell, x, y) then return x, y end
+        if isRainColumn(cell, x, y, RAIN_DROP_Z) then return x, y end
     end
     return nil
 end
@@ -126,7 +130,7 @@ local function pickAirdropColumn(cell, px, py, cx, cy, radius)
         local y = math.floor(cy + math.sin(angle) * dist)
         local dx, dy = x + 0.5 - px, y + 0.5 - py
         if dx * dx + dy * dy >= RAIN_MIN_DIST * RAIN_MIN_DIST
-            and isRainColumn(cell, x, y) then
+            and isRainColumn(cell, x, y, AIRDROP_DROP_Z) then
             return x, y
         end
     end
@@ -155,12 +159,12 @@ local function buildKindList(kinds)
     return list, requested
 end
 
--- 1마리 스폰: z=DROP_Z 스퀘어에 직접 생성. 랜덤 아웃핏(outfit=nil),
+-- 1마리 스폰: z=session.dropZ 스퀘어에 직접 생성. 랜덤 아웃핏(outfit=nil),
 -- 체력 캡처 후 세션 배치에 적재. 특좀 종류는 서버 modData에 마킹만 하고
 -- 스탯/행동 적용은 RainMark를 받은 클라가 특좀 적용기(mutantspawn)에 넘겨
 -- 처리한다 (B41 MP 좀비는 클라 권한).
 local function spawnRainZombie(session, col, kind)
-    local zeds = addZombiesInOutfit(col.x, col.y, RAIN_DROP_Z, 1, nil, nil)
+    local zeds = addZombiesInOutfit(col.x, col.y, session.dropZ, 1, nil, nil)
     if not zeds or zeds:size() == 0 then return false end
     local zed = zeds:get(0)
     zed:DoZombieStats()
@@ -488,6 +492,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     if durS < RAIN_DUR_MIN_S then durS = RAIN_DUR_MIN_S
     elseif durS > RAIN_DUR_MAX_S then durS = RAIN_DUR_MAX_S end
     local durMs = durS * 1000
+    local dropZ = (style == STYLE_AIRDROP) and AIRDROP_DROP_Z or RAIN_DROP_Z
 
     local kinds  = type(data and data["kinds"]) == "table" and data["kinds"] or nil
     local kindList, requested = buildKindList(kinds)
@@ -564,7 +569,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
 
     local createdSq, reusedSq = 0, 0
     for _, c in ipairs(cols) do
-        for zz = 1, RAIN_DROP_Z do
+        for zz = 1, dropZ do
             if cell:getGridSquare(c.x, c.y, zz) then
                 reusedSq = reusedSq + 1
             else
@@ -579,7 +584,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     if isSP() then
         print("[PongDuRain] SP bridge on (Prep skipped, shared cell)")
     else
-        sendServerCommand("PongDuRain", "Prep", { ["cols"] = payload, ["z"] = RAIN_DROP_Z })
+        sendServerCommand("PongDuRain", "Prep", { ["cols"] = payload, ["z"] = dropZ })
     end
 
     -- 투하 모드: 그림자 연출용 비행 정보. 수송기는 PREP_DELAY_MS 시점에 A, 그로부터
@@ -621,6 +626,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
         cols       = cols,
         kinds      = kindList,   -- cols[i] 에 떨어질 종류
         durMs      = durMs,
+        dropZ      = dropZ,
         sender     = sender,
         para       = para,
         readyAt   = getTimestampMs() + PREP_DELAY_MS,
@@ -632,7 +638,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
         lastFlush = 0,
     }
     print("[PongDuRain] session start para=" .. tostring(para) .. " player=" .. tostring(player:getUsername())
-        .. " style=" .. STYLE_NAMES[style] .. " r=" .. tostring(r)
+        .. " style=" .. STYLE_NAMES[style] .. " dropZ=" .. tostring(dropZ) .. " r=" .. tostring(r)
         .. " dur=" .. tostring(durS) .. "s cnt=" .. tostring(cnt)
         .. " cols=" .. tostring(#cols) .. " intervalMs=" .. tostring(math.floor(durMs / #cols)))
 end)

@@ -282,7 +282,7 @@ end
 -- 네 꼭짓점을 월드 좌표로 잡아 화면에 투영하므로 아이소 시점에 맞게 찌그러진다.
 -- renderPoly UV: 1=좌상, 2=우상, 3=우하, 4=좌하 (GenericSpriteRenderState.renderPoly).
 local SHADOW_TEX    = getTexture("media/textures/Shadows/shadowPongDuAirdrop.png")
-local SHADOW_SIZE   = 52     -- 그림자 한 변 (타일 = m). 날개폭이 텍스처 폭을 채운다. C-17 날개폭 51.5 m 에 맞춤
+local SHADOW_SIZE   = 41     -- 그림자 한 변 (타일 = m). 날개폭이 텍스처 폭을 채운다. 기체 날개폭 41.2 m 에 맞춤
 local SHADOW_ALPHA  = 0.38
 local SHADOW_FADE   = 800    -- 등장/퇴장 페이드 (ms)
 local SHADOW_TAIL   = 2500   -- 마지막 투하 후 화면 밖으로 빠져나가는 시간 (ms)
@@ -435,10 +435,12 @@ Events.OnTick.Add(planeTick)
 -- 파일럿 클라만 매 틱 경로 좌표로 옮긴다(화력지원 헬기 heliMoveTo 와 같은 setWorldTransform).
 -- 다른 클라는 엔진 차량 보간으로 받는다. 진행률 식은 그림자(flightState)와 같아서
 -- 기체와 그림자가 같은 지점을 지난다.
--- 고도: 물리 y 단위, iso 층 = y / 2.46 (firesupport.lua HELI_FLY_ALT 주석). 좀비 낙하 시작
--- 높이(서버 RAIN_DROP_Z = 7층)보다 한 층 위.
+-- 고도: 물리 y 단위, iso 층 = y / 2.46 (firesupport.lua HELI_FLY_ALT 주석). 12층(약 29 m).
+-- 투하 좀비 낙하 시작 높이(서버 AIRDROP_DROP_Z = 11층)보다 한 층 위.
+-- 고정 아이소 시점이라 1층 올릴 때마다 기체가 화면에서 지면 6칸만큼 위로 밀린다
+-- (IsoUtils.YToScreen: 층당 96, 타일당 16). 더 올리면 기체가 화면에 들어오는 경로가 줄어든다.
 local PLANE_SCRIPT   = "Base.PongDuC17"
-local PLANE_FLY_ALT  = 8 * 2.46
+local PLANE_FLY_ALT  = 12 * 2.46
 local PLANE_YAW_OFF  = 0        -- fbx 기수 방향 보정(도). 기수가 거꾸로 보이면 180
 local _planes = {}              -- [vid] = { pilot, ax, ay, bx, by, frac0, dur, f1, t0, amPilot }
 
@@ -469,11 +471,18 @@ local function planePilotTick()
                 end
                 local wx = pl.ax + (pl.bx - pl.ax) * frac
                 local wy = pl.ay + (pl.by - pl.ay) * frac
+                -- 기수 방향은 매 틱 다시 건다. 한 번만 걸면 물리 권한(authorizationChanged)이 오기 전
+                -- 서버 차량 갱신이 회전을 스폰 방향(N)으로 되돌릴 수 있고, 아래 이동은 현재 회전을
+                -- 그대로 쓰므로 그 뒤로 기체가 옆으로 난다(2026-10-27 제보, 원인은 추정).
+                -- 화력지원 헬기도 매 틱 setAngles 를 부른다(firesupport.lua heliShadowRefreshTick).
+                -- setAngles 는 정수 각도가 같으면 아무것도 안 한다(BaseVehicle.setAngles).
+                if not pl.yaw then
+                    pl.yaw = math.deg(math.atan2(pl.bx - pl.ax, pl.by - pl.ay)) + PLANE_YAW_OFF
+                end
+                local okY, errY = pcall(function() v:setAngles(0, pl.yaw, 0) end)
                 if not pl.yawSet then
                     pl.yawSet = true
-                    local yaw = math.deg(math.atan2(pl.bx - pl.ax, pl.by - pl.ay)) + PLANE_YAW_OFF
-                    local okY, errY = pcall(function() v:setAngles(0, yaw, 0) end)
-                    print(string.format("[PongDuRain] plane yaw %.1f ok=%s", yaw, tostring(okY))
+                    print(string.format("[PongDuRain] plane yaw %.1f ok=%s", pl.yaw, tostring(okY))
                         .. (okY and "" or (" err=" .. tostring(errY))))
                 end
                 local ok, err = pcall(function()

@@ -19,8 +19,9 @@ module Base
 	     기수 +Z(원시 정점 기준). 크기는 model scale 로만 조정한다.
 	   - 크기: 1 월드 단위 = 1 m (바닐라 CarNormal 길이 2.6044 x 1.82 = 4.74).
 	     원시 정점 길이 4686 / 날개폭 4557 / 높이 1411 에 최종 배율
-	     0.1 x 0.1131 = 0.01131 -> 길이 53.0 / 날개폭 51.5 / 높이 16.0 m
-	     (실기 53.0 / 51.75 / 16.8 m). vehicle scale 은 extents·물리 형상에도
+	     0.1 x 0.0905 = 0.00905 -> 길이 42.4 / 날개폭 41.2 / 높이 12.8 m
+	     (실기 53.0 / 51.75 / 16.8 m 의 80%. 실물 크기는 화면을 너무 가려서
+	     줄였다). vehicle scale 은 extents·물리 형상에도
 	     곱해지므로(VehicleScript.Loaded) 건드리지 않고 model scale 만 키운다.
 	   ═══════════════════════════════════════════════════════════════════ */
 
@@ -29,7 +30,7 @@ module Base
 		mesh = vehicles/pongdu_c17_body,
 		shader = vehicle,
 		static = TRUE,
-		scale = 0.1131,
+		scale = 0.0905,
 	}
 
 	vehicle PongDuC17
