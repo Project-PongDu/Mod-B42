@@ -24,6 +24,35 @@ local function addServerTick(fn)
     Events.OnTick.Add(fn)
 end
 
+-- ── 재활용 좀비의 묵은 소유권 제거 (특수좀비 소환 씹힘 수정) ──────────────────
+-- B42 MP 엔진 버그 우회. 클라가 좀비를 죽이면 서버 좀비 객체에 owner(소유 클라)가 남은 채로
+-- 재활용 풀에 들어간다:
+--   * NetworkZombieManager.moveZombie 는 죽은 좀비의 owner 를 realState == OnGround 일 때만 지운다
+--   * IsoZombie.resetForReuse / VirtualZombieManager.createZombieOutsideWorld 는 owner 를 안 지운다
+-- 그 객체로 새 좀비를 만들면 updateAuth -> moveZombie(z, 같은 연결) 이 "이미 그 클라 소유"로 보고
+-- 아무것도 안 해서, 그 연결의 소유 목록(owns)에 안 들어간다 -> ZombieList 에 안 실린다 ->
+-- 클라는 그 좀비를 영영 모른다. 서버 getOwnerPlayer() 는 그 클라를 가리켜서 정상처럼 보인다.
+-- 재접속하면 clearTargetAuth 가 owner 를 지워서 그때 보인다.
+-- (2026-10-27 멀티 실측: 사살 13 -> 다음 소환 13건 클라 미생성, 14번째부터 정상)
+-- 새로 만들어진 좀비는 소유자가 없어야 정상이므로 생성 즉시 지운다. updateAuth 가 다음 틱에
+-- 정상 경로(moveZombie -> owns 등록 -> ZombieList)로 다시 배정한다. 퐁듀 소환뿐 아니라 바닐라
+-- 인구 스폰도 같은 경로(createRealZombieAlways -> OnZombieCreate)라 전부 적용된다.
+local _ownerFixCount, _ownerFixLogAt = 0, 0
+Events.OnZombieCreate.Add(function(z)
+    if not isServer() or not z then return end
+    if z:getOwner() == nil and z:getOwnerPlayer() == nil then return end
+    local op = z:getOwnerPlayer()
+    z:setOwner(nil)
+    z:setOwnerPlayer(nil)
+    _ownerFixCount = _ownerFixCount + 1
+    local now = getTimestampMs()
+    if now - _ownerFixLogAt >= 5000 then
+        _ownerFixLogAt = now
+        print(string.format("[PongDu][OwnerFix] cleared stale owner on new zombie obj=%s staleOwner=%s total=%d",
+            tostring(z:getID()), op and tostring(op:getUsername()) or "conn", _ownerFixCount))
+    end
+end)
+
 -- ── 특수좀비 영속 레지스트리 (부활 유지의 핵심) ──────────────────────────────
 -- persistentOutfitID는 좀비 외형을 사망->시체(reanimated.bin)->부활 내내
 -- 유지시키는 영속 ID다. 단, 원시값은 모자 상태가 16번 비트로 박혀 있어
