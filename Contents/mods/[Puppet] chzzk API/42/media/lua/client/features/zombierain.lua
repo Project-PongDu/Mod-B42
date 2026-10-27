@@ -374,6 +374,11 @@ local PLANE_HEAR       = 90       -- 이 거리(타일, 3D)부터 들리기 시�
 local PLANE_TEAR_GAIN  = 0.5      -- 금속음 볼륨 배율 (위 4) 주석의 실녹음 맞춤값)
 local SOUND_C          = 343      -- 음속 (m/s)
 local DOPPLER_V        = 65       -- 도플러 계산용 비행 속도 (m/s)
+-- 투하가 끝난 뒤에도 소리는 이만큼 더 이어지며 꺼진다 (ms). 수송기는 같은 속도로 계속 멀어지고
+-- (경로 연장선), 볼륨도 이 시간 동안 코사인 곡선으로 0 까지 내려간다. 지속시간 10초면 소리는
+-- 15초, 5초면 10초 (준비 지연 동안 다가오는 소리는 별도). 그림자(SHADOW_TAIL)보다 길어서
+-- 비행 항목은 소리가 끝날 때 지운다.
+local PLANE_SOUND_TAIL = 5000
 local _planeSnd = nil   -- { em = emitter, h = { [alias] = 핸들 }, v = { [alias] = 마지막 볼륨 }, p = 마지막 피치 }
 local _planeSwept = false
 
@@ -422,10 +427,23 @@ local function planeSoundEnsure()
     print("[PongDuRain] airdrop plane sound started" .. info)
 end
 
--- 비행 f 의 현재 소리 파라미터: 볼륨(0~1), 앞쪽 비율(0~1), 피치, 근접 계수(0~1). 끝난 비행이면 nil.
+-- 비행 f 의 현재 소리 파라미터: 볼륨(0~1), 앞쪽 비율(0~1), 피치, 근접 계수(0~1).
+-- 소리가 끝난 비행이면 nil (그림자보다 늦게, 투하 종료 + PLANE_SOUND_TAIL 에 끝난다).
 local function planeSoundParams(f, now, px, py)
-    local mx, my, k = flightState(f, now)
-    if not mx then return nil end
+    local t = now - f.t0
+    local dropEnd = f.prep + f.dur
+    if t > dropEnd + PLANE_SOUND_TAIL then return nil end
+    -- 위치는 그림자와 같은 식(범위 밖은 연장선으로 외삽 -> 투하 후에도 계속 멀어진다)
+    local frac = (t - f.prep) / f.dur
+    local mx = f.ax + (f.bx - f.ax) * frac
+    local my = f.ay + (f.by - f.ay) * frac
+    local k = 1
+    if t < SHADOW_FADE then k = t / SHADOW_FADE end
+    if t > dropEnd then
+        local u = (t - dropEnd) / PLANE_SOUND_TAIL
+        k = k * 0.5 * (1 + math.cos(math.pi * u))
+    end
+    if k < 0 then k = 0 end
     local rx, ry = px - mx, py - my                     -- 수송기 -> 플레이어
     local d3 = math.sqrt(rx * rx + ry * ry + PLANE_ALT_M * PLANE_ALT_M)
     local near = PLANE_ALT_M / d3
@@ -478,7 +496,7 @@ local function planeTick()
         local v, front, pitch, q = planeSoundParams(_flights[i], now, px, py)
         if not v then
             table.remove(_flights, i)
-            print("[PongDuRain] airdrop shadow done")
+            print("[PongDuRain] airdrop flight done (shadow + sound tail)")
         elseif not bv or v > bv then
             bv, bfront, bpitch, bq = v, front, pitch, q
         end
