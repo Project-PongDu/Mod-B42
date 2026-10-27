@@ -959,10 +959,7 @@ Events.OnServerCommand.Add(function(module, command, args)
     if module ~= "PongDuMutant" then return end
     if command == "MutantMark" then
         _lastMarkAt = getTimestampMs()
-        -- 클라 parseZombie 가 좀비 생성을 건너뛰는 두 경로를 미리 본다:
-        --   IsoDeadBody.isDead(id) (같은 onlineID 시체가 최근에 있음) / 스폰 칸이 클라에 없음
-        local zidN = args and tonumber(args["zedId"])
-        local okd, isDeadId = pcall(function() return IsoDeadBody.isDead(zidN) end)
+        -- 스폰 칸이 클라에 로드돼 있는지 (클라 parseZombie 는 칸이 없으면 좀비 생성을 건너뛴다)
         local sqLoaded = "na"
         if args and args["x"] and args["y"] then
             local cell = getCell()
@@ -971,7 +968,7 @@ Events.OnServerCommand.Add(function(module, command, args)
         end
         print("[PuppetMutant] mark received zid=" .. tostring(args and args["zedId"])
             .. " kind=" .. tostring(args and args["kind"]) .. " pool=" .. reusePoolSize()
-            .. " deadBodyId=" .. (okd and tostring(isDeadId) or "na") .. " squareLoaded=" .. sqLoaded)
+            .. " squareLoaded=" .. sqLoaded)
         _a.mark(args and tonumber(args["zedId"]), args and args["kind"], args and args["sender"])
         -- 스폰 마크(좌표 포함)만 3초 뒤 클라에 그 좀비가 있는지 확인한다.
         if args and args["x"] and args["y"] and isClient() then
