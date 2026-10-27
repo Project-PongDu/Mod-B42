@@ -353,32 +353,42 @@ Events.OnPreUIDraw.Add(drawFlights)
 --  2) 도플러: 다가올 때 음이 높고 지나가면 낮아진다. 게임 속 비행 속도(초당 4~12칸)로는
 --     변화가 3% 남짓이라 안 들리므로, 실제 C-17 투하 속도(약 130노트 = 65 m/s)로 계산한다.
 --  3) 거리 감쇠: 고도를 포함한 3D 거리 기준 1/거리. 머리 위에서 최대, PLANE_HEAR 에서 0.
+--  4) 공기 찢는 소리: 실녹음에서 머리 위를 막 지날 때(19~23초) 2~8kHz 가 5~15 dB 솟으며
+--     2~8 Hz 로 거칠게 일렁인다. 별도 루프 pongdu_airdrop_plane_tear 를 가까울수록(근접
+--     계수^1.5) 키우고, 막 지나간 직후에 조금 더 세게 둔다. 통과 전체를 모의 합성해 4~10kHz
+--     상대 레벨을 실녹음과 맞췄다: 접근 -12 dB(실녹음 -13), 머리 위 -10(-8.5), 이탈 -18(-17).
 -- 음원은 합성 루프(12초, 무이음). 사용자가 준 C-17 실녹음(32초)의 옥타브 스펙트럼을
 -- 2 dB 안팎으로 맞추고, 실녹음에서 측정한 0.6~1.7 Hz 공기 요동과 고역 크래클(첨도 약 5~6)을 넣었다.
 -- 실녹음에 뚜렷한 팬 톤(휘이잉)은 없어서 넣지 않았다. 실녹음 자체는 저작권 때문에 쓰지 않는다.
-local PLANE_ALIAS      = "pongdu_airdrop_plane"        -- 앞쪽 음색 (팬 고음 + 굉음)
-local PLANE_ALIAS_REAR = "pongdu_airdrop_plane_rear"   -- 뒤쪽 음색 (배기 굉음 + 저음)
+-- 찢는 소리 루프는 실녹음 19~23초 스펙트럼(2~8kHz)과 일렁임(첨도 약 4, 변동계수 약 0.6)에 맞췄다.
+local PLANE_ALIAS      = "pongdu_airdrop_plane"        -- 앞쪽 음색 (접근·통과 밝은 굉음)
+local PLANE_ALIAS_REAR = "pongdu_airdrop_plane_rear"   -- 뒤쪽 음색 (이탈 어두운 저음 굉음)
+local PLANE_ALIAS_TEAR = "pongdu_airdrop_plane_tear"   -- 공기 찢는 고역 (머리 위 근처만)
+local PLANE_ALIASES    = { PLANE_ALIAS, PLANE_ALIAS_REAR, PLANE_ALIAS_TEAR }
 local PLANE_FLOORS     = 12       -- 수송기 고도 (층). 아래 PLANE_FLY_ALT 와 공용
 local PLANE_ALT_M      = PLANE_FLOORS * 2.46   -- 1 타일 = 1 m 기준 고도
 local PLANE_VOL_NEAR   = 0.60     -- 머리 위 통과 시
 local PLANE_HEAR       = 90       -- 이 거리(타일, 3D)부터 들리기 시작 (경로 끝 D = 반경 + 50)
+local PLANE_TEAR_GAIN  = 1.2      -- 찢는 소리 볼륨 배율 (아래 4) 주석의 실녹음 맞춤값)
 local SOUND_C          = 343      -- 음속 (m/s)
 local DOPPLER_V        = 65       -- 도플러 계산용 비행 속도 (m/s)
-local _planeSnd = nil   -- { em = emitter, f = 앞 핸들, r = 뒤 핸들 }
+local _planeSnd = nil   -- { em = emitter, h = { [alias] = 핸들 }, v = { [alias] = 마지막 볼륨 }, p = 마지막 피치 }
 local _planeSwept = false
 
 local function planeSoundStop(reason)
     local s = _planeSnd
     if s and s.em then
-        pcall(function() s.em:stopSound(s.f) end)
-        pcall(function() s.em:stopSound(s.r) end)
-        pcall(function() s.em:stopSoundByName(PLANE_ALIAS) end)
-        pcall(function() s.em:stopSoundByName(PLANE_ALIAS_REAR) end)
+        for _, alias in ipairs(PLANE_ALIASES) do
+            local h = s.h[alias]
+            if h then pcall(function() s.em:stopSound(h) end) end
+            pcall(function() s.em:stopSoundByName(alias) end)
+        end
     end
     local pl = getSpecificPlayer(0)
     if pl then
-        pcall(function() pl:getEmitter():stopSoundByName(PLANE_ALIAS) end)
-        pcall(function() pl:getEmitter():stopSoundByName(PLANE_ALIAS_REAR) end)
+        for _, alias in ipairs(PLANE_ALIASES) do
+            pcall(function() pl:getEmitter():stopSoundByName(alias) end)
+        end
     end
     if s then
         print("[PongDuRain] airdrop plane sound stopped (" .. tostring(reason) .. ")")
@@ -392,21 +402,25 @@ local function planeSoundEnsure()
     if not pl then return end
     local okE, em = pcall(function() return pl:getEmitter() end)
     if not okE or not em then return end
-    local okF, hf = pcall(function() return em:playSound(PLANE_ALIAS) end)
-    local okR, hr = pcall(function() return em:playSound(PLANE_ALIAS_REAR) end)
-    if not okF or not hf or hf == 0 then hf = nil end
-    if not okR or not hr or hr == 0 then hr = nil end
-    if not hf and not hr then
+    local hs, n, info = {}, 0, ""
+    for _, alias in ipairs(PLANE_ALIASES) do
+        local ok, h = pcall(function() return em:playSound(alias) end)
+        if ok and h and h ~= 0 then
+            hs[alias] = h
+            n = n + 1
+            pcall(function() em:setVolume(h, 0) end)
+        end
+        info = info .. " " .. alias .. "=" .. tostring(hs[alias] ~= nil)
+    end
+    if n == 0 then
         print("[PongDuRain] airdrop plane sound start FAILED")
         return
     end
-    if hf then pcall(function() em:setVolume(hf, 0) end) end
-    if hr then pcall(function() em:setVolume(hr, 0) end) end
-    _planeSnd = { em = em, f = hf, r = hr, logged = false }
-    print("[PongDuRain] airdrop plane sound started front=" .. tostring(hf ~= nil) .. " rear=" .. tostring(hr ~= nil))
+    _planeSnd = { em = em, h = hs, v = {}, logged = false }
+    print("[PongDuRain] airdrop plane sound started" .. info)
 end
 
--- 비행 f 의 현재 소리 파라미터: 볼륨(0~1), 앞쪽 비율(0~1), 피치. 끝난 비행이면 nil.
+-- 비행 f 의 현재 소리 파라미터: 볼륨(0~1), 앞쪽 비율(0~1), 피치, 근접 계수(0~1). 끝난 비행이면 nil.
 local function planeSoundParams(f, now, px, py)
     local mx, my, k = flightState(f, now)
     if not mx then return nil end
@@ -414,14 +428,24 @@ local function planeSoundParams(f, now, px, py)
     local d3 = math.sqrt(rx * rx + ry * ry + PLANE_ALT_M * PLANE_ALT_M)
     local near = PLANE_ALT_M / d3
     local edge = PLANE_ALT_M / PLANE_HEAR
-    local v = (near - edge) / (1 - edge)
-    if v < 0 then v = 0 elseif v > 1 then v = 1 end
-    v = PLANE_VOL_NEAR * v * k
+    local q = (near - edge) / (1 - edge)
+    if q < 0 then q = 0 elseif q > 1 then q = 1 end
+    local v = PLANE_VOL_NEAR * q * k
     -- 진행 방향과 플레이어 방향 사이 코사인 (3D). +1 = 정면에서 다가옴, -1 = 지나감
     local c = (rx * f.ux + ry * f.uy) / d3
     local front = (1 + c) / 2
     local pitch = SOUND_C / (SOUND_C - DOPPLER_V * c)
-    return v, front, pitch
+    return v, front, pitch, q * k
+end
+
+-- 볼륨은 값이 실제로 바뀔 때만 보낸다(아래 setPitch 주석과 같은 이유).
+local function planeSetVol(s, alias, vol)
+    local h = s.h[alias]
+    if not h then return end
+    local last = s.v[alias]
+    if last and math.abs(vol - last) < 0.005 then return end
+    s.v[alias] = vol
+    pcall(function() s.em:setVolume(h, vol) end)
 end
 
 -- 매 틱: 끝난 비행 정리 + 엔진음 볼륨·음색·피치 갱신
@@ -431,8 +455,9 @@ local function planeTick()
         local pl = getSpecificPlayer(0)
         if pl then
             _planeSwept = true
-            pcall(function() pl:getEmitter():stopSoundByName(PLANE_ALIAS) end)
-            pcall(function() pl:getEmitter():stopSoundByName(PLANE_ALIAS_REAR) end)
+            for _, alias in ipairs(PLANE_ALIASES) do
+                pcall(function() pl:getEmitter():stopSoundByName(alias) end)
+            end
         end
     end
     if #_flights == 0 then
@@ -446,14 +471,14 @@ local function planeTick()
     local pl = getSpecificPlayer(0)
     local px, py = 0, 0
     if pl then px, py = pl:getX(), pl:getY() end
-    local bv, bfront, bpitch = nil, 0.5, 1
+    local bv, bfront, bpitch, bq = nil, 0.5, 1, 0
     for i = #_flights, 1, -1 do
-        local v, front, pitch = planeSoundParams(_flights[i], now, px, py)
+        local v, front, pitch, q = planeSoundParams(_flights[i], now, px, py)
         if not v then
             table.remove(_flights, i)
             print("[PongDuRain] airdrop shadow done")
         elseif not bv or v > bv then
-            bv, bfront, bpitch = v, front, pitch
+            bv, bfront, bpitch, bq = v, front, pitch, q
         end
     end
     if not bv then
@@ -466,25 +491,26 @@ local function planeTick()
     -- 등전력 크로스페이드 (합친 크기가 중간에 꺼지지 않게)
     local vf = bv * math.sqrt(bfront)
     local vr = bv * math.sqrt(1 - bfront)
+    -- 찢는 소리: 근접 계수^1.5 (머리 위에서 두드러짐), 막 지나간 직후(front < 0.5) 최대 1.25 배
+    local tw = bq ^ 1.5 * (0.75 + 0.5 * (1 - bfront))
+    if tw > 1 then tw = 1 end
+    local vt = bv * PLANE_TEAR_GAIN * tw
     -- 값이 실제로 바뀔 때만 보낸다. 엔진이 setPitch 마다 "Set pitch for Instance" 를
     -- 로그에 남겨 매 틱 호출하면 한 세션에 7천 줄이 쌓였다(2026-10-27 로그). 들리는 차이가
     -- 없는 범위(피치 0.3%, 볼륨 0.005)는 건너뛴다.
     if not s.p or math.abs(bpitch - s.p) >= 0.003 then
         s.p = bpitch
-        if s.f then pcall(function() s.em:setPitch(s.f, bpitch) end) end
-        if s.r then pcall(function() s.em:setPitch(s.r, bpitch) end) end
+        for _, alias in ipairs(PLANE_ALIASES) do
+            local h = s.h[alias]
+            if h then pcall(function() s.em:setPitch(h, bpitch) end) end
+        end
     end
-    if s.f and (not s.vf or math.abs(vf - s.vf) >= 0.005) then
-        s.vf = vf
-        pcall(function() s.em:setVolume(s.f, vf) end)
-    end
-    if s.r and (not s.vr or math.abs(vr - s.vr) >= 0.005) then
-        s.vr = vr
-        pcall(function() s.em:setVolume(s.r, vr) end)
-    end
+    planeSetVol(s, PLANE_ALIAS, vf)
+    planeSetVol(s, PLANE_ALIAS_REAR, vr)
+    planeSetVol(s, PLANE_ALIAS_TEAR, vt)
     if not s.logged and bv > 0.3 then
         s.logged = true
-        print(string.format("[PongDuRain] airdrop plane sound near vol=%.2f front=%.2f pitch=%.3f", bv, bfront, bpitch))
+        print(string.format("[PongDuRain] airdrop plane sound near vol=%.2f front=%.2f pitch=%.3f tear=%.2f", bv, bfront, bpitch, vt))
     end
 end
 Events.OnTick.Add(planeTick)

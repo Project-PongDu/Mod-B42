@@ -210,6 +210,19 @@ module Base
         }
     }
 
+    /* 수송기가 머리 위를 지날 때 공기를 찢는 날카로운 고역(2~8kHz). zombierain.lua 가
+       가까울수록 키운다. 볼륨 비율은 앞 루프와 같은 0.5 를 전제로 맞췄다. */
+    sound pongdu_airdrop_plane_tear
+    {
+        category = Object,
+        loop = true,
+        clip
+        {
+            file = media/sound/airdrop_plane_tear.wav,
+            volume = 0.5,
+        }
+    }
+
     sound zombie_rain
     {
         category = Object,
