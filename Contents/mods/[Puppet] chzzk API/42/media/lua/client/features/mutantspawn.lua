@@ -959,8 +959,19 @@ Events.OnServerCommand.Add(function(module, command, args)
     if module ~= "PongDuMutant" then return end
     if command == "MutantMark" then
         _lastMarkAt = getTimestampMs()
+        -- 클라 parseZombie 가 좀비 생성을 건너뛰는 두 경로를 미리 본다:
+        --   IsoDeadBody.isDead(id) (같은 onlineID 시체가 최근에 있음) / 스폰 칸이 클라에 없음
+        local zidN = args and tonumber(args["zedId"])
+        local okd, isDeadId = pcall(function() return IsoDeadBody.isDead(zidN) end)
+        local sqLoaded = "na"
+        if args and args["x"] and args["y"] then
+            local cell = getCell()
+            local sq = cell and cell:getGridSquare(math.floor(tonumber(args["x"])), math.floor(tonumber(args["y"])), math.floor(tonumber(args["z"]) or 0))
+            sqLoaded = tostring(sq ~= nil)
+        end
         print("[PuppetMutant] mark received zid=" .. tostring(args and args["zedId"])
-            .. " kind=" .. tostring(args and args["kind"]) .. " pool=" .. reusePoolSize())
+            .. " kind=" .. tostring(args and args["kind"]) .. " pool=" .. reusePoolSize()
+            .. " deadBodyId=" .. (okd and tostring(isDeadId) or "na") .. " squareLoaded=" .. sqLoaded)
         _a.mark(args and tonumber(args["zedId"]), args and args["kind"], args and args["sender"])
         -- 스폰 마크(좌표 포함)만 3초 뒤 클라에 그 좀비가 있는지 확인한다.
         if args and args["x"] and args["y"] and isClient() then

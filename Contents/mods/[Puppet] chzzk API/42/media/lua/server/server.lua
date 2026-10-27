@@ -185,6 +185,15 @@ local function spawnSpecialZombie(x, y, z, kind, sender)
         ["x"] = zed:getX(), ["y"] = zed:getY(), ["z"] = zed:getZ(),
     })
     registerMutant(zed, kind, sender) -- 부활 유지용 영속 등록 (후원자 포함)
+    -- 씹힘 진단: 서버가 이 특좀을 최근에 죽은 좀비 객체(재활용 풀)로 만들었는지 (getID 는 재활용돼도 유지)
+    do
+        local obj = zed:getID()
+        local deadAt = PongDuSrvDeadObj and PongDuSrvDeadObj[obj]
+        local okp, pool = pcall(function() return VirtualZombieManager.instance:reusableZombiesSize() end)
+        print(string.format("[PongDu][SpawnObj] zid=%s obj=%s reusedFromDead=%s deadAgo=%d pool=%s",
+            tostring(zed:getOnlineID()), tostring(obj), tostring(deadAt ~= nil),
+            deadAt and (getTimestampMs() - deadAt) or -1, okp and tostring(pool) or "na"))
+    end
     PongDuSpawnFate = PongDuSpawnFate or {}
     PongDuSpawnFate[#PongDuSpawnFate + 1] = {
         zid = zed:getOnlineID(), kind = kind, x = zed:getX(), y = zed:getY(),
@@ -1686,8 +1695,12 @@ local LOST_MAX      = 300
 Events.OnZombieDead.Add(function(z)
     if not z then return end
     -- 사살-증발 상관관계 진단: 서버가 처리한 좀비 사망을 시각과 함께 남긴다.
-    print(string.format("[PongDu][KillLog] server zombie dead zid=%s mutant=%s at %.1f,%.1f",
-        tostring(z:getOnlineID()), tostring(z:getModData()["PuppetMutant"]), z:getX(), z:getY()))
+    print(string.format("[PongDu][KillLog] server zombie dead zid=%s mutant=%s at %.1f,%.1f obj=%s",
+        tostring(z:getOnlineID()), tostring(z:getModData()["PuppetMutant"]), z:getX(), z:getY(), tostring(z:getID())))
+    if not isClient() then
+        PongDuSrvDeadObj = PongDuSrvDeadObj or {}
+        PongDuSrvDeadObj[z:getID()] = getTimestampMs()
+    end
     if _live[z] then _live[z] = nil end
     -- 진짜 사망인지 가르는 진단: 1.5초 뒤 그 자리 +-1칸에 시체가 생겼는지 센다.
     -- (서버 die() 는 IsoDeadBody 를 만들고 좀비 modData 를 복사한다 -> mutantBodies 로 특좀 시체 구분)
