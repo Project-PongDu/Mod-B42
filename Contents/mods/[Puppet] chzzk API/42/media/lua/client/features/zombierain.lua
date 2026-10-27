@@ -353,23 +353,25 @@ Events.OnPreUIDraw.Add(drawFlights)
 --  2) 도플러: 다가올 때 음이 높고 지나가면 낮아진다. 게임 속 비행 속도(초당 4~12칸)로는
 --     변화가 3% 남짓이라 안 들리므로, 실제 C-17 투하 속도(약 130노트 = 65 m/s)로 계산한다.
 --  3) 거리 감쇠: 고도를 포함한 3D 거리 기준 1/거리. 머리 위에서 최대, PLANE_HEAR 에서 0.
---  4) 공기 찢는 소리: 실녹음에서 머리 위를 막 지날 때(19~23초) 2~8kHz 가 5~15 dB 솟으며
---     2~8 Hz 로 거칠게 일렁인다. 별도 루프 pongdu_airdrop_plane_tear 를 가까울수록(근접
---     계수^1.5) 키우고, 막 지나간 직후에 조금 더 세게 둔다. 통과 전체를 모의 합성해 4~10kHz
---     상대 레벨을 실녹음과 맞췄다: 접근 -12 dB(실녹음 -13), 머리 위 -10(-8.5), 이탈 -18(-17).
+--  4) 날카로운 금속음: 실녹음 21.5~23.3초(머리 위를 지나는 순간과 직후)에 팬 날개 통과음이
+--     솟는다. 기본음 약 1776 Hz 와 배음, 특히 2배음 3.55kHz 가 그 구간 에너지의 약 9%.
+--     3.52~3.58kHz 에 선이 여럿(엔진 4발 회전수 1~2% 차) -> 맥놀이가 금속성으로 들린다.
+--     별도 루프 pongdu_airdrop_plane_tear 를 근접 계수^3.5 x 뒤쪽 가중(4*(1-front)^2, 최대 1)으로
+--     키운다. 통과 모의 합성에서 3.5kHz 대역 비율: 접근 -22 dB(실녹음 -21.5), 머리 위 -9.6(-10.3),
+--     이탈 30칸 -26(-24). 도플러 피치는 다른 루프와 같이 걸려 지나가며 음이 떨어진다.
 -- 음원은 합성 루프(12초, 무이음). 사용자가 준 C-17 실녹음(32초)의 옥타브 스펙트럼을
 -- 2 dB 안팎으로 맞추고, 실녹음에서 측정한 0.6~1.7 Hz 공기 요동과 고역 크래클(첨도 약 5~6)을 넣었다.
 -- 실녹음에 뚜렷한 팬 톤(휘이잉)은 없어서 넣지 않았다. 실녹음 자체는 저작권 때문에 쓰지 않는다.
--- 찢는 소리 루프는 실녹음 19~23초 스펙트럼(2~8kHz)과 일렁임(첨도 약 4, 변동계수 약 0.6)에 맞췄다.
+-- 금속음 루프는 실녹음 21.5~23.3초의 팬 톤(1776 Hz 계열, 배음 비율·4발 회전수 차)에 맞췄다.
 local PLANE_ALIAS      = "pongdu_airdrop_plane"        -- 앞쪽 음색 (접근·통과 밝은 굉음)
 local PLANE_ALIAS_REAR = "pongdu_airdrop_plane_rear"   -- 뒤쪽 음색 (이탈 어두운 저음 굉음)
-local PLANE_ALIAS_TEAR = "pongdu_airdrop_plane_tear"   -- 공기 찢는 고역 (머리 위 근처만)
+local PLANE_ALIAS_TEAR = "pongdu_airdrop_plane_tear"   -- 날카로운 금속음 (팬 날개 통과음, 머리 위·직후만)
 local PLANE_ALIASES    = { PLANE_ALIAS, PLANE_ALIAS_REAR, PLANE_ALIAS_TEAR }
 local PLANE_FLOORS     = 12       -- 수송기 고도 (층). 아래 PLANE_FLY_ALT 와 공용
 local PLANE_ALT_M      = PLANE_FLOORS * 2.46   -- 1 타일 = 1 m 기준 고도
 local PLANE_VOL_NEAR   = 0.60     -- 머리 위 통과 시
 local PLANE_HEAR       = 90       -- 이 거리(타일, 3D)부터 들리기 시작 (경로 끝 D = 반경 + 50)
-local PLANE_TEAR_GAIN  = 1.2      -- 찢는 소리 볼륨 배율 (아래 4) 주석의 실녹음 맞춤값)
+local PLANE_TEAR_GAIN  = 0.5      -- 금속음 볼륨 배율 (위 4) 주석의 실녹음 맞춤값)
 local SOUND_C          = 343      -- 음속 (m/s)
 local DOPPLER_V        = 65       -- 도플러 계산용 비행 속도 (m/s)
 local _planeSnd = nil   -- { em = emitter, h = { [alias] = 핸들 }, v = { [alias] = 마지막 볼륨 }, p = 마지막 피치 }
@@ -491,9 +493,10 @@ local function planeTick()
     -- 등전력 크로스페이드 (합친 크기가 중간에 꺼지지 않게)
     local vf = bv * math.sqrt(bfront)
     local vr = bv * math.sqrt(1 - bfront)
-    -- 찢는 소리: 근접 계수^1.5 (머리 위에서 두드러짐), 막 지나간 직후(front < 0.5) 최대 1.25 배
-    local tw = bq ^ 1.5 * (0.75 + 0.5 * (1 - bfront))
-    if tw > 1 then tw = 1 end
+    -- 금속음: 근접 계수^3.5 (머리 위에서만) x 뒤쪽 가중 (다가올 땐 약하고 머리 위부터 최대)
+    local back = 4 * (1 - bfront) * (1 - bfront)
+    if back > 1 then back = 1 end
+    local tw = bq ^ 3.5 * back
     local vt = bv * PLANE_TEAR_GAIN * tw
     -- 값이 실제로 바뀔 때만 보낸다. 엔진이 setPitch 마다 "Set pitch for Instance" 를
     -- 로그에 남겨 매 틱 호출하면 한 세션에 7천 줄이 쌓였다(2026-10-27 로그). 들리는 차이가
