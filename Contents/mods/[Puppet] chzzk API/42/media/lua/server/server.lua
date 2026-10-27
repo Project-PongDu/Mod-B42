@@ -1680,12 +1680,69 @@ local _lastSyncLog = 0
 local _live = {}                 -- [IsoZombie] = { k, s, pid, x, y, z }  (객체 키: SP 는 zid 가 전부 -1)
 local _lost = {}                 -- { {k, s, pid, x, y, z, t}, ... }
 local LOST_MATCH_R  = 60         -- 가상 좀비는 경로 목표로 계속 걸어가므로 넉넉히
-local LOST_KEEP_MS  = 6 * 60 * 60 * 1000
+local LOST_KEEP_MS  = 3 * 24 * 60 * 60 * 1000   -- 서버가 밤새 꺼져 있어도 유지되게 3일
 local LOST_MAX      = 300
 
 Events.OnZombieDead.Add(function(z)
-    if z and _live[z] then _live[z] = nil end
+    if not z then return end
+    -- 사살-증발 상관관계 진단: 서버가 처리한 좀비 사망을 시각과 함께 남긴다.
+    print(string.format("[PongDu][KillLog] server zombie dead zid=%s mutant=%s at %.1f,%.1f",
+        tostring(z:getOnlineID()), tostring(z:getModData()["PuppetMutant"]), z:getX(), z:getY()))
+    if _live[z] then _live[z] = nil end
 end)
+
+-- ── 서버 재시작 너머로 추적 유지 ──────────────────────────────────────────────
+-- _live/_lost 는 메모리라 서버를 끄면 사라진다. 그런데 꺼지는 순간 로드돼 있던 특좀과
+-- 이미 가상화돼 있던 특좀은 다음 기동 때 옷 ID·위치만 남은 일반 좀비로 다시 만들어진다
+-- (2026-10-27 멀티: 씹힌 수만큼 서버 재시작 후 일반좀비가 서 있었다).
+-- 그래서 두 목록을 글로벌 ModData 에 계속 비춰 두고(서버 세이브에 같이 저장), 기동 시
+-- _lost 로 되읽는다. 로드돼 있던 것(Live 스냅샷)도 기동 후엔 전부 "잃어버린 것"이다.
+local MD_LOST, MD_LIVE = "PongDuMutantLost", "PongDuMutantLive"
+local _lostDirty = false
+
+local function copyEntry(e, t)
+    return { k = e.k, s = e.s, pid = e.pid, x = e.x, y = e.y, z = e.z, t = t or e.t }
+end
+
+Events.OnInitGlobalModData.Add(function()
+    if isClient() then return end
+    local now = getTimestampMs()
+    local lostT = ModData.getOrCreate(MD_LOST)
+    local liveT = ModData.getOrCreate(MD_LIVE)
+    local nLost, nLive = 0, 0
+    for _, e in pairs(lostT) do
+        if type(e) == "table" and e.pid then
+            _lost[#_lost + 1] = copyEntry(e)
+            nLost = nLost + 1
+        end
+    end
+    for _, e in pairs(liveT) do
+        if type(e) == "table" and e.pid then
+            _lost[#_lost + 1] = copyEntry(e, now)
+            nLive = nLive + 1
+        end
+    end
+    _lostDirty = true
+    print("[PongDu][MutantTrack] restored tracking from save: lost=" .. nLost .. " live=" .. nLive)
+end)
+
+local function persistTracking()
+    local liveT = ModData.getOrCreate(MD_LIVE)
+    for k in pairs(liveT) do liveT[k] = nil end
+    local i = 0
+    for _, info in pairs(_live) do
+        if info.pid and info.pid ~= 0 then
+            i = i + 1
+            liveT[i] = copyEntry(info, 0)
+        end
+    end
+    if _lostDirty then
+        _lostDirty = false
+        local lostT = ModData.getOrCreate(MD_LOST)
+        for k in pairs(lostT) do lostT[k] = nil end
+        for j = 1, #_lost do lostT[j] = copyEntry(_lost[j]) end
+    end
+end
 
 local function markToClients(zid, kind, sender)
     if not isServer() then return end
@@ -1715,6 +1772,7 @@ local function matchLost(z)
     end
     if not best then return nil end
     local e = table.remove(_lost, best)
+    _lostDirty = true
     return e, bestD
 end
 
@@ -1727,7 +1785,7 @@ local function staleSweep()
         if now > _reviveRestamp[i].expire then table.remove(_reviveRestamp, i) end
     end
     for i = #_lost, 1, -1 do
-        if now - _lost[i].t > LOST_KEEP_MS then table.remove(_lost, i) end
+        if now - _lost[i].t > LOST_KEEP_MS then table.remove(_lost, i) _lostDirty = true end
     end
     local cell = getCell()
     if not cell then return end
@@ -1820,6 +1878,7 @@ local function staleSweep()
                 _lost[#_lost + 1] = { k = info.k, s = info.s, pid = info.pid,
                                       x = info.x, y = info.y, z = info.z, t = now }
                 lostNow = lostNow + 1
+                _lostDirty = true
                 if #_lost > LOST_MAX then table.remove(_lost, 1) end
             end
         end
@@ -1827,6 +1886,7 @@ local function staleSweep()
     if lostNow > 0 then
         print("[PongDu][MutantTrack] unloaded mutants=" .. lostNow .. " (tracking " .. #_lost .. ")")
     end
+    persistTracking()
     if restamped + restored > 0 then
         print("[PongDu][MutantTrack] sweep restamped=" .. restamped .. " restored=" .. restored)
     end

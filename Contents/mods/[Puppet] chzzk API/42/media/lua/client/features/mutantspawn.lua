@@ -860,6 +860,23 @@ local function runSpawnChecks()
 end
 Events.OnTick.Add(runSpawnChecks)
 
+-- 사살-증발 상관관계 진단: 로컬 플레이어의 공격(근접 휘두르기/사격)과 클라에서 본 좀비 사망을
+-- 시각과 함께 남긴다. 공격 로그는 1초에 한 번만 (연사 시 도배 방지).
+local _lastSwingLog = 0
+Events.OnWeaponSwing.Add(function(character, weapon)
+    if not isClient() or not character or not character:isLocalPlayer() then return end
+    local now = getTimestampMs()
+    if now - _lastSwingLog < 1000 then return end
+    _lastSwingLog = now
+    print("[PongDu][KillLog] local attack weapon=" .. tostring(weapon and weapon:getFullType())
+        .. " ranged=" .. tostring(weapon and weapon:isRanged()))
+end)
+Events.OnZombieDead.Add(function(z)
+    if not isClient() or not z then return end
+    print(string.format("[PongDu][KillLog] client zombie dead zid=%s mutant=%s",
+        tostring(z:getOnlineID()), tostring(z:getModData()["PuppetMutant"])))
+end)
+
 -- 클라 좀비 수 급감 감시: 1초마다 세어 3마리 이상 한 번에 줄면 기록한다.
 -- (2026-10-27 멀티 5E: 제자리에서 클라 좀비가 9 -> 4 -> 0 으로 통째로 사라졌다가 돌아옴)
 local _zcLast, _zcAt = -1, 0
