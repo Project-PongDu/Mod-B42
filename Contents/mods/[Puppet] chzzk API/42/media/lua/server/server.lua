@@ -1689,7 +1689,50 @@ Events.OnZombieDead.Add(function(z)
     print(string.format("[PongDu][KillLog] server zombie dead zid=%s mutant=%s at %.1f,%.1f",
         tostring(z:getOnlineID()), tostring(z:getModData()["PuppetMutant"]), z:getX(), z:getY()))
     if _live[z] then _live[z] = nil end
+    -- 진짜 사망인지 가르는 진단: 1.5초 뒤 그 자리 +-1칸에 시체가 생겼는지 센다.
+    -- (서버 die() 는 IsoDeadBody 를 만들고 좀비 modData 를 복사한다 -> mutantBodies 로 특좀 시체 구분)
+    if not isClient() and z:getModData()["PuppetMutant"] then
+        PongDuCorpseCheck = PongDuCorpseCheck or {}
+        PongDuCorpseCheck[#PongDuCorpseCheck + 1] = {
+            zid = z:getOnlineID(), kind = z:getModData()["PuppetMutant"],
+            x = math.floor(z:getX()), y = math.floor(z:getY()), z = math.floor(z:getZ()),
+            at = getTimestampMs() + 1500,
+        }
+    end
 end)
+
+local function corpseCheckTick()
+    if not PongDuCorpseCheck or #PongDuCorpseCheck == 0 then return end
+    local now = getTimestampMs()
+    local cell = getCell()
+    if not cell then return end
+    for i = #PongDuCorpseCheck, 1, -1 do
+        local c = PongDuCorpseCheck[i]
+        if now >= c.at then
+            table.remove(PongDuCorpseCheck, i)
+            local bodies, mutantBodies, loaded = 0, 0, 0
+            for dx = -1, 1 do
+                for dy = -1, 1 do
+                    local sq = cell:getGridSquare(c.x + dx, c.y + dy, c.z)
+                    if sq then
+                        loaded = loaded + 1
+                        local list = sq:getDeadBodys()
+                        if list then
+                            for j = 0, list:size() - 1 do
+                                bodies = bodies + 1
+                                local b = list:get(j)
+                                if b and b:getModData()["PuppetMutant"] then mutantBodies = mutantBodies + 1 end
+                            end
+                        end
+                    end
+                end
+            end
+            print(string.format("[PongDu][KillLog] corpse check zid=%s kind=%s at %d,%d,%d bodies=%d mutantBodies=%d squares=%d",
+                tostring(c.zid), tostring(c.kind), c.x, c.y, c.z, bodies, mutantBodies, loaded))
+        end
+    end
+end
+addServerTick(corpseCheckTick)
 
 -- ── 서버 재시작 너머로 추적 유지 ──────────────────────────────────────────────
 -- _live/_lost 는 메모리라 서버를 끄면 사라진다. 그런데 꺼지는 순간 로드돼 있던 특좀과
@@ -1776,6 +1819,43 @@ local function matchLost(z)
     return e, bestD
 end
 
+-- 씹힘 진단: 서버엔 있는데 클라에 안 넘어가는 특좀은 소유 클라(owner)가 없는지 본다.
+-- 플레이어 OWNER_NEAR_R 안에 있는데 owner 가 없으면 기록(같은 좀비는 OWNER_LOG_MS 마다 한 번).
+-- owner 가 생기거나 바뀌면 그 순간도 한 줄 남긴다.
+local OWNER_NEAR_R = 30
+local OWNER_LOG_MS = 5000
+local _ownerSeen = {}            -- [zid] = { name, lastLog }
+local function logOwnerState(z, kind, zid, now)
+    local op = z:getOwnerPlayer()
+    local name = op and tostring(op:getUsername()) or (z:getOwner() and "conn" or "nil")
+    local st = _ownerSeen[zid]
+    local nearest = -1
+    local players = getOnlinePlayers()
+    if players then
+        for j = 0, players:size() - 1 do
+            local p = players:get(j)
+            local dx, dy = p:getX() - z:getX(), p:getY() - z:getY()
+            local d = math.sqrt(dx * dx + dy * dy)
+            if nearest < 0 or d < nearest then nearest = d end
+        end
+    end
+    if not st then
+        st = { name = name, lastLog = 0 }
+        _ownerSeen[zid] = st
+        print(string.format("[PongDu][OwnerLog] first zid=%s kind=%s owner=%s nearestPlayer=%.1f",
+            tostring(zid), tostring(kind), name, nearest))
+    elseif st.name ~= name then
+        print(string.format("[PongDu][OwnerLog] change zid=%s kind=%s owner=%s -> %s nearestPlayer=%.1f",
+            tostring(zid), tostring(kind), st.name, name, nearest))
+        st.name = name
+    end
+    if name == "nil" and nearest >= 0 and nearest <= OWNER_NEAR_R and now - st.lastLog >= OWNER_LOG_MS then
+        st.lastLog = now
+        print(string.format("[PongDu][OwnerLog] unowned near player zid=%s kind=%s nearestPlayer=%.1f state=%s at %.1f,%.1f",
+            tostring(zid), tostring(kind), nearest, tostring(z:getCurrentStateName()), z:getX(), z:getY()))
+    end
+end
+
 local function staleSweep()
     local now = getTimestampMs()
     if now - _lastStaleSweep < STALE_SWEEP_MS then return end
@@ -1798,9 +1878,9 @@ local function staleSweep()
             local f = PongDuSpawnFate[i]
             if now >= f.at then
                 table.remove(PongDuSpawnFate, i)
-                local present = false
+                local present, fz = false, nil
                 for j = 0, zeds:size() - 1 do
-                    if zeds:get(j):getOnlineID() == f.zid then present = true break end
+                    if zeds:get(j):getOnlineID() == f.zid then present = true fz = zeds:get(j) break end
                 end
                 local nearest = -1
                 local players = getOnlinePlayers()
@@ -1812,8 +1892,16 @@ local function staleSweep()
                         if nearest < 0 or d < nearest then nearest = d end
                     end
                 end
-                print(string.format("[PongDu][SpawnFate] zid=%s kind=%s present=%s serverZombies=%d nearestPlayer=%.1f",
-                    tostring(f.zid), tostring(f.kind), tostring(present), zeds:size(), nearest))
+                -- owner: 이 좀비를 시뮬레이션하는 클라 연결. nil 이면 서버가 어느 클라에도 안 보낸다
+                -- (NetworkZombiePacker.getZombieData 는 소유 클라 목록 + 다른 클라가 소유한 좀비만 전송)
+                local ownerName = "nil"
+                if fz then
+                    local op = fz:getOwnerPlayer()
+                    if op then ownerName = tostring(op:getUsername())
+                    elseif fz:getOwner() then ownerName = "conn" end
+                end
+                print(string.format("[PongDu][SpawnFate] zid=%s kind=%s present=%s serverZombies=%d nearestPlayer=%.1f owner=%s",
+                    tostring(f.zid), tostring(f.kind), tostring(present), zeds:size(), nearest, ownerName))
             end
         end
     end
@@ -1824,6 +1912,7 @@ local function staleSweep()
     local syncList = doSync and {} or nil
 
     local seen = {}
+    local seenZid = {}
     local restamped, restored = 0, 0
     for i = 0, zeds:size() - 1 do
         local z = zeds:get(i)
@@ -1849,6 +1938,10 @@ local function staleSweep()
                 md["PuppetMutantZid"] = zid
                 restamped = restamped + 1
                 markToClients(zid, kind, md["PuppetMutantSender"])
+            end
+            if kind and mp then
+                logOwnerState(z, kind, zid, now)
+                seenZid[zid] = true
             end
             if kind then
                 seen[z] = true
@@ -1882,6 +1975,9 @@ local function staleSweep()
                 if #_lost > LOST_MAX then table.remove(_lost, 1) end
             end
         end
+    end
+    for zid in pairs(_ownerSeen) do
+        if not seenZid[zid] then _ownerSeen[zid] = nil end
     end
     if lostNow > 0 then
         print("[PongDu][MutantTrack] unloaded mutants=" .. lostNow .. " (tracking " .. #_lost .. ")")
