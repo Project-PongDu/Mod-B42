@@ -6,39 +6,15 @@
 --
 -- 여기가 하는 일은 두 가지뿐이다:
 --   1) roll()  - 샌드박스 옵션을 보고 어떤 혈청을 지급할지 추첨
---   2) OnEat_serum - 42종이 공유하는 단일 섭취 핸들러
+--   2) (OnEat_serum 은 shared/PongDuSerum.lua 로 옮겼다)
 
 local serum = {}
 
--- 등급.
---   levels : 상승 레벨 수
---   weight : 등급 추첨 가중치. 일반:희귀:특급 = 10:3:1
--- 순서가 곧 등급 서열이다. allowedGradeCount() 가 앞에서부터 n개를 잘라 쓴다.
-serum.GRADES = {
-    { id = "common", levels = 1, weight = 10 },
-    { id = "rare",   levels = 2, weight = 3  },
-    { id = "epic",   levels = 3, weight = 1  },
-}
-
--- 대상 스킬 14종. id 는 Perks.FromString() 키이자 아이템 타입/번역/샌드박스
--- 옵션의 접미사다. 재장전(Reloading)은 의도적으로 제외했다.
-serum.SKILLS = {
-    "Fitness", "Strength",
-    "Sprinting", "Lightfoot", "Nimble", "Sneak",
-    "Axe", "Blunt", "SmallBlunt", "LongBlade", "SmallBlade", "Spear",
-    "Maintenance", "Aiming",
-}
-
--- 아이템 타입 -> 효과. OnEat 이 문자열 파싱 없이 바로 찾아 쓴다.
-local EFFECT = {}
-for _, grade in ipairs(serum.GRADES) do
-    for _, perkId in ipairs(serum.SKILLS) do
-        EFFECT["serum_" .. grade.id .. "_" .. perkId] = {
-            perkId = perkId,
-            levels = grade.levels,
-        }
-    end
-end
+-- 등급·스킬 표와 섭취 핸들러(OnEat_serum)는 shared/PongDuSerum.lua 에 있다.
+-- B42 MP 는 먹기 OnEat 이 서버에서도 돌기 때문에 서버가 함수를 가져야 한다.
+require "PongDuSerum"
+serum.GRADES = PongDuSerum.GRADES
+serum.SKILLS = PongDuSerum.SKILLS
 
 -- 샌드박스 드롭박스 값 -> 획득 가능한 등급 수.
 --   1: 일반+희귀+특급 -> 3 / 2: 일반+희귀 -> 2 / 3: 일반만 -> 1 / 4: 획득 불가 -> 0
@@ -87,28 +63,6 @@ function serum.roll()
 
     -- 안전망. 정수 연산이라 위 루프에서 반드시 반환되지만 방어적으로 둔다.
     return "serum_" .. serum.GRADES[maxGrade].id .. "_" .. perkId
-end
-
--- ── OnEat (42종 공용) ────────────────────────────────────────────────────
--- LevelPerk() 는 호출 1회당 정확히 +1레벨이며 이미 만렙이면 무시된다
--- (엔진 네이티브 메서드, Lua wrapper 없음 -- pz41 vanilla 소스 확인됨).
--- food:getType() 은 모듈 prefix 없는 타입명("serum_epic_Aiming")을 돌려준다.
-function OnEat_serum(food, player, percent)
-    local itemType = food:getType()
-    local effect = EFFECT[itemType]
-
-    if not effect then
-        print("[PongDu] Serum consume FAILED: unknown item type=" .. tostring(itemType))
-        return
-    end
-
-    local perk = Perks.FromString(effect.perkId)
-    for i = 1, effect.levels do
-        player:LevelPerk(perk)
-    end
-
-    print("[PongDu] Serum consumed: type=" .. itemType
-        .. ", perk=" .. effect.perkId .. ", levels=+" .. effect.levels)
 end
 
 return serum
