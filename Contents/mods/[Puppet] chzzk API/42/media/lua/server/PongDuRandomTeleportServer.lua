@@ -10,8 +10,11 @@
 --
 -- 후보 제외 기준:
 --   - 요청자 본인 (username 비교)
---   - 스태프: getAccessLevel() ~= "None" (Admin/Moderator/Overseer/GM/Observer)
---     Observer는 투명 상태라 그 위치로 보내면 허공에 떨어진 것처럼 보인다.
+--   - 스태프: 역할에 Capability.UseDebugContextMenu 가 있음 (observer/gm/
+--     moderator/admin, Roles.addStatic). Observer는 투명 상태라 그 위치로 보내면
+--     허공에 떨어진 것처럼 보인다.
+--     [B42] getAccessLevel() 은 역할 이름(일반 유저 "user")이라 B41 의
+--     ~= "None" 비교는 전원을 스태프로 빼서 후보가 항상 0명이 된다.
 --   - 사망자
 --
 -- 이 파일은 media/lua/server/ 에 있어 MP 클라에서도 로드된다. OnClientCommand
@@ -41,7 +44,8 @@ Events.OnClientCommand.Add(function(module, command, player, data)
         for i = 0, players:size() - 1 do
             local p = players:get(i)
             if p and p:getUsername() ~= me then
-                if p:getAccessLevel() ~= "None" then
+                local role = p:getRole()
+                if role and role:hasCapability(Capability.UseDebugContextMenu) then
                     staff = staff + 1
                 elseif p:isDead() then
                     dead = dead + 1

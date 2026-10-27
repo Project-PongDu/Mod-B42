@@ -3,7 +3,7 @@
 -- 서버 후원은 접속자 전원에게 효과가 걸리는 계열이라 아무나 쏠 수 있으면 안 된다.
 -- 판정 기준은 두 가지다.
 --   ① 서버장: 샌드박스 PongDu.Host_SteamID 에 수동 입력한 Steam ID64 와 일치
---   ② 어드민: accessLevel == "Admin". 단 샌드박스 PongDu.Host_AllowAdmin 이
+--   ② 어드민: 역할(role) 이름이 "admin". 단 샌드박스 PongDu.Host_AllowAdmin 이
 --      켜져 있을 때만이며, 이 경우 Host_SteamID 설정과 무관하게 통과한다.
 --
 -- 이 파일은 media/lua/shared/ 에 있어 서버와 클라이언트 양쪽에서 로드된다.
@@ -89,26 +89,25 @@ end
 -- 서버 전체 대상 효과(호드나이트/블러드문 등)의 발동 주체가 조용히 늘어난다.
 -- 그래서 샌드박스 PongDu.Host_AllowAdmin (기본 false) 로 명시적 opt-in 을 받는다.
 --
--- 기준은 accessLevel == "Admin" 하나다. moderator / gm / overseer / observer 는
--- 포함하지 않는다 -- 컨텍스트 메뉴 노출 조건인 isAdmin() 이 accessLevel == 32
--- (admin) 단일 값이라(LuaManager.java:6612), 여기서 범위를 넓히면 "메뉴는 안
--- 보이는데 서버는 허용" 같은 비대칭이 생긴다.
+-- 기준은 역할 이름 "admin" 하나다. moderator / gm / observer 는 포함하지 않는다.
 --
--- 서버측 판정은 위조 불가능하다. IsoPlayer.accessLevel 을 채우는 곳이
--- GameServer.java:5366 의 udpConnection0.accessLevel 하나뿐이고, 이건 로그온
--- 시점에 ServerWorldDatabase 가 준 값이다.
+-- [B42] accessLevel 문자열은 역할(Role) 체계로 바뀌었다. getAccessLevel() 은
+-- 역할 이름을 그대로 돌려주고(IsoPlayer.getAccessLevel: role.getName(), 미설정
+-- "none"), 기본 역할 이름은 전부 소문자다(Roles.addStatic: "user"/"observer"/
+-- "gm"/"moderator"/"admin"). B41 처럼 "Admin" 과 == 비교하면 항상 false 다.
+-- isAccessLevel(name) 은 equalsIgnoreCase 비교라 대소문자에 안전하다.
+-- 역할 객체 동일성(isAdmin() 의 getRole() == Roles.getDefaultForAdmin())은 쓰지
+-- 않는다 -- 클라는 ExtraInfoPacket 에서 역할을 new Role("") 로 새로 만들어
+-- 받으므로 객체가 달라 false 가 된다.
 --
--- 클라측에서도 같은 함수를 쓸 수 있다. GameServer.sendPlayerExtraInfo 가
--- accessLevel 을 전 접속자에게 브로드캐스트하고(GameServer.java:1274~1288)
--- GameClient.receiveExtraInfo 가 원격 플레이어 객체에 대입하므로
--- (GameClient.java:3086), 클라에서 남의 어드민 여부도 볼 수 있다.
--- 물론 표시용일 뿐이고 실제 권한은 서버가 다시 본다.
+-- 서버측 판정은 위조 불가능하다. 서버의 역할은 로그온 시 ServerWorldDatabase 가
+-- 준 값(LoginPacket)이고, 권한 변경은 RolesPacket/ConnectedPacket 이 서버에서
+-- 설정한다. 클라측 값은 ExtraInfoPacket 으로 받은 표시용이고 실제 권한은 서버가
+-- 다시 본다.
 function PongDuHost.isAdminLevel(player)
     if not player then return false end
     if not SandboxVars.PongDu.Host_AllowAdmin then return false end
-    -- getAccessLevel() 은 내부 소문자값을 "Admin"/"Moderator"/.../"None" 으로
-    -- 정규화해 돌려준다(IsoPlayer.java:6614). 미설정이면 "None".
-    return player:getAccessLevel() == "Admin"
+    return player:isAccessLevel("admin")
 end
 
 -- 서버 판정. 반환값은 위 상수 중 하나.

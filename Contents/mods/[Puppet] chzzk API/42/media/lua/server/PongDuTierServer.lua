@@ -26,10 +26,13 @@ Events.OnClientCommand.Add(function(module, command, player, data)
 
     -- 클라 훅은 어드민 패널에서만 발화하지만, 커맨드 자체는 아무 클라나
     -- 위조해서 보낼 수 있다. 효과가 "전 클라가 파일 1개 재기록"이라 피해는
-    -- 없지만 스팸은 막는다. 샌드박스 패널 자체가 admin/moderator 권한이라
-    -- 같은 기준을 쓴다.
-    local level = player and player:getAccessLevel() or "None"
-    if level == "None" then
+    -- 없지만 스팸은 막는다. 바닐라 어드민 패널의 샌드박스 버튼과 같은 기준
+    -- (Capability.SandboxOptions, ISAdminPanelUI.lua)을 쓴다.
+    -- [B42] getAccessLevel() 은 역할 이름(소문자, 일반 유저 "user")이라 B41 의
+    -- "None" 비교는 모든 접속자를 통과시킨다.
+    local level = player and player:getAccessLevel() or "none"
+    local role = player and player:getRole()
+    if not (role and role:hasCapability(Capability.SandboxOptions)) then
         print(LOG .. "REFRESH DENIED user=" .. tostring(player and player:getUsername())
             .. " accessLevel=" .. tostring(level))
         return
