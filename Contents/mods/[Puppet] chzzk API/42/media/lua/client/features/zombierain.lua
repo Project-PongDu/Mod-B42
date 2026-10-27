@@ -343,48 +343,88 @@ Events.OnPreUIDraw.Add(drawFlights)
 
 -- ── 투하 모드: 수송기 엔진음 ─────────────────────────────────────────────────
 -- 화력지원 헬기 로터음(firesupport.lua)과 같은 방식:
---  * GameSound pongdu_airdrop_plane (loop = true, t3_rewards_sounds.txt)
 --  * 로컬 플레이어 emitter 로 로컬 재생 (네트워크 전송 없음 -- Flight 를 받은 클라가 각자 튼다)
---  * 루프는 1개만 유지하고, 볼륨은 가장 가까운 수송기와의 거리로 매 틱 갱신
---    -> 멀리서 다가와 머리 위를 지나 멀어지는 느낌
 --  * 정지는 재생한 그 emitter 로 핸들 + 이름 둘 다 (플레이어 교체 시 잔존 방지)
-local PLANE_ALIAS    = "pongdu_airdrop_plane"
-local PLANE_VOL_NEAR = 0.60     -- 머리 위 통과 시
-local PLANE_VOL_FAR  = 0.0      -- PLANE_HEAR_DIST 이상
-local PLANE_HEAR     = 90       -- 이 거리(타일)부터 들리기 시작 (경로 끝 D = 반경 + 50)
-local _planeSound, _planeEmitter = nil, nil
+-- 실제 제트 수송기 통과음에 가깝게 세 가지를 매 틱 갱신한다 (가장 크게 들리는 비행 1개 기준):
+--  1) 앞/뒤 음색 크로스페이드: 가까이 다가올수록 밝은 굉음(1~4kHz 와 지글거리는 크래클),
+--     멀어지면 저음 위주의 어두운 굉음이 된다(실녹음 레퍼런스의 접근·이탈 구간 스펙트럼).
+--     다가올 때는 pongdu_airdrop_plane(앞), 지나간 뒤에는 pongdu_airdrop_plane_rear(뒤)로
+--     넘어간다. 두 루프를 같이 틀고 볼륨만 나눈다.
+--  2) 도플러: 다가올 때 음이 높고 지나가면 낮아진다. 게임 속 비행 속도(초당 4~12칸)로는
+--     변화가 3% 남짓이라 안 들리므로, 실제 C-17 투하 속도(약 130노트 = 65 m/s)로 계산한다.
+--  3) 거리 감쇠: 고도를 포함한 3D 거리 기준 1/거리. 머리 위에서 최대, PLANE_HEAR 에서 0.
+-- 음원은 합성 루프(12초, 무이음). 사용자가 준 C-17 실녹음(32초)의 옥타브 스펙트럼을
+-- 2 dB 안팎으로 맞추고, 실녹음에서 측정한 0.6~1.7 Hz 공기 요동과 고역 크래클(첨도 약 5~6)을 넣었다.
+-- 실녹음에 뚜렷한 팬 톤(휘이잉)은 없어서 넣지 않았다. 실녹음 자체는 저작권 때문에 쓰지 않는다.
+local PLANE_ALIAS      = "pongdu_airdrop_plane"        -- 앞쪽 음색 (팬 고음 + 굉음)
+local PLANE_ALIAS_REAR = "pongdu_airdrop_plane_rear"   -- 뒤쪽 음색 (배기 굉음 + 저음)
+local PLANE_FLOORS     = 12       -- 수송기 고도 (층). 아래 PLANE_FLY_ALT 와 공용
+local PLANE_ALT_M      = PLANE_FLOORS * 2.46   -- 1 타일 = 1 m 기준 고도
+local PLANE_VOL_NEAR   = 0.60     -- 머리 위 통과 시
+local PLANE_HEAR       = 90       -- 이 거리(타일, 3D)부터 들리기 시작 (경로 끝 D = 반경 + 50)
+local SOUND_C          = 343      -- 음속 (m/s)
+local DOPPLER_V        = 65       -- 도플러 계산용 비행 속도 (m/s)
+local _planeSnd = nil   -- { em = emitter, f = 앞 핸들, r = 뒤 핸들 }
 local _planeSwept = false
 
 local function planeSoundStop(reason)
-    if _planeEmitter then
-        pcall(function() _planeEmitter:stopSound(_planeSound) end)
-        pcall(function() _planeEmitter:stopSoundByName(PLANE_ALIAS) end)
+    local s = _planeSnd
+    if s and s.em then
+        pcall(function() s.em:stopSound(s.f) end)
+        pcall(function() s.em:stopSound(s.r) end)
+        pcall(function() s.em:stopSoundByName(PLANE_ALIAS) end)
+        pcall(function() s.em:stopSoundByName(PLANE_ALIAS_REAR) end)
     end
     local pl = getSpecificPlayer(0)
-    if pl then pcall(function() pl:getEmitter():stopSoundByName(PLANE_ALIAS) end) end
-    if _planeSound then
+    if pl then
+        pcall(function() pl:getEmitter():stopSoundByName(PLANE_ALIAS) end)
+        pcall(function() pl:getEmitter():stopSoundByName(PLANE_ALIAS_REAR) end)
+    end
+    if s then
         print("[PongDuRain] airdrop plane sound stopped (" .. tostring(reason) .. ")")
     end
-    _planeSound, _planeEmitter = nil, nil
+    _planeSnd = nil
 end
 
 local function planeSoundEnsure()
-    if _planeSound then return end
+    if _planeSnd then return end
     local pl = getSpecificPlayer(0)
     if not pl then return end
     local okE, em = pcall(function() return pl:getEmitter() end)
     if not okE or not em then return end
-    local okH, h = pcall(function() return em:playSound(PLANE_ALIAS) end)
-    if not okH or not h or h == 0 then
+    local okF, hf = pcall(function() return em:playSound(PLANE_ALIAS) end)
+    local okR, hr = pcall(function() return em:playSound(PLANE_ALIAS_REAR) end)
+    if not okF or not hf or hf == 0 then hf = nil end
+    if not okR or not hr or hr == 0 then hr = nil end
+    if not hf and not hr then
         print("[PongDuRain] airdrop plane sound start FAILED")
         return
     end
-    pcall(function() em:setVolume(h, PLANE_VOL_FAR) end)
-    _planeSound, _planeEmitter = h, em
-    print("[PongDuRain] airdrop plane sound started")
+    if hf then pcall(function() em:setVolume(hf, 0) end) end
+    if hr then pcall(function() em:setVolume(hr, 0) end) end
+    _planeSnd = { em = em, f = hf, r = hr, logged = false }
+    print("[PongDuRain] airdrop plane sound started front=" .. tostring(hf ~= nil) .. " rear=" .. tostring(hr ~= nil))
 end
 
--- 매 틱: 끝난 비행 정리 + 엔진음 볼륨 갱신
+-- 비행 f 의 현재 소리 파라미터: 볼륨(0~1), 앞쪽 비율(0~1), 피치. 끝난 비행이면 nil.
+local function planeSoundParams(f, now, px, py)
+    local mx, my, k = flightState(f, now)
+    if not mx then return nil end
+    local rx, ry = px - mx, py - my                     -- 수송기 -> 플레이어
+    local d3 = math.sqrt(rx * rx + ry * ry + PLANE_ALT_M * PLANE_ALT_M)
+    local near = PLANE_ALT_M / d3
+    local edge = PLANE_ALT_M / PLANE_HEAR
+    local v = (near - edge) / (1 - edge)
+    if v < 0 then v = 0 elseif v > 1 then v = 1 end
+    v = PLANE_VOL_NEAR * v * k
+    -- 진행 방향과 플레이어 방향 사이 코사인 (3D). +1 = 정면에서 다가옴, -1 = 지나감
+    local c = (rx * f.ux + ry * f.uy) / d3
+    local front = (1 + c) / 2
+    local pitch = SOUND_C / (SOUND_C - DOPPLER_V * c)
+    return v, front, pitch
+end
+
+-- 매 틱: 끝난 비행 정리 + 엔진음 볼륨·음색·피치 갱신
 local function planeTick()
     -- 로드 직후 1회: 핫리로드로 핸들을 잃은 루프 잔존분을 이름으로 정리
     if not _planeSwept then
@@ -392,10 +432,11 @@ local function planeTick()
         if pl then
             _planeSwept = true
             pcall(function() pl:getEmitter():stopSoundByName(PLANE_ALIAS) end)
+            pcall(function() pl:getEmitter():stopSoundByName(PLANE_ALIAS_REAR) end)
         end
     end
     if #_flights == 0 then
-        if _planeSound then planeSoundStop("no flight") end
+        if _planeSnd then planeSoundStop("no flight") end
         return
     end
     local now = getTimestampMs()
@@ -405,27 +446,37 @@ local function planeTick()
     local pl = getSpecificPlayer(0)
     local px, py = 0, 0
     if pl then px, py = pl:getX(), pl:getY() end
-    local best = nil
+    local bv, bfront, bpitch = nil, 0.5, 1
     for i = #_flights, 1, -1 do
-        local mx, my, k = flightState(_flights[i], now)
-        if not mx then
+        local v, front, pitch = planeSoundParams(_flights[i], now, px, py)
+        if not v then
             table.remove(_flights, i)
             print("[PongDuRain] airdrop shadow done")
-        else
-            local dx, dy = mx - px, my - py
-            local v = 1 - math.sqrt(dx * dx + dy * dy) / PLANE_HEAR
-            if v < 0 then v = 0 end
-            v = (PLANE_VOL_FAR + (PLANE_VOL_NEAR - PLANE_VOL_FAR) * v) * k
-            if not best or v > best then best = v end
+        elseif not bv or v > bv then
+            bv, bfront, bpitch = v, front, pitch
         end
     end
-    if not best then
-        if _planeSound then planeSoundStop("flights done") end
+    if not bv then
+        if _planeSnd then planeSoundStop("flights done") end
         return
     end
     planeSoundEnsure()
-    if _planeSound and _planeEmitter then
-        pcall(function() _planeEmitter:setVolume(_planeSound, best) end)
+    local s = _planeSnd
+    if not s then return end
+    -- 등전력 크로스페이드 (합친 크기가 중간에 꺼지지 않게)
+    local vf = bv * math.sqrt(bfront)
+    local vr = bv * math.sqrt(1 - bfront)
+    if s.f then
+        pcall(function() s.em:setVolume(s.f, vf) end)
+        pcall(function() s.em:setPitch(s.f, bpitch) end)
+    end
+    if s.r then
+        pcall(function() s.em:setVolume(s.r, vr) end)
+        pcall(function() s.em:setPitch(s.r, bpitch) end)
+    end
+    if not s.logged and bv > 0.3 then
+        s.logged = true
+        print(string.format("[PongDuRain] airdrop plane sound near vol=%.2f front=%.2f pitch=%.3f", bv, bfront, bpitch))
     end
 end
 Events.OnTick.Add(planeTick)
@@ -441,7 +492,7 @@ Events.OnTick.Add(planeTick)
 -- 고정 아이소 시점이라 1층 올릴 때마다 기체가 화면에서 지면 6칸만큼 위로 밀린다
 -- (IsoUtils.YToScreen: 층당 96, 타일당 16). 더 올리면 기체가 화면에 들어오는 경로가 줄어든다.
 local PLANE_SCRIPT   = "Base.PongDuC17"
-local PLANE_FLY_ALT  = 12 * 2.46
+local PLANE_FLY_ALT  = PLANE_FLOORS * 2.46   -- PLANE_FLOORS 는 엔진음 절에서 정의
 local PLANE_YAW_OFF  = 0        -- fbx 기수 방향 보정(도). 기수가 거꾸로 보이면 180
 local _planes = {}              -- [vid] = { pilot, ax, ay, bx, by, frac0, dur, f1, t0, amPilot }
 

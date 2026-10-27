@@ -808,12 +808,12 @@ option PongDu.Rain_Style = {
 }
 
 option PongDu.Rain_Radius = {
-    type = integer, min = 3, max = 50, default = 20,
+    type = integer, min = 3, max = 50, default = 10,
     page = PongDu_Debuff, translation = PongDu_Rain_Radius,
 }
 
 option PongDu.Rain_Duration = {
-    type = integer, min = 5, max = 120, default = 30,
+    type = integer, min = 5, max = 120, default = 10,
     page = PongDu_Debuff, translation = PongDu_Rain_Duration,
 }
 

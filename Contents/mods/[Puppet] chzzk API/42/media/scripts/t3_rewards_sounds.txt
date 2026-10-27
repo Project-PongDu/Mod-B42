@@ -184,8 +184,10 @@ module Base
     }
 
     /* 좀비 공습 - 수송기 투하 방식의 엔진음. 헬기 로터음과 같은 이유로 loop = true.
-       재생/정지와 거리 볼륨은 features/zombierain.lua가 emitter 핸들로 관리.
-       airdrop_plane.wav는 합성 임시 음원(6초 무이음 루프) -- 교체 시 파일명만 유지. */
+       재생/정지와 볼륨·피치는 features/zombierain.lua가 emitter 핸들로 관리.
+       앞(airdrop_plane.wav: 접근·통과 때의 밝은 굉음 + 크래클)과 뒤(airdrop_plane_rear.wav:
+       멀어질 때의 어두운 저음 굉음)를 같이 틀고, 다가오는지 지나갔는지에 따라 볼륨을 나눈다.
+       둘 다 C-17 실녹음 스펙트럼에 맞춘 합성 음원(12초 무이음 루프) -- 교체 시 파일명만 유지. */
     sound pongdu_airdrop_plane
     {
         category = Object,
@@ -193,6 +195,17 @@ module Base
         clip
         {
             file = media/sound/airdrop_plane.wav,
+            volume = 0.5,
+        }
+    }
+
+    sound pongdu_airdrop_plane_rear
+    {
+        category = Object,
+        loop = true,
+        clip
+        {
+            file = media/sound/airdrop_plane_rear.wav,
             volume = 0.5,
         }
     }
