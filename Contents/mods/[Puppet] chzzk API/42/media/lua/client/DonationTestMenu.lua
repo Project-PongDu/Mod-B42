@@ -186,8 +186,14 @@ end
 -- utils/labelKey.resolve 가 전담한다 (예전엔 폭격 분기가 여기 복사돼 있었다).
 local function displayLabel(featureId)
     local key = labelKey.resolve(featureId)
-    if key then return getText(key) end
-    return featureId
+    if not key then return featureId end
+    -- IGUI_donation_sprinter 는 "뛰좀 %1마리!" 라 인자 없이 부르면 Translator 가
+    -- MissingFormatArgumentException 경고를 남긴다(2026-10-27 로그). 큐박스 라벨
+    -- (DonationReceiver.donationTextArg)과 같은 값을 넘긴다.
+    if featureId == "sprinter5" then
+        return getText(key, tostring(SandboxVars.PongDu.Sprinter_Count))
+    end
+    return getText(key)
 end
 
 -- ── 메뉴 노출 권한 ───────────────────────────────────────────────────────────

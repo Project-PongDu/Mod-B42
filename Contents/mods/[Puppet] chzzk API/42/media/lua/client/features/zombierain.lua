@@ -466,13 +466,21 @@ local function planeTick()
     -- 등전력 크로스페이드 (합친 크기가 중간에 꺼지지 않게)
     local vf = bv * math.sqrt(bfront)
     local vr = bv * math.sqrt(1 - bfront)
-    if s.f then
-        pcall(function() s.em:setVolume(s.f, vf) end)
-        pcall(function() s.em:setPitch(s.f, bpitch) end)
+    -- 값이 실제로 바뀔 때만 보낸다. 엔진이 setPitch 마다 "Set pitch for Instance" 를
+    -- 로그에 남겨 매 틱 호출하면 한 세션에 7천 줄이 쌓였다(2026-10-27 로그). 들리는 차이가
+    -- 없는 범위(피치 0.3%, 볼륨 0.005)는 건너뛴다.
+    if not s.p or math.abs(bpitch - s.p) >= 0.003 then
+        s.p = bpitch
+        if s.f then pcall(function() s.em:setPitch(s.f, bpitch) end) end
+        if s.r then pcall(function() s.em:setPitch(s.r, bpitch) end) end
     end
-    if s.r then
+    if s.f and (not s.vf or math.abs(vf - s.vf) >= 0.005) then
+        s.vf = vf
+        pcall(function() s.em:setVolume(s.f, vf) end)
+    end
+    if s.r and (not s.vr or math.abs(vr - s.vr) >= 0.005) then
+        s.vr = vr
         pcall(function() s.em:setVolume(s.r, vr) end)
-        pcall(function() s.em:setPitch(s.r, bpitch) end)
     end
     if not s.logged and bv > 0.3 then
         s.logged = true
