@@ -18,7 +18,7 @@ local mutantspawn = require("features/mutantspawn")
 --  ③ 남은시간 UI: 폭격 타이머와 동일 스타일의 30초 카운트다운 패널
 --  ④ 낙하 처리: 서버 RainMark(zedId+종류)를 받아 공중에 있는 동안
 --     - 소유 클라: 낙하 속도(lastFallSpeed)를 매 틱 직접 정한다 (아래 낙하 속도 절).
---       낙하산은 데미지 없이 사뿐히, 자유낙하는 넘어짐 연출만 남긴다
+--       낙하산은 데미지 없이 사뿐히, 자유낙하도 바닥 1층 위부터 감속해 데미지·넘어짐 없이 착지
 --     - 전 클라: 바라보는 방향 고정 (플레이어 쪽으로 돌며 낙하산이 회전하는 것 방지)
 --     - 전 클라: 낙하 자세 고정 (아래 낙하 애니메이션 절)
 --     - 낙하산 연출이면 낙하산 부착 + 감속 (아래 Rain_Parachute 절)
@@ -131,13 +131,23 @@ local PARA_ITEM      = "t3chzzkDonation.PongDuZombieParachute"
 local PARA_CLOTHING  = "PongDu_ZombieParachute"
 local PARA_DESCENT   = 1.2      -- 낙하산 하강 속도 (층/초). 4층에서 약 3.3초.
                                 -- lastFallSpeed 로도 쓴다: 2.24(데미지 기준) 미만이라 착지 데미지·넘어짐 없음
--- 자유낙하 속도 상한 (층/초). 3.87(넘어짐 기준) 이상 5.00(기어다니는 좀비 기준) 미만으로
--- 둬서 넘어짐/죽은척 연출만 남긴다. 이 구간의 데미지(약 0.5 x 샌드박스 배율)는 착지 직후
--- 공중에서 기록한 체력으로 되돌린다 -- 체력은 서버 설정 그대로 둔다는 원칙.
-local FREE_FALL_CAP  = 4.2
+-- 자유낙하 속도 상한 (층/초). 공중에서 보이는 낙하 속도만 정한다.
+-- 예전엔 이 값 그대로 착지시켜 넘어짐 연출을 남겼는데, 착지 속도 3.87 이상이면
+-- IsoZombie.handleLandingImpact 가 50% 확률로 setFakeDead(true) 를 건다. 죽은척 좀비는
+-- ZombieOnGroundState 에서 isFakeDead 동안 일어나지 않아 "시체처럼 굳은 좀비"가 됐다
+-- (시체가 아니라 파밍 인벤토리도 안 뜨고, 좀비 삭제로만 지워짐. 2026-10-27 제보).
+-- 그래서 바닥 FREE_FALL_BRAKE_H 층 위부터는 LAND_SPEED 로 감속해 착지 속도를
+-- noDamageThreshold(약 2.24, FallingConstants: 0.5층 낙하 속도) 아래로 맞춘다
+-- -> isDamagingFall=false -> 데미지·넘어짐·죽은척 전부 없음.
+local FREE_FALL_CAP    = 4.2
+local FREE_FALL_BRAKE_H = 1.0   -- 바닥에서 이 높이(층)부터 감속
+-- 착지 속도. updateFalling 이 착지 틱에 중력분(5.0 x dt)을 한 번 더하므로
+-- 10fps(dt 0.1)에서도 1.2 + 0.5 = 1.7 < 2.24 로 여유가 있다.
+local LAND_SPEED       = PARA_DESCENT
 local LAND_LOG_MAX   = 3        -- 공습 1회당 체력 원복 상세 로그 상한
 local _landLogLeft   = LAND_LOG_MAX
 local _landRestored  = 0
+local _landFakeDeadCleared = 0
 
 -- 공중 수평 위치 고정 (소유 클라). 스폰 직후 좀비는 플레이어를 노리며(setTarget/lunger)
 -- 걷는 상태인데, 방향 고정 때문에 처음 바라본 무작위 방향으로 공중에서 계속 걸어
@@ -538,9 +548,11 @@ local function paraStatsFlush()
     if _fallAnimCount > 0 then
         print("[PongDuRain] fall anim summary set=" .. _fallAnimCount
             .. " landHpRestored=" .. _landRestored
+            .. " fakeDeadCleared=" .. _landFakeDeadCleared
             .. " landed=" .. _landCount .. " landOutsideRadius=" .. _landOutside
             .. string.format(" landMaxDist=%.1f", _landMaxDist))
         _landRestored    = 0
+        _landFakeDeadCleared = 0
         _landCount       = 0
         _landOutside     = 0
         _landMaxDist     = 0
@@ -626,8 +638,16 @@ local function onTick()
                             z:setForceX(p.ax)
                             z:setForceY(p.ay)
                         end
-                        if usePara then
-                            z:setLastFallSpeed(PARA_DESCENT)
+                    end
+                    -- 낙하 속도 (전 클라). 착지 판정(updateFalling -> DoLand)은 각 클라가 자기
+                    -- lastFallSpeed 로 로컬에서 하므로 원격 좀비도 같이 묶어야 그 클라에서 안 넘어진다.
+                    if usePara then
+                        z:setLastFallSpeed(PARA_DESCENT)
+                    else
+                        local h = zz
+                        pcall(function() h = z:getHeightAboveFloor() end)
+                        if h < FREE_FALL_BRAKE_H then
+                            if z:getLastFallSpeed() > LAND_SPEED then z:setLastFallSpeed(LAND_SPEED) end
                         elseif z:getLastFallSpeed() > FREE_FALL_CAP then
                             z:setLastFallSpeed(FREE_FALL_CAP)
                         end
@@ -681,7 +701,15 @@ local function onTick()
                             end
                         end
                     end
-                    -- 자유낙하 넘어짐 구간의 착지 데미지 원복 (소유 클라, FREE_FALL_CAP 참고)
+                    -- 안전망: 그래도 죽은척이 걸렸으면 푼다 (전 클라). fakeDead 가 꺼지면
+                    -- ZombieOnGroundState 가 바닐라 경로로 일으켜 세운다.
+                    if not z:isDead() and z:isFakeDead() then
+                        z:setFakeDead(false)
+                        _landFakeDeadCleared = _landFakeDeadCleared + 1
+                        print(string.format("[PongDuRain] WARN fake-dead cleared on landing zid=%d para=%s remote=%s",
+                            id, tostring(p.para), tostring(PongDuZombieId.IsRemote(z))))
+                    end
+                    -- 착지 데미지 원복 안전망 (소유 클라, FREE_FALL_CAP 참고)
                     if p.hp and not z:isDead() and not PongDuZombieId.IsRemote(z)
                         and z:getHealth() < p.hp then
                         if _landLogLeft > 0 then
