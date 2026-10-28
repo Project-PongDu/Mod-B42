@@ -1226,6 +1226,11 @@ DOServer["PongDuBombard"]["Kaboom"] = function(player, data)
     local e  = player:getCell()
     local r  = tonumber(data["r"]) or 80
     -- Burn walls and floors in radius.
+    -- [B42] BurnWalls(explode, recursive) 2인자다(IsoGridSquare.java:6298). B41 의 1인자 호출은
+    -- "expected 2 arguments" 예외로 Kaboom 전체를 끊었다. recursive=false 는 B41 처럼 칸 위
+    -- 오브젝트 개별 연소(handleBurning / safelyBurnTileObjectFromSquare)를 하지 않는다.
+    -- 이 구간이 예외로 끊기면 아래 차량 파괴·폭발 부상까지 통째로 안 돌므로 pcall 로 감싼다.
+    local okBurn, errBurn = pcall(function()
     for floor = 0, 1 do
         for dy = -r, r do
             for dx = -r, r do
@@ -1235,7 +1240,7 @@ DOServer["PongDuBombard"]["Kaboom"] = function(player, data)
                 if dist < r then
                     local sq = e:getGridSquare(wx, wy, floor)
                     if sq then
-                        if floor == 0 and ZombRand(100) < 80 then sq:BurnWalls(false) end   -- 바닥 탈 확률: 80%
+                        if floor == 0 and ZombRand(100) < 80 then sq:BurnWalls(false, false) end   -- 바닥 탈 확률: 80%
                         if ZombRand(100) < 50 and sq:isFree(false) then                     -- 바닥 잿더미 확률: 50%
                             local obj = IsoObject.new(sq, "floors_burnt_01_1", "")
                             -- transmitAddObjectToSquare가 로컬 추가(AddTileObject)와 클라 전파를
@@ -1249,6 +1254,8 @@ DOServer["PongDuBombard"]["Kaboom"] = function(player, data)
             end
         end
     end
+    end)
+    if not okBurn then srvlog("Kaboom burn ERROR: " .. tostring(errBurn)) end
     -- 반경 내 차량 고철화. 샌드박스에서 끌 수 있다(기본 켜짐).
     if SandboxVars.PongDu.Bombard_VehicleDamage then
         local okv, errv = pcall(function() wreckVehiclesAround(e, cx, cy, r) end)
