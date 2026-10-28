@@ -244,10 +244,24 @@ local TRACER_ALPHA      = 0.90   -- 기본(저격/헬기): 진한 흰색
 local TRACER_ALPHA_FAINT = 0.14  -- 히트맨 예광탄과 동일한 옅은 알파(드론용)
 
 local _tracers = {}
+local TRACER_PX_PER_M = 86.7  -- 고도 px <-> 물리 고도(m). HELI_ALT_PX_PER_UNIT 와 같은 값
 
 -- oalt : 원점 고도(px). 생략 시 저격수 고도(ORIGIN_ALT). 헬기는 더 높은 값을 준다.
 -- alpha: 선 알파. 생략 시 TRACER_ALPHA(0.90, 진한 흰색). 드론만 옅게 쏜다.
-local function addTracer(ox, oy, oz, tx, ty, tz, oalt, alpha)
+-- src  : 발사원 "heli" | "drone" | "sniper"(생략 시). Viewpoint 호환 모드가 3D 예광탄을
+--        그릴 때 기체 몸통을 피할 원점 오프셋을 고르는 데 쓴다.
+-- [Viewpoint] 1·3인칭이면 2D 선을 쌓지 않고 호환 모드 훅(PongDuVPHook.tracer)에 넘긴다.
+-- 훅이 없으면(호환 모드 미설치) 아무것도 그리지 않는다 -- 2D 선은 3D 화면과 어긋난다.
+local function addTracer(ox, oy, oz, tx, ty, tz, oalt, alpha, src)
+    if tracerView.isPerspective() then
+        local hook = PongDuVPHook
+        if hook and hook.tracer then
+            local ok, err = pcall(hook.tracer, src or "sniper", ox, oy, oz,
+                (oalt or ORIGIN_ALT) / TRACER_PX_PER_M, tx, ty, tz)
+            if not ok then print("[PongDu][FireSupport] viewpoint tracer hook error: " .. tostring(err)) end
+        end
+        return
+    end
     _tracers[#_tracers + 1] = {
         ox = ox, oy = oy, oz = oz,
         tx = tx, ty = ty, tz = tz,
@@ -1767,7 +1781,7 @@ local function heliShotPlay(own, ox, oy, oz, sh)
         local px2, py2 = heliCurPos(h)
         if px2 then ox, oy = px2, py2 end
     end
-    addTracer(ox, oy, oz, tx, ty, tz, HELI_ALT)
+    addTracer(ox, oy, oz, tx, ty, tz, HELI_ALT, nil, "heli")
     -- 총성은 pongdu_heli_lmg 루프가 교전 내내 재생 중이라 발당 트리거 없음.
     fsApplyShot(z, id, fsShotHp("heli", tonumber(sh.crit) == 1), tonumber(sh.crit) == 1, false, "heli", own)
 end
@@ -1783,7 +1797,7 @@ local function droneShotPlay(own, ox, oy, oz, sh)
     local z = id and findZombieById(id) or nil
     local tx, ty, tz = tonumber(sh.tx) or 0, tonumber(sh.ty) or 0, tonumber(sh.tz) or 0
     if z then tx, ty, tz = z:getX(), z:getY(), z:getZ() end
-    addTracer(ox, oy, oz, tx, ty, tz, DRONE_ALT_PX, TRACER_ALPHA_FAINT)
+    addTracer(ox, oy, oz, tx, ty, tz, DRONE_ALT_PX, TRACER_ALPHA_FAINT, "drone")
     if not z or z:isDead() then return end
     local crit = tonumber(sh.crit) == 1
     local kd   = (not crit) and tonumber(sh.kd) == 1
@@ -1970,7 +1984,7 @@ local function heliFireTick(h, now)
         local crit = ZombRand(100) < h.kc
         local id = z:getOnlineID()
         local tx, ty, tz = z:getX(), z:getY(), z:getZ()
-        addTracer(ox, oy, oz, tx, ty, tz, HELI_ALT)
+        addTracer(ox, oy, oz, tx, ty, tz, HELI_ALT, nil, "heli")
         -- 로컬 즉시 적용. 다른 클라 소유 좀비면 연출만 되고 데미지는 중계를
         -- 받은 소유 클라가 넣는다(fsApplyShot 참조).
         fsApplyShot(z, id, fsShotHp("heli", crit), crit, false, "heli", h.own)
@@ -2160,7 +2174,7 @@ local function droneFireTick(d, now)
 
         -- 로컬 즉시 적용(서버 왕복 없음). 원격 소유 좀비면 연출만 되고
         -- 데미지는 중계를 받은 소유 클라가 넣는다(fsApplyShot 참조).
-        addTracer(ox, oy, oz, z:getX(), z:getY(), z:getZ(), DRONE_ALT_PX, TRACER_ALPHA_FAINT)
+        addTracer(ox, oy, oz, z:getX(), z:getY(), z:getZ(), DRONE_ALT_PX, TRACER_ALPHA_FAINT, "drone")
         fsApplyShot(z, id, fsShotHp("drone", crit), crit, kd, "drone", d.own)
 
         if crit or kd or remote then

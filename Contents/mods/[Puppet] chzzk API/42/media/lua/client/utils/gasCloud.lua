@@ -170,6 +170,16 @@ function _gas.spawn(x, y, z, featureId, radius, durationMs)
         .. " puffs=" .. tostring(n) .. " place=" .. tostring(math.floor(place * 10) / 10)
         .. " puffSize=" .. tostring(math.floor(puffSize * 10) / 10)
         .. " spreadMs=" .. tostring(math.floor(spread)))
+
+    -- [Viewpoint] 1·3인칭 3D 연막은 호환 모드(t3chzzkDonationB42_ViewpointComp)가 맡는다.
+    -- 시점과 무관하게 매번 넘긴다 -- 아이소에서 발동한 뒤 1·3인칭으로 바꿔도 남은 시간만큼
+    -- 그릴 수 있게 하려는 것. 훅이 없으면(호환 모드 미설치) 아무 일도 없다.
+    local hook = PongDuVPHook
+    if hook and hook.gasSpawn then
+        local c = _clouds[#_clouds]
+        local ok, err = pcall(hook.gasSpawn, x, y, tonumber(z) or 0, r, dur, c.tr, c.tg, c.tb)
+        if not ok then print("[PongDu][Gas] viewpoint gas hook error: " .. tostring(err)) end
+    end
 end
 
 -- ── 렌더 ──────────────────────────────────────────────────────────────────

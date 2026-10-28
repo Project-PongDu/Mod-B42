@@ -47,4 +47,8 @@ function M.isPerspective()
     return M.mode() ~= "isometric"
 end
 
+-- 호환 모드(t3chzzkDonationB42_ViewpointComp)가 같은 판정을 쓰도록 전역으로도 둔다.
+-- require 로 이 파일을 다른 모드에서 다시 불러 감지 상태를 둘로 나누지 않게 하기 위함.
+PongDuViewpointView = M
+
 return M
