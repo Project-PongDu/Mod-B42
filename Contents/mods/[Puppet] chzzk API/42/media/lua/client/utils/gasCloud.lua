@@ -1,6 +1,7 @@
 local _gas = {}
 
 local colorMap = require("utils/colorMap")
+local vpView = require("utils/viewpointView")
 
 -- ═══════════════════════════════════════════════════════════════════════════
 --  바닥 가스 확산 연출  [leaf 모듈 -- features/ 를 require 하지 않는다]
@@ -200,8 +201,20 @@ local function onTick()
 end
 Events.OnTick.Add(onTick)
 
+-- [Viewpoint] 1·3인칭(Viewpoint 3D 시점)에서는 그리지 않는다. 아이소 화면 좌표로 그린 2D 퍼프가
+-- 3D 화면 위에 그대로 덮여 그려진다(Viewpoint 는 isoToScreenX/Y 를 바꾸지 않는다).
+-- 소산된 구름 정리는 아이소로 돌아왔을 때 아래 루프에서 한다. utils/viewpointView.lua 참고.
+local _hiddenLogged = false
 local function drawClouds()
     if #_clouds == 0 then return end
+    if vpView.isPerspective() then
+        if not _hiddenLogged then
+            _hiddenLogged = true
+            print("[PongDu][Gas] cloud hidden (viewpoint " .. vpView.mode() .. " view) clouds=" .. #_clouds)
+        end
+        return
+    end
+    _hiddenLogged = false
 
     local now = getTimestampMs()
     if _lastTickAt and now - _lastTickAt > PAUSE_GAP_MS then now = _lastTickAt end

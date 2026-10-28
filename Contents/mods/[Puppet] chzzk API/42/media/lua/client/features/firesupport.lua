@@ -235,6 +235,7 @@ end
 -- ═══════════════════════════════════════════════════════════════════════════
 
 local TRACER_TEX  = getTexture("media/textures/mask_white.png")
+local tracerView  = require("utils/viewpointView")
 local TRACER_STEP = 0.16      -- 프레임당 진행률 (1/0.16 = 약 7프레임에 도달)
 local TRACER_SEG  = 0.20      -- 그려지는 선분 길이 (진행률 단위)
 local ORIGIN_ALT  = 95        -- 원점 고도(px). PZ엔 3D가 없어 스크린 Y로 위조한다
@@ -254,10 +255,22 @@ local function addTracer(ox, oy, oz, tx, ty, tz, oalt, alpha)
     }
 end
 
+-- [Viewpoint] 1·3인칭(Viewpoint 3D 시점)에서는 그리지 않고 쌓인 예광탄을 버린다. 아이소 화면
+-- 좌표(ISCoordConversion.ToScreen)로 그린 선이 3D 화면과 어긋난다. utils/viewpointView.lua 참고.
+local _tracerHiddenLogged = false
 local function drawTracers()
     if #_tracers == 0 then return end
     if isServer() then return end
     if not isIngameState() then return end
+    if tracerView.isPerspective() then
+        if not _tracerHiddenLogged then
+            _tracerHiddenLogged = true
+            print("[PongDu][FireSupport] tracers hidden (viewpoint " .. tracerView.mode() .. " view)")
+        end
+        _tracers = {}
+        return
+    end
+    _tracerHiddenLogged = false
 
     local zoom = getCore():getZoom(0)
     if not zoom or zoom == 0 then return end
