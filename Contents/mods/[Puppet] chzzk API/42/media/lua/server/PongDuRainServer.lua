@@ -67,16 +67,17 @@ local STYLE_NAMES   = { [STYLE_RAIN] = "rain", [STYLE_AIRDROP] = "airdrop" }
 --   D = 투하 반경 + AIR_PATH_EXTRA -> 시작/소멸이 화면 밖. 지터 때문에 머리 위가
 --   아니라 근처(최대 약 0.26D)를 스치듯 지나가기도 한다.
 -- 수송기는 A 에 도달하기 전·B 를 지난 뒤에도 같은 속도로 난다: 비행 경로는 AB 를 양쪽으로
--- AB 길이만큼 늘인 A' -> B' (A' A B B' 순, 각 구간 길이 같음)이고, PREP_DELAY_MS 시점에 A',
--- 그로부터 지속시간 뒤 A, 다시 지속시간 뒤 B, 다시 지속시간 뒤 B' 에 도달한다.
--- 좀비 투하는 여전히 A -> B 구간(가운데 1/3)에서만 한다. 클라에는 Flight 로 A'/B' 와
--- 지속시간 x3 을 보내 그림자·엔진음이 A' -> B' 를 따라가게 한다.
+-- AB 길이 x (AIR_PATH_SCALE - 1) / 2 만큼 늘인 A' -> B' (A' A B B' 순)이다.
+-- 지속시간 설정값 = A' -> B' 체공 시간. PREP_DELAY_MS 시점에 A' 에서 나타나 지속시간 끝에 B' 에서
+-- 사라진다. 좀비 투하는 A -> B 구간(가운데 1/AIR_PATH_SCALE)에서만 한다.
+-- 예: AIR_PATH_SCALE 2, 지속 10초 -> 0~2.5초 접근, 2.5~7.5초 투하, 7.5~10초 이탈.
+-- 클라에는 Flight 로 A'/B' 와 체공 시간을 보내 그림자·엔진음이 A' -> B' 를 따라가게 한다.
 -- 각 좀비는 스폰 시각 t의 수송기 위치 P(t)를 중심으로 투하 반경(r) 원 안에 떨어진다
 -- (그림자가 움직이면 투하 범위도 같이 움직인다). 스퀘어 선행 생성(Prep) 때문에
 -- 시각과 위치는 Start 시점에 전부 미리 정한다. 그림자는 클라가 Flight로 그린다.
 local AIR_PATH_EXTRA     = 50                               -- 헬기와 동일 (D = r + 50)
 local AIR_JITTER         = 0.52                             -- B 각도 지터 (rad, 약 ±30도)
-local AIR_PATH_SCALE     = 3                                -- 비행 경로 A'B' = AB x 이 값 (투하는 AB 만)
+local AIR_PATH_SCALE     = 2                                -- 비행 경로 A'B' = AB x 이 값 (투하는 AB 만)
 
 local _sessions = {}
 
