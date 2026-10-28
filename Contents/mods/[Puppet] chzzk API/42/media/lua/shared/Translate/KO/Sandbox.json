@@ -227,7 +227,7 @@
     "Sandbox_PongDu_Rain_Duration": "좀비 공습 지속시간 (초)",
     "Sandbox_PongDu_Rain_Duration_tooltip": "첫 좀비부터 마지막 좀비가 떨어질 때까지 시간.",
     "Sandbox_PongDu_Rain_Parachute": "낙하산 연출",
-    "Sandbox_PongDu_Rain_Parachute_tooltip": "켜면 낙하산을 메고 천천히 내려옴 (초당 약 1.2층. 좀비 레인 7층 약 6초, 좀비 공중투하 19층 약 16초). 착지·사망 시 낙하산은 사라지고 남지 않음.",
+    "Sandbox_PongDu_Rain_Parachute_tooltip": "켜면 낙하산을 메고 천천히 내려옴 (초당 약 2.4층. 좀비 레인 7층 약 3초, 좀비 공중투하 19층 약 8초). 착지·사망 시 낙하산은 사라지고 남지 않음.",
     "Sandbox_PongDu_Rain_Count_Normal": "좀비 공습 마리수: 일반 좀비",
     "Sandbox_PongDu_Rain_Count_Normal_tooltip": "1회에 떨어지는 일반 좀비 수. 0 = 없음. 전 종류 합계 최대 500 (넘으면 비율대로 자름). 발동당 빈 스퀘어가 (합계×7)개 남으니 큰 값은 부하 확인 후.",
     "Sandbox_PongDu_Rain_Count_Sprinter": "좀비 공습 마리수: 스프린터",

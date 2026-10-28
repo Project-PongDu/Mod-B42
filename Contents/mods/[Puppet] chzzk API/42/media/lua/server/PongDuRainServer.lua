@@ -43,7 +43,7 @@ local RAIN_KINDS = { "normal", "sprinter", "screamer", "brute", "roach", "tracer
 local RAIN_DROP_Z        = 7                                -- 좀비 레인 낙하 시작 높이 (층)
 -- 수송기 투하 낙하 시작 높이 (층). 수송기 고도(클라 zombierain.lua PLANE_FLOORS = 20층) 바로 아래라
 -- 화면에서 좀비가 기체 배 밑에서 떨어져 나온다. 스퀘어 상한은 31층(IsoChunkMap.TOP_LEVEL)이라 19층 생성 가능.
--- 대가: 낙하산 하강 시간 약 16초(1.2층/초). 스퀘어는 층수와 무관하게 클라 컬럼당 1칸.
+-- 대가: 낙하산 하강 시간 약 8초(2.4층/초, 클라 zombierain.lua PARA_DESCENT). 스퀘어는 층수와 무관하게 클라 컬럼당 1칸.
 local AIRDROP_DROP_Z     = 19
 local RAIN_MIN_DIST      = 3                                -- 플레이어 직격 방지 최소 거리
 local SPAWN_CAP_PER_TICK = 5                                -- 랙 스파이크 후 몰아치기 상한

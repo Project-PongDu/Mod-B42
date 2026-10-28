@@ -190,6 +190,123 @@ end
 local PAUSE_GAP_MS = 500
 local _lastTickAt  = nil
 
+-- ── [Viewpoint] 1·3인칭 연막 (안개 채널) ─────────────────────────────────────
+-- Viewpoint 3D 시점에선 2D 퍼프를 그릴 수 없다(아이소 화면 좌표, drawClouds 주석). 대신
+-- 기후 안개 강도(ClimateManager FLOAT_FOG_INTENSITY)를 이 클라에서만 올린다. Viewpoint 는
+-- 자체 대기 렌더(Atmosphere)가 ClimateManager.getFogIntensity()(= fogIntensity.finalValue)를
+-- 읽으므로 3D 화면에 실제 옅은 연막으로 보인다. 플레이어가 구름 반경 안이면 최대,
+-- 반경 밖 HAZE_EDGE 칸에 걸쳐 옅어진다(구름 소산·등장 계수도 곱함). 아이소 시점에선 쓰지 않는다
+-- (2D 퍼프가 그려지고, 안개는 아이소 화면 전체를 덮기 때문).
+-- MP/SP 쓰기 방식은 블러드문(shared/PongDuBloodMoonLight.lua applyFxMP/applyFxSP)과 같다.
+-- 블러드문이 켜져 있으면 같은 채널을 쓰므로 연막은 건너뛴다.
+local FLOAT_FOG_INTENSITY = 5
+local HAZE_FOG_PEAK = 0.55     -- 구름 한가운데 안개 강도 (0~1)
+local HAZE_EDGE     = 10       -- 반경 밖으로 이 거리(타일)에 걸쳐 0 까지 옅어짐
+local HAZE_IN_MS    = 800      -- 발동 후 연막이 차오르는 시간
+local _haze = { on = false, base = nil, written = nil, logK = -1 }
+
+local function fogFloat()
+    local cm = getClimateManager()
+    if not cm then return nil end
+    return cm:getClimateFloat(FLOAT_FOG_INTENSITY)
+end
+
+local function hazeK(now, px, py)
+    local best = 0
+    for i = 1, #_clouds do
+        local c = _clouds[i]
+        local age = now - c.t0
+        if age >= 0 and age < c.dur then
+            local dx, dy = px - c.x, py - c.y
+            local d = math.sqrt(dx * dx + dy * dy)
+            local kd = 0
+            if d <= c.r then
+                kd = 1
+            elseif d < c.r + HAZE_EDGE then
+                kd = 1 - (d - c.r) / HAZE_EDGE
+            end
+            local kin = age / HAZE_IN_MS
+            if kin > 1 then kin = 1 end
+            local gk = 1
+            local left = c.dur - age
+            if left < c.fade then gk = left / c.fade end
+            local k = kd * kin * gk
+            if k > best then best = k end
+        end
+    end
+    return best
+end
+
+local function hazeApply(k)
+    local cf = fogFloat()
+    if not cf then return end
+    local target
+    if isClient() then
+        local cur = cf:getOverride()
+        if _haze.written == nil or cur ~= _haze.written then _haze.base = cur end
+        local base = _haze.base or 0
+        target = base + (HAZE_FOG_PEAK - base) * k
+        if target < base then target = base end
+        cf:setOverride(target, cf:getOverrideInterpolate())
+        _haze.written = cf:getOverride()
+        cf:setFinalValue(target)
+    else
+        local base = cf:getInternalValue()
+        target = base + (HAZE_FOG_PEAK - base) * k
+        if target < base then target = base end
+        cf:setOverride(target, 1.0)
+    end
+    if not _haze.on then
+        print(string.format("[PongDu][Gas] viewpoint haze on (fog base=%.2f target=%.2f k=%.2f)",
+            _haze.base or cf:getInternalValue(), target, k))
+    end
+    _haze.on = true
+end
+
+local function hazeClear(reason)
+    if not _haze.on then return end
+    local cf = fogFloat()
+    if cf then
+        if isClient() then
+            if _haze.base then
+                cf:setOverride(_haze.base, cf:getOverrideInterpolate())
+                cf:setFinalValue(_haze.base)
+            end
+        else
+            pcall(function() cf:setEnableOverride(false) end)
+        end
+    end
+    _haze.on, _haze.base, _haze.written = false, nil, nil
+    print("[PongDu][Gas] viewpoint haze off (" .. tostring(reason) .. ")")
+end
+
+local function hazeTick(now)
+    if #_clouds == 0 then
+        hazeClear("no cloud")
+        return
+    end
+    -- 아이소에서는 2D 퍼프 쪽에서 소산된 구름을 지우지만, 3D 시점에선 그리기를 건너뛰므로 여기서 지운다
+    for ci = #_clouds, 1, -1 do
+        if now - _clouds[ci].t0 >= _clouds[ci].dur then table.remove(_clouds, ci) end
+    end
+    if not vpView.isPerspective() then
+        hazeClear("isometric view")
+        return
+    end
+    if PongDuBloodMoonLight and PongDuBloodMoonLight.isArmed and PongDuBloodMoonLight.isArmed() then
+        hazeClear("blood moon owns fog")
+        return
+    end
+    local pl = getSpecificPlayer(0)
+    if not pl then return end
+    local k = hazeK(now, pl:getX(), pl:getY())
+    if k <= 0 then
+        hazeClear("outside cloud")
+    else
+        hazeApply(k)
+    end
+end
+
 local function onTick()
     local now = getTimestampMs()
     local gap = _lastTickAt and (now - _lastTickAt) or 0
@@ -198,6 +315,8 @@ local function onTick()
         for i = 1, #_clouds do _clouds[i].t0 = _clouds[i].t0 + gap end
         print(string.format("[PongDu][Gas] tick gap %dms (pause?) -> %d cloud(s) shifted", gap, #_clouds))
     end
+    local ok, err = pcall(hazeTick, now)
+    if not ok then print("[PongDu][Gas] viewpoint haze error: " .. tostring(err)) end
 end
 Events.OnTick.Add(onTick)
 

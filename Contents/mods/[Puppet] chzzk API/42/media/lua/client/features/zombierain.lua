@@ -132,8 +132,10 @@ end
 --    남아 있는지 확인하고 없으면 다시 씌운다.
 local PARA_ITEM      = "t3chzzkDonation.PongDuZombieParachute"
 local PARA_CLOTHING  = "PongDu_ZombieParachute"
-local PARA_DESCENT   = 1.2      -- 낙하산 하강 속도 (층/초). 4층에서 약 3.3초.
-                                -- lastFallSpeed 로도 쓴다: 2.24(데미지 기준) 미만이라 착지 데미지·넘어짐 없음
+local PARA_DESCENT   = 2.4      -- 낙하산 하강 속도 (층/초). 레인 7층 약 3초, 공중투하 19층 약 8초.
+                                -- (1.2 에서 2배로 올림: 체공이 너무 길었다. 2026-10-28)
+                                -- 2.24(데미지 기준)를 넘으므로 바닥 FREE_FALL_BRAKE_H 층 위부터는
+                                -- 아래 LAND_SPEED 로 감속해 착지한다(자유낙하와 같은 방식).
 -- 자유낙하 속도 상한 (층/초). 공중에서 보이는 낙하 속도만 정한다.
 -- 예전엔 이 값 그대로 착지시켜 넘어짐 연출을 남겼는데, 착지 속도 3.87 이상이면
 -- IsoZombie.handleLandingImpact 가 50% 확률로 setFakeDead(true) 를 건다. 죽은척 좀비는
@@ -145,8 +147,8 @@ local PARA_DESCENT   = 1.2      -- 낙하산 하강 속도 (층/초). 4층에서
 local FREE_FALL_CAP    = 4.2
 local FREE_FALL_BRAKE_H = 1.0   -- 바닥에서 이 높이(층)부터 감속
 -- 착지 속도. updateFalling 이 착지 틱에 중력분(5.0 x dt)을 한 번 더하므로
--- 10fps(dt 0.1)에서도 1.2 + 0.5 = 1.7 < 2.24 로 여유가 있다.
-local LAND_SPEED       = PARA_DESCENT
+-- 10fps(dt 0.1)에서도 1.2 + 0.5 = 1.7 < 2.24 로 여유가 있다. 낙하산·자유낙하 공통.
+local LAND_SPEED       = 1.2
 local LAND_LOG_MAX   = 3        -- 공습 1회당 체력 원복 상세 로그 상한
 local _landLogLeft   = LAND_LOG_MAX
 local _landRestored  = 0
@@ -866,11 +868,16 @@ local function onTick()
                     end
                     -- 낙하 속도 (전 클라). 착지 판정(updateFalling -> DoLand)은 각 클라가 자기
                     -- lastFallSpeed 로 로컬에서 하므로 원격 좀비도 같이 묶어야 그 클라에서 안 넘어진다.
+                    local h = zz
+                    pcall(function() h = z:getHeightAboveFloor() end)
                     if usePara then
-                        z:setLastFallSpeed(PARA_DESCENT)
+                        -- 낙하산: 공중에선 PARA_DESCENT, 바닥 FREE_FALL_BRAKE_H 층 위부터 LAND_SPEED
+                        if h < FREE_FALL_BRAKE_H then
+                            z:setLastFallSpeed(LAND_SPEED)
+                        else
+                            z:setLastFallSpeed(PARA_DESCENT)
+                        end
                     else
-                        local h = zz
-                        pcall(function() h = z:getHeightAboveFloor() end)
                         if h < FREE_FALL_BRAKE_H then
                             if z:getLastFallSpeed() > LAND_SPEED then z:setLastFallSpeed(LAND_SPEED) end
                         elseif z:getLastFallSpeed() > FREE_FALL_CAP then
