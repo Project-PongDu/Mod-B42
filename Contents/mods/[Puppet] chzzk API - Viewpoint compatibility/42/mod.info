@@ -1,0 +1,12 @@
+name=[PongDu] - Viewpoint 호환
+poster=poster.png
+icon=icon.png
+id=t3chzzkDonationB42_ViewpointComp
+require=\t3chzzkDonationB42,\ZombieBuddy,\Viewpoint
+loadModAfter=t3chzzkDonationB42,Viewpoint
+description=Project Viewpoint(1st/3rd person) 3D effects for PongDu: dense reanimation gas clouds and fire-support tracers. Java part loaded by ZombieBuddy.
+versionMin=42.21
+modversion=0.2.0
+javaJarFile=media/java/client/PongDuVP.jar
+javaPkgName=pongduvp
+ZBVersionMin=2.0.0
