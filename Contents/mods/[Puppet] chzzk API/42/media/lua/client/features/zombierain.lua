@@ -367,7 +367,7 @@ local PLANE_ALIAS      = "pongdu_airdrop_plane"        -- 앞쪽 음색 (접근�
 local PLANE_ALIAS_REAR = "pongdu_airdrop_plane_rear"   -- 뒤쪽 음색 (이탈 어두운 저음 굉음)
 local PLANE_ALIAS_TEAR = "pongdu_airdrop_plane_tear"   -- 날카로운 금속음 (팬 날개 통과음, 머리 위·직후만)
 local PLANE_ALIASES    = { PLANE_ALIAS, PLANE_ALIAS_REAR, PLANE_ALIAS_TEAR }
-local PLANE_FLOORS     = 12       -- 수송기 고도 (층). 아래 PLANE_FLY_ALT 와 공용
+local PLANE_FLOORS     = 20       -- 수송기 고도 (층). 아래 PLANE_FLY_ALT 와 공용
 local PLANE_ALT_M      = PLANE_FLOORS * 2.46   -- 1 타일 = 1 m 기준 고도
 local PLANE_VOL_NEAR   = 0.60     -- 머리 위 통과 시
 local PLANE_HEAR       = 90       -- 이 거리(타일, 3D)부터 들리기 시작 (경로 끝 D = 반경 + 50)
@@ -542,8 +542,8 @@ Events.OnTick.Add(planeTick)
 -- 파일럿 클라만 매 틱 경로 좌표로 옮긴다(화력지원 헬기 heliMoveTo 와 같은 setWorldTransform).
 -- 다른 클라는 엔진 차량 보간으로 받는다. 진행률 식은 그림자(flightState)와 같아서
 -- 기체와 그림자가 같은 지점을 지난다.
--- 고도: 물리 y 단위, iso 층 = y / 2.46 (firesupport.lua HELI_FLY_ALT 주석). 12층(약 29 m).
--- 투하 좀비 낙하 시작 높이(서버 AIRDROP_DROP_Z = 11층)보다 한 층 위.
+-- 고도: 물리 y 단위, iso 층 = y / 2.46 (firesupport.lua HELI_FLY_ALT 주석). 20층(약 49 m).
+-- 투하 좀비 낙하 시작 높이(서버 AIRDROP_DROP_Z = 19층)보다 한 층 위.
 -- 고정 아이소 시점이라 1층 올릴 때마다 기체가 화면에서 지면 6칸만큼 위로 밀린다
 -- (IsoUtils.YToScreen: 층당 96, 타일당 16). 더 올리면 기체가 화면에 들어오는 경로가 줄어든다.
 local PLANE_SCRIPT   = "Base.PongDuC17"
