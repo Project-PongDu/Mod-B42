@@ -283,7 +283,7 @@ end
 -- 네 꼭짓점을 월드 좌표로 잡아 화면에 투영하므로 아이소 시점에 맞게 찌그러진다.
 -- renderPoly UV: 1=좌상, 2=우상, 3=우하, 4=좌하 (GenericSpriteRenderState.renderPoly).
 local SHADOW_TEX    = getTexture("media/textures/Shadows/shadowPongDuAirdrop.png")
-local SHADOW_SIZE   = 41     -- 그림자 한 변 (타일 = m). 날개폭이 텍스처 폭을 채운다. 기체 날개폭 41.2 m 에 맞춤
+local SHADOW_SIZE   = 52     -- 그림자 한 변 (타일 = m). 날개폭이 텍스처 폭을 채운다. C-17 실기 날개폭 51.5 m 에 맞춤
 local SHADOW_ALPHA  = 0.38
 local SHADOW_FADE   = 800    -- 등장/퇴장 페이드 (ms)
 local SHADOW_TAIL   = 2500   -- 마지막 투하 후 화면 밖으로 빠져나가는 시간 (ms)
