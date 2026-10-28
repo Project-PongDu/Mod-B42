@@ -3,12 +3,14 @@
 -- 서버가 방송한 단계를 받아 모든 클라가 자기 쪽 좀비에 애니메이션 단계 변수를 세운다.
 -- 그 위에 클라 역할에 따라:
 --   * 소유 클라(MP 에서 isRemoteZombie()=false, SP 는 항상):
---       warn/sprint/bash/recovery 동안 AI 이동을 멈추고(바닐라 no-op 상태 W.HOLD_STATE 로 전환),
+--       warn/sprint/recovery 동안 AI 이동을 멈추고(바닐라 no-op 상태 W.HOLD_STATE 로 전환),
 --       warn/sprint 동안 서버가 준 방향으로 몸을 고정한다. 돌진 이동은 sprint 노드 클립의 루트모션.
 --       sprint 중 벽·문·차량에 막히면(isCollidedThisFrame: 칸 경계 충돌만 서고 캐릭터 충돌은 안 섬,
 --       IsoMovingObject.java:1158) 서버에 Crash 를 보고한다. crash 단계를 받으면 넘어진다.
 --   * 모든 클라: sprint 중 자기 로컬 플레이어가 레커와 HIT_RADIUS 안이면 그 플레이어를 넘어뜨리고
 --     (바닐라 스프린터 충돌과 같은 호출 순서, IsoGameCharacter.java:14828~14842) 서버에 Hit 를 보고한다.
+--     돌진은 멈추지 않으므로 같은 돌진에 여러 명이 맞을 수 있다(플레이어마다 1번).
+--   * 모든 클라: warn 을 받으면 레커 위치에서 예고음을 낸다(클라 로컬 재생).
 
 require "PongDuWrecker"
 
@@ -186,6 +188,10 @@ W.clientHandler = function(args, zobj)
         clearAnim(z)
         if isOwner(z) then crashFall(e) end
         return
+    end
+
+    if ph == PH.WARN then
+        z:playSound(z:isFemale() and W.WARN_SOUND_FEMALE or W.WARN_SOUND_MALE)
     end
 
     z:setVariable(W.VAR_PHASE, ph)

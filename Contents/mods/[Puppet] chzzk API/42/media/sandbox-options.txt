@@ -746,11 +746,6 @@ option PongDu.Mutant_Health_Wrecker = {
     page = PongDu_Debuff, translation = PongDu_Mutant_Health_Wrecker,
 }
 
-option PongDu.Wrecker_Cooldown = {
-    type = integer, min = 3, max = 60, default = 10,
-    page = PongDu_Debuff, translation = PongDu_Wrecker_Cooldown,
-}
-
 option PongDu.Wrecker_ChargeDistance = {
     type = integer, min = 4, max = 20, default = 10,
     page = PongDu_Debuff, translation = PongDu_Wrecker_ChargeDistance,
@@ -762,7 +757,7 @@ option PongDu.Wrecker_HitDamage = {
 }
 
 option PongDu.Wrecker_FractureChance = {
-    type = integer, min = 0, max = 100, default = 10,
+    type = integer, min = 0, max = 100, default = 30,
     page = PongDu_Debuff, translation = PongDu_Wrecker_FractureChance,
 }
 

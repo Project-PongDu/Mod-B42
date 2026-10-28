@@ -7,10 +7,9 @@
 --     none     : 쿨다운이 끝났고 대상 플레이어가 1.5~5칸, 같은 층, 사이가 트여 있으면 warn
 --     warn     : 1.5초 뒤 sprint. 방향은 이때의 대상 위치로 한 번 다시 잡고 고정한다
 --     sprint   : Wrecker_ChargeDistance 칸을 갔거나 4초가 지나면 recovery
---                피격자 클라 Hit 보고 -> 피해 + bash(어깨빵)
+--                피격자 클라 Hit 보고 -> 그 플레이어에게 피해. 돌진은 계속된다(여러 명 관통)
 --                소유 클라 Crash 보고 -> 앞을 막은 문·창문·바리케이드 파괴 + crash(레커 넘어짐)
---     bash     : 0.8초 뒤 recovery
---     recovery : 1초 뒤 none
+--     recovery : 1초 뒤 none (돌진 끝 직후 늦게 도착한 Hit 도 이 단계까지 받는다)
 --     crash    : 0.3초 뒤 none (넘어짐 이후는 바닐라 넉다운이 처리)
 --   단계 중 레커가 넘어지면(플레이어 밀치기 등) 바로 none 으로 끊는다.
 --
@@ -34,12 +33,6 @@ local SPAWN_GRACE_MS = 2000    -- 처음 발견한 레커는 이만큼 기다린
 local CLAIM_RANGE    = 40      -- Crash 보고자와 레커의 최대 거리 (칸)
 local THUMP_BIG      = 30000   -- IsoObject:Thump 이벤트 수 (short 범위 안)
 
--- 피격 부위 후보 (머리·목·손·발 제외: 머리/목은 치명적, 손발은 어깨빵 부위가 아님)
-local HIT_PARTS = {
-    "Torso_Upper", "Torso_Lower",
-    "UpperArm_L", "UpperArm_R", "ForeArm_L", "ForeArm_R",
-    "UpperLeg_L", "UpperLeg_R",
-}
 
 local _st        = {}   -- [zombie] = { phase, seq, untilMs, cooldownUntil, dx, dy, sx, sy, hit }
 local _byZid     = {}   -- [onlineID] = zombie (MP 보고 매칭용)
@@ -109,7 +102,7 @@ local function startSprint(z, st, tnow)
     end
     st.sx, st.sy = z:getX(), z:getY()
     st.untilMs = tnow + W.SPRINT_MAX_MS
-    st.cooldownUntil = tnow + SandboxVars.PongDu.Wrecker_Cooldown * 1000
+    st.cooldownUntil = tnow + W.COOLDOWN_MS
     send(z, st, PH.SPRINT, "warn done")
 end
 
@@ -124,7 +117,12 @@ local function toNone(z, st, reason)
 end
 
 -- ── 피해 ─────────────────────────────────────────────────────────────────────
--- 1~2 부위에 둔상 피해 + 통증, 확률로 골절. 서버에서 바꾸고 부위마다 syncBodyPart.
+-- 전 부위(손~발, 머리·목·사타구니 포함)에서 무작위 1~2곳, 같은 부위가 두 번 뽑힐 수 있다.
+-- 부위마다 피해 + 통증 + 부상 1개:
+--   목·사타구니 -> 깊은 상처 (바닐라 차량 충돌도 이 두 곳의 골절을 깊은 상처로 바꾼다)
+--   그 외       -> Wrecker_FractureChance % 골절, 나머지 깊은 상처
+--                  바닐라 골절이 꺼진 서버(SandboxVars.BoneFracture=false)면 항상 깊은 상처
+-- 서버에서 바꾸고 부위마다 syncBodyPart.
 local function applyHit(player)
     if player:isGodMod() or player:isInvincible() then
         print(LOG .. "hit skipped (god/invincible) player=" .. tostring(player:getUsername()))
@@ -135,31 +133,35 @@ local function applyHit(player)
     local dmg = SandboxVars.PongDu.Wrecker_HitDamage
     local fracChance = SandboxVars.PongDu.Wrecker_FractureChance
     local allowFracture = SandboxVars.BoneFracture
+    local first = BodyPartType.ToIndex(BodyPartType.Hand_L)
+    local last = BodyPartType.ToIndex(BodyPartType.MAX)   -- 미포함
     local count = ZombRand(1, 3)   -- 1~2
-    local picked, used = {}, {}
-    while #picked < count do
-        local name = HIT_PARTS[ZombRand(#HIT_PARTS) + 1]
-        if not used[name] then
-            used[name] = true
-            picked[#picked + 1] = name
-        end
-    end
-    local fractured = 0
-    for _, name in ipairs(picked) do
-        local part = bd:getBodyPart(BodyPartType[name])
+    local log = {}
+    for _ = 1, count do
+        local bpt = BodyPartType.FromIndex(ZombRand(first, last))
+        local part = bpt and bd:getBodyPart(bpt)
         if part then
             part:AddDamage(dmg)
             part:setAdditionalPain(60)
-            if allowFracture and ZombRand(100) < fracChance then
+            local injury
+            if bpt == BodyPartType.Neck or bpt == BodyPartType.Groin then
+                injury = "deep"
+            elseif allowFracture and ZombRand(100) < fracChance then
+                injury = "fracture"
+            else
+                injury = "deep"
+            end
+            if injury == "fracture" then
                 part:setFractureTime(ZombRand(30, 51))
-                fractured = fractured + 1
+            else
+                part:generateDeepWound()
             end
             PongDuBody.syncPart(part)
+            log[#log + 1] = tostring(BodyPartType.ToString(bpt)) .. ":" .. injury
         end
     end
     print(LOG .. "hit applied player=" .. tostring(player:getUsername())
-        .. " parts=" .. table.concat(picked, ",") .. " dmg=" .. tostring(dmg)
-        .. " fractured=" .. tostring(fractured))
+        .. " parts=" .. table.concat(log, ",") .. " dmg=" .. tostring(dmg))
 end
 
 -- ── 장애물 파괴 ───────────────────────────────────────────────────────────────
@@ -235,17 +237,16 @@ W.serverHandler = function(command, player, args, zombieObj)
     local tnow = now()
 
     if command == "Hit" then
-        if st.phase ~= PH.SPRINT and st.phase ~= PH.BASH then
+        if st.phase ~= PH.SPRINT and st.phase ~= PH.RECOVERY then
             print(LOG .. "Hit ignored: phase=" .. tostring(st.phase) .. " from=" .. who)
             return
         end
         local key = player and player:getOnlineID() or who
         if st.hit[key] then return end
         st.hit[key] = true
+        print(LOG .. "hit zid=" .. tostring(zidOf(z)) .. " seq=" .. tostring(st.seq) .. " victim=" .. who
+            .. " phase=" .. tostring(st.phase))
         if player then applyHit(player) end
-        if st.phase == PH.SPRINT then
-            toPhase(z, st, PH.BASH, W.BASH_MS, tnow, "hit " .. who)
-        end
     elseif command == "Crash" then
         if st.phase ~= PH.SPRINT then
             print(LOG .. "Crash ignored: phase=" .. tostring(st.phase) .. " from=" .. who)
@@ -321,8 +322,6 @@ local function step(z, st, tnow)
         elseif tnow >= st.untilMs then
             toPhase(z, st, PH.RECOVERY, W.RECOVERY_MS, tnow, "timeout traveled=" .. string.format("%.1f", traveled))
         end
-    elseif ph == PH.BASH then
-        if tnow >= st.untilMs then toPhase(z, st, PH.RECOVERY, W.RECOVERY_MS, tnow, "bash done") end
     elseif ph == PH.RECOVERY or ph == PH.CRASH then
         if tnow >= st.untilMs then toNone(z, st, ph .. " done") end
     end

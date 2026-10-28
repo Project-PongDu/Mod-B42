@@ -33,8 +33,9 @@ end
 --               AnimSets/zombie-crawler/*/roach_*.xml 노드가 PuppetRoach
 --               애님 변수 조건으로 3배속 크롤을 재생 (조건 수가 많은 노드가
 --               우선 선택되는 PZ 애님 규칙, Hitman 애님 변형과 동일 기법).
---    레커     : 일반 걸음. 대상이 1.5~5칸이면 예고 후 직선 돌진, 닿으면 어깨빵으로
---               넘어뜨리고 피해, 벽·문에 막히면 문·창문·바리케이드를 부수고 자기가 넘어진다.
+--    레커     : 빠른 걸음(바닐라 fast shambler) 고정. 대상이 1.5~5칸이면 예고 후 직선 돌진,
+--               닿은 플레이어는 넘어뜨리고 피해(돌진은 계속, 여러 명 관통), 벽·문에 막히면
+--               문·창문·바리케이드를 부수고 자기가 넘어진다.
 --               단계 결정은 서버(server/PongDuWreckerServer.lua), 연출·이동은 features/wrecker.lua.
 --               여기서는 종류 등록·체력·이름표만 한다.
 --
@@ -170,7 +171,10 @@ local function initMutant(zombie, kind)
         -- m_SpeedScale 오버라이드로만 가능(TR locomotion 노드, 별도 작업).
         zombie:setWalkType("sprint" .. tostring(ZombRand(5) + 1))
     elseif kind == "wrecker" then
-        -- 레커: 걸음은 기본값 유지. 돌진은 서버 단계 방송을 받아 features/wrecker.lua 가 처리한다.
+        -- 레커: 빠른 걸음 고정 (speedType 2, walkType "1"~"5", IsoZombie.doFastShambler).
+        -- speedType 을 2 로 박아 두므로 이후 DoZombieStats 도 같은 속도로 다시 만든다.
+        -- 돌진은 서버 단계 방송을 받아 features/wrecker.lua 가 처리한다.
+        zombie:doFastShambler()
     end
     -- 체력은 분기 뒤에 일괄 적용한다. 브루트는 위에서 DoZombieStats()를 부르는데
     -- 그 안에서 Toughness 기준으로 setHealth가 다시 걸리므로(IsoZombie.java:3350)
@@ -209,6 +213,8 @@ end
 -- 항목을 지워 onlineID 재사용에도 오염되지 않게 한다.
 local _hpSnap = {}
 local SPRINT_KIND = { brute = true, tracer = true, sprinter = true }
+-- 빠른 걸음이어야 하는 종류: walkType 이 숫자만("1"~"5")이어야 한다 (sprint*/slow* 면 덮어써진 것)
+local FAST_KIND = { wrecker = true }
 
 local function guardStats(zombie, kind)
     if not zombie:getVariableBoolean("PuppetMutantInit") then return end
@@ -219,6 +225,11 @@ local function guardStats(zombie, kind)
     if SPRINT_KIND[kind] then
         local wt = zombie:getVariableString("zombiewalktype")
         if not (wt and string.sub(wt, 1, 6) == "sprint") then
+            reason = "walkType=" .. tostring(wt)
+        end
+    elseif FAST_KIND[kind] then
+        local wt = zombie:getVariableString("zombiewalktype")
+        if not wt or string.sub(wt, 1, 6) == "sprint" or string.sub(wt, 1, 4) == "slow" then
             reason = "walkType=" .. tostring(wt)
         end
     end
