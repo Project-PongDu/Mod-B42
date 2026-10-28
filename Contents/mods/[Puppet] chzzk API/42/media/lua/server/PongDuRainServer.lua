@@ -66,12 +66,17 @@ local STYLE_NAMES   = { [STYLE_RAIN] = "rain", [STYLE_AIRDROP] = "airdrop" }
 --   A = 플레이어 중심 반경 D 원 위 무작위 각도, B = 반대편(±30도 지터).
 --   D = 투하 반경 + AIR_PATH_EXTRA -> 시작/소멸이 화면 밖. 지터 때문에 머리 위가
 --   아니라 근처(최대 약 0.26D)를 스치듯 지나가기도 한다.
--- 수송기는 PREP_DELAY_MS 시점에 A, 지속시간 뒤 B에 도달하는 등속 비행이다.
+-- 수송기는 A 에 도달하기 전·B 를 지난 뒤에도 같은 속도로 난다: 비행 경로는 AB 를 양쪽으로
+-- AB 길이만큼 늘인 A' -> B' (A' A B B' 순, 각 구간 길이 같음)이고, PREP_DELAY_MS 시점에 A',
+-- 그로부터 지속시간 뒤 A, 다시 지속시간 뒤 B, 다시 지속시간 뒤 B' 에 도달한다.
+-- 좀비 투하는 여전히 A -> B 구간(가운데 1/3)에서만 한다. 클라에는 Flight 로 A'/B' 와
+-- 지속시간 x3 을 보내 그림자·엔진음이 A' -> B' 를 따라가게 한다.
 -- 각 좀비는 스폰 시각 t의 수송기 위치 P(t)를 중심으로 투하 반경(r) 원 안에 떨어진다
 -- (그림자가 움직이면 투하 범위도 같이 움직인다). 스퀘어 선행 생성(Prep) 때문에
 -- 시각과 위치는 Start 시점에 전부 미리 정한다. 그림자는 클라가 Flight로 그린다.
 local AIR_PATH_EXTRA     = 50                               -- 헬기와 동일 (D = r + 50)
 local AIR_JITTER         = 0.52                             -- B 각도 지터 (rad, 약 ±30도)
+local AIR_PATH_SCALE     = 3                                -- 비행 경로 A'B' = AB x 이 값 (투하는 AB 만)
 
 local _sessions = {}
 
@@ -527,6 +532,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     local cols, payload = {}, {}
     local missedPick = 0
     local flight = nil
+    local leadMs = 0      -- 투하 모드: 수송기가 A' 에서 A 까지 오는 시간. 좀비 스폰은 그만큼 늦게 시작
     if style == STYLE_AIRDROP then
         -- 비행 경로 A -> B (화력지원 헬기와 같은 산출식)
         local D    = r + AIR_PATH_EXTRA
@@ -586,17 +592,28 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     -- 투하 모드: 그림자 연출용 비행 정보. 수송기는 PREP_DELAY_MS 시점에 A, 그로부터
     -- durMs 뒤 B에 도달한다 (서버 스폰 시각 t와 같은 기준).
     if flight then
-        toClients("Flight", {
-            ["ax"] = flight.ax, ["ay"] = flight.ay,
-            ["bx"] = flight.bx, ["by"] = flight.by,
-            ["prep"] = PREP_DELAY_MS, ["dur"] = durMs,
-        })
-        planeQueue(player, flight, durMs, getTimestampMs() + PREP_DELAY_MS)
+        -- 비행 경로 A' -> B': AB 를 양쪽으로 (AIR_PATH_SCALE - 1) / 2 배씩 연장. 속도는 그대로라
+        -- 비행 시간은 durMs x AIR_PATH_SCALE, A 도달은 PREP_DELAY_MS + leadMs.
         local ldx, ldy = flight.bx - flight.ax, flight.by - flight.ay
+        local ext = (AIR_PATH_SCALE - 1) / 2
+        leadMs = durMs * ext
+        local flyMs = durMs * AIR_PATH_SCALE
+        local flightExt = {
+            ax = flight.ax - ldx * ext, ay = flight.ay - ldy * ext,
+            bx = flight.bx + ldx * ext, by = flight.by + ldy * ext,
+        }
+        toClients("Flight", {
+            ["ax"] = flightExt.ax, ["ay"] = flightExt.ay,
+            ["bx"] = flightExt.bx, ["by"] = flightExt.by,
+            ["prep"] = PREP_DELAY_MS, ["dur"] = flyMs,
+        })
+        planeQueue(player, flightExt, flyMs, getTimestampMs() + PREP_DELAY_MS)
         local len = math.sqrt(ldx * ldx + ldy * ldy)
-        print(string.format("[PongDuRain] airdrop flight A=(%d,%d) B=(%d,%d) len=%.0f speed=%.2f tiles/s dropR=%d",
+        print(string.format("[PongDuRain] airdrop flight A'=(%d,%d) A=(%d,%d) B=(%d,%d) B'=(%d,%d) dropLen=%.0f flyLen=%.0f speed=%.2f tiles/s leadMs=%d flyMs=%d dropR=%d",
+            math.floor(flightExt.ax), math.floor(flightExt.ay),
             math.floor(flight.ax), math.floor(flight.ay), math.floor(flight.bx), math.floor(flight.by),
-            len, len / durS, r))
+            math.floor(flightExt.bx), math.floor(flightExt.by),
+            len, len * AIR_PATH_SCALE, len / durS, math.floor(leadMs), math.floor(flyMs), r))
     end
 
     -- 낙하 좀비 플레이어 어그로 창 (클라 features/aggro.lua 수신).
@@ -607,7 +624,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     -- v4: 반경 필터 폐지 — zid는 위 flushBatch가 배치마다 AddIds로 공급하므로
     -- 여기선 빈 창만 연다. 주변 기존 좀비는 더 이상 어그로 대상이 아니다.
     sendServerCommand("PongDuAggro", "Window", {
-        ["dur"] = PREP_DELAY_MS + durMs + 8000,
+        ["dur"] = PREP_DELAY_MS + leadMs + durMs + 8000,
         ["pid"] = player:getOnlineID(),
         ["src"] = "rain",
     })
@@ -625,7 +642,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
         dropZ      = dropZ,
         sender     = sender,
         para       = para,
-        readyAt   = getTimestampMs() + PREP_DELAY_MS,
+        readyAt   = getTimestampMs() + PREP_DELAY_MS + leadMs,   -- 투하 모드는 수송기가 A 에 올 때
         startMs   = nil,
         spawned   = 0,
         hits      = 0,
