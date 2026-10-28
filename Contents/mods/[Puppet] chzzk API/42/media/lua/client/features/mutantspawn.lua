@@ -265,8 +265,20 @@ end
 
 -- ── 스크리머: 비명 (CDDA_ZombieFunction.Scream 이식) ─────────────────────────
 -- playSound는 클라 로컬 렌더링이라 각 클라가 각자 재생 = 전원이 들림.
--- addSound(월드사운드)는 각 클라가 자기 소유 좀비를 유인 -> 폭격(bombard)과
--- 같은 분산 처리 구조라 클라별 실행이 정답.
+--
+-- 월드사운드(주변 좀비 유인)는 소스를 nil 로 낸다. 소스가 좀비면 WorldSound.init 이
+-- sourceIsZombie=true 를 세우고(WorldSoundManager.java:615), 좀비는 그런 소리를 전부 무시한다:
+--   실좀비 getSoundAttract -> 0 (:356), getBiggestSoundZomb(ignoreBySameType=true) 제외 (:317),
+--   가상 좀비 ZombiePopulationManager.addWorldSound 제외 (:493).
+-- 예전엔 addSound(zombie, ...) 라 비명이 아무 좀비도 끌지 못했다 (B41 도 init 이 같다).
+--
+-- 월드사운드는 소유 클라 한 곳에서만 낸다. MP 클라 addSound 는 서버로 올라가고
+-- (GameClient.sendWorldSound) 서버가 가상 좀비에 적용한 뒤 범위 안 다른 클라에 중계한다
+-- (WorldSoundPacket.processServer) -> 한 번이면 전원의 좀비가 듣는다. 모든 클라가 내면
+-- 접속자 수만큼 중복 중계된다. 반경 50 이상이어야 가상 좀비(청크 밖 인구)도 끈다.
+local SCREAM_RADIUS = 50
+local SCREAM_VOLUME = 50
+
 local function updateScreamer(zombie)
     local target = zombie:getTarget()
     if not target then return end
@@ -278,9 +290,11 @@ local function updateScreamer(zombie)
     if player and not player:hasTrait(CharacterTrait.DEAF) then
         zombie:playSound("mutant_scream" .. tostring(ZombRand(2) + 1))
     end
-    -- 소스=좀비: 바닐라 addSound 패턴. 소스 본인은 월드사운드에 반응하지
-    -- 않으므로 스크리머가 자기 비명을 쫓아가는 일도 자연 차단된다.
-    addSound(zombie, zombie:getX(), zombie:getY(), zombie:getZ(), 50, 50)
+    if isClient() and zombie:isRemoteZombie() then return end
+    addSound(nil, zombie:getX(), zombie:getY(), zombie:getZ(), SCREAM_RADIUS, SCREAM_VOLUME)
+    print("[PuppetMutant] scream zid=" .. tostring(zombie:getOnlineID())
+        .. " at " .. tostring(math.floor(zombie:getX())) .. "," .. tostring(math.floor(zombie:getY()))
+        .. " radius=" .. tostring(SCREAM_RADIUS))
 end
 
 -- ── 브루트: 넉다운 면역 + 밀치기 (keepstand + Push 이식) ─────────────────────
