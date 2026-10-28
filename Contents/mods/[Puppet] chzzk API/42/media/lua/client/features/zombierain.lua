@@ -693,6 +693,17 @@ Events.OnServerCommand.Add(function(module, command, args)
             return
         end
         local me = getPlayer()
+        -- 발동자 본인: 남은시간 패널 = 수송기 체공 시간(A'->B', 서버 flyMs). 좀비가 떨어지는
+        -- 구간은 그 중 A->B 뿐이지만 타이머는 수송기가 떠 있는 동안을 센다. 요청 시점엔
+        -- 레인과 같은 dur 로 켜 두고, 여기서 체공 시간으로 늘린다. 패널 표시는 SERVER_PREP_MS
+        -- 를 빼므로 서버 prep 을 더해 맞춘다(둘은 같은 값 1000ms).
+        local pid = tonumber(args["pid"])
+        if me and pid and me:getOnlineID() == pid then
+            local totalMs = dur + (tonumber(args["prep"]) or SERVER_PREP_MS)
+            if _rainRemainMs < totalMs then _rainRemainMs = totalMs end
+            print("[PongDuRain] client timer set to airdrop flight time flyMs=" .. tostring(math.floor(dur))
+                .. " remainMs=" .. tostring(math.floor(_rainRemainMs)))
+        end
         if me then
             local dx = me:getX() - (ax + bx) / 2
             local dy = me:getY() - (ay + by) / 2

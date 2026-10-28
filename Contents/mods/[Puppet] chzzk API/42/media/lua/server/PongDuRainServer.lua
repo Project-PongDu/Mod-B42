@@ -606,6 +606,8 @@ Events.OnClientCommand.Add(function(module, command, player, data)
             ["ax"] = flightExt.ax, ["ay"] = flightExt.ay,
             ["bx"] = flightExt.bx, ["by"] = flightExt.by,
             ["prep"] = PREP_DELAY_MS, ["dur"] = flyMs,
+            -- 발동자 클라는 이걸 받아 남은시간 패널을 수송기 체공 시간(A'->B')으로 맞춘다
+            ["pid"] = player:getOnlineID(),
         })
         planeQueue(player, flightExt, flyMs, getTimestampMs() + PREP_DELAY_MS)
         local len = math.sqrt(ldx * ldx + ldy * ldy)
