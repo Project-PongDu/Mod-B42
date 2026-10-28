@@ -1,0 +1,8 @@
+name=[PongDu] - Viewpoint 호환
+poster=poster.png
+icon=icon.png
+id=t3chzzkDonationB42_ViewpointComp
+require=\t3chzzkDonationB42
+description=Project Viewpoint(1st/3rd person) 3D effects for PongDu. Does nothing without Viewpoint.
+versionMin=42.0
+modversion=0.1.0

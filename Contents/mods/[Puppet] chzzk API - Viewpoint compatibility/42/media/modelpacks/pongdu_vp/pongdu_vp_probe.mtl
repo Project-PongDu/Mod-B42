@@ -1,0 +1,3 @@
+newmtl pongdu_vp_probe
+Kd 1 1 1
+map_Kd pongdu_vp_probe.png
