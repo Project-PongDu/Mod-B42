@@ -260,6 +260,7 @@ local function onTick()
         for _, s in ipairs(_sessions) do
             if s.startMs then s.startMs = s.startMs + gap end
             s.readyAt = s.readyAt + gap
+            s.flightAt = s.flightAt + gap
         end
         print(string.format("[PongDuRain] tick gap %dms (pause?) -> %d session(s) shifted", gap, #_sessions))
     end
@@ -292,12 +293,25 @@ local function onTick()
                     s.byKind[k] = (s.byKind[k] or 0) + 1
                 end
             end
+            if n > 0 then
+                -- 투하 시각 검증용: 발동 + PREP_DELAY_MS(투하 모드는 수송기가 A' 에 나타나는 시각) 기준 ms
+                local rel = now - s.flightAt
+                if not s.firstDropMs then
+                    s.firstDropMs = rel
+                    print(string.format("[PongDuRain] first drop at %dms (expected %d..%d)",
+                        math.floor(rel), math.floor(s.leadMs), math.floor(s.leadMs + s.durMs)))
+                end
+                s.lastDropMs = rel
+            end
             flushBatch(s, false)
             if s.spawned >= #s.cols or elapsed > s.durMs + 5000 then
                 flushBatch(s, true)
                 print("[PongDuRain] session done player=" .. tostring(s.player:getUsername())
                     .. " spawned=" .. tostring(s.spawned) .. " hits=" .. tostring(s.hits)
-                    .. " cols=" .. tostring(#s.cols) .. kindTally(s))
+                    .. " cols=" .. tostring(#s.cols) .. kindTally(s)
+                    .. " firstDropMs=" .. tostring(s.firstDropMs and math.floor(s.firstDropMs) or -1)
+                    .. " lastDropMs=" .. tostring(s.lastDropMs and math.floor(s.lastDropMs) or -1)
+                    .. " expected=" .. tostring(math.floor(s.leadMs)) .. ".." .. tostring(math.floor(s.leadMs + s.durMs)))
                 table.remove(_sessions, i)
             end
         end
@@ -649,6 +663,10 @@ Events.OnClientCommand.Add(function(module, command, player, data)
         sender     = sender,
         para       = para,
         readyAt   = getTimestampMs() + PREP_DELAY_MS + leadMs,   -- 투하 모드는 수송기가 A 에 올 때
+        flightAt  = getTimestampMs() + PREP_DELAY_MS,            -- 투하 시각 로그 기준 (수송기 A' 출현)
+        leadMs    = leadMs,
+        firstDropMs = nil,
+        lastDropMs  = nil,
         startMs   = nil,
         spawned   = 0,
         hits      = 0,
