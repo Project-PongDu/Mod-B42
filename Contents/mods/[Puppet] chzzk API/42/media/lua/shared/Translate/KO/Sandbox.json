@@ -225,7 +225,7 @@
     "Sandbox_PongDu_Rain_Radius": "좀비 투하 반경 (타일)",
     "Sandbox_PongDu_Rain_Radius_tooltip": "좀비가 떨어지는 반경. 좀비 레인은 플레이어 중심, 좀비 공중투하는 그림자 중심(따라 이동). 건물 없는 야외만.",
     "Sandbox_PongDu_Rain_Duration": "좀비 공습 지속시간 (초)",
-    "Sandbox_PongDu_Rain_Duration_tooltip": "첫 좀비부터 마지막 좀비가 떨어질 때까지 시간.",
+    "Sandbox_PongDu_Rain_Duration_tooltip": "좀비 레인: 첫 좀비부터 마지막 좀비가 떨어질 때까지 시간.\\n좀비 공중투하: 수송기가 나타나서 사라질 때까지 체공 시간. 좀비는 그중 가운데 1/3 구간에서만 떨어짐 (예: 30초면 10~20초 사이).",
     "Sandbox_PongDu_Rain_Parachute": "낙하산 연출",
     "Sandbox_PongDu_Rain_Parachute_tooltip": "켜면 낙하산을 메고 천천히 내려옴 (초당 약 2.4층. 좀비 레인 7층 약 3초, 좀비 공중투하 14층 약 6초). 착지·사망 시 낙하산은 사라지고 남지 않음.",
     "Sandbox_PongDu_Rain_Count_Normal": "좀비 공습 마리수: 일반 좀비",

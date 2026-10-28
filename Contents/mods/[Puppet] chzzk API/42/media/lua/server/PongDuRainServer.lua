@@ -506,6 +506,9 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     if durS < RAIN_DUR_MIN_S then durS = RAIN_DUR_MIN_S
     elseif durS > RAIN_DUR_MAX_S then durS = RAIN_DUR_MAX_S end
     local durMs = durS * 1000
+    -- 좀비가 실제로 떨어지는 구간 시간. 레인은 지속시간 그대로. 공중투하는 지속시간이 수송기
+    -- 체공 시간(A'->B')이고, 좀비는 그중 A->B(가운데 1/AIR_PATH_SCALE)에서만 떨어진다.
+    local dropMs = (style == STYLE_AIRDROP) and (durMs / AIR_PATH_SCALE) or durMs
     local dropZ = (style == STYLE_AIRDROP) and AIRDROP_DROP_Z or RAIN_DROP_Z
 
     local kinds  = type(data and data["kinds"]) == "table" and data["kinds"] or nil
@@ -551,7 +554,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
             local cy = flight.ay + (flight.by - flight.ay) * frac
             local x, y = pickAirdropColumn(cell, px, py, cx, cy, r)
             if x then
-                cols[#cols + 1]       = { x = x, y = y, t = frac * durMs }
+                cols[#cols + 1]       = { x = x, y = y, t = frac * dropMs }
                 payload[#payload + 1] = { ["x"] = x, ["y"] = y }
             else
                 missedPick = missedPick + 1
@@ -589,15 +592,15 @@ Events.OnClientCommand.Add(function(module, command, player, data)
         sendServerCommand("PongDuRain", "Prep", { ["cols"] = payload, ["z"] = dropZ })
     end
 
-    -- 투하 모드: 그림자 연출용 비행 정보. 수송기는 PREP_DELAY_MS 시점에 A, 그로부터
-    -- durMs 뒤 B에 도달한다 (서버 스폰 시각 t와 같은 기준).
+    -- 투하 모드: 그림자 연출용 비행 정보. 수송기는 PREP_DELAY_MS 시점에 A', + leadMs 에 A,
+    -- 그로부터 dropMs 뒤 B, 지속시간(durMs) 끝에 B' 에 도달한다 (서버 스폰 시각 t와 같은 기준).
     if flight then
-        -- 비행 경로 A' -> B': AB 를 양쪽으로 (AIR_PATH_SCALE - 1) / 2 배씩 연장. 속도는 그대로라
-        -- 비행 시간은 durMs x AIR_PATH_SCALE, A 도달은 PREP_DELAY_MS + leadMs.
+        -- 비행 경로 A' -> B': AB 를 양쪽으로 (AIR_PATH_SCALE - 1) / 2 배씩 연장. 등속이라
+        -- 비행 시간 = 지속시간 = dropMs x AIR_PATH_SCALE, A 도달은 PREP_DELAY_MS + leadMs.
         local ldx, ldy = flight.bx - flight.ax, flight.by - flight.ay
         local ext = (AIR_PATH_SCALE - 1) / 2
-        leadMs = durMs * ext
-        local flyMs = durMs * AIR_PATH_SCALE
+        leadMs = dropMs * ext
+        local flyMs = durMs
         local flightExt = {
             ax = flight.ax - ldx * ext, ay = flight.ay - ldy * ext,
             bx = flight.bx + ldx * ext, by = flight.by + ldy * ext,
@@ -615,7 +618,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
             math.floor(flightExt.ax), math.floor(flightExt.ay),
             math.floor(flight.ax), math.floor(flight.ay), math.floor(flight.bx), math.floor(flight.by),
             math.floor(flightExt.bx), math.floor(flightExt.by),
-            len, len * AIR_PATH_SCALE, len / durS, math.floor(leadMs), math.floor(flyMs), r))
+            len, len * AIR_PATH_SCALE, len / (dropMs / 1000), math.floor(leadMs), math.floor(flyMs), r))
     end
 
     -- 낙하 좀비 플레이어 어그로 창 (클라 features/aggro.lua 수신).
@@ -626,7 +629,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     -- v4: 반경 필터 폐지 — zid는 위 flushBatch가 배치마다 AddIds로 공급하므로
     -- 여기선 빈 창만 연다. 주변 기존 좀비는 더 이상 어그로 대상이 아니다.
     sendServerCommand("PongDuAggro", "Window", {
-        ["dur"] = PREP_DELAY_MS + leadMs + durMs + 8000,
+        ["dur"] = PREP_DELAY_MS + leadMs + dropMs + 8000,
         ["pid"] = player:getOnlineID(),
         ["src"] = "rain",
     })
@@ -640,7 +643,7 @@ Events.OnClientCommand.Add(function(module, command, player, data)
         player     = player,
         cols       = cols,
         kinds      = kindList,   -- cols[i] 에 떨어질 종류
-        durMs      = durMs,
+        durMs      = dropMs,     -- 낙하 구간 길이 (세션 시간초과 판정 기준)
         dropZ      = dropZ,
         sender     = sender,
         para       = para,
@@ -655,5 +658,6 @@ Events.OnClientCommand.Add(function(module, command, player, data)
     print("[PongDuRain] session start para=" .. tostring(para) .. " player=" .. tostring(player:getUsername())
         .. " style=" .. STYLE_NAMES[style] .. " dropZ=" .. tostring(dropZ) .. " r=" .. tostring(r)
         .. " dur=" .. tostring(durS) .. "s cnt=" .. tostring(cnt)
-        .. " cols=" .. tostring(#cols) .. " intervalMs=" .. tostring(math.floor(durMs / #cols)))
+        .. " dropMs=" .. tostring(math.floor(dropMs))
+        .. " cols=" .. tostring(#cols) .. " intervalMs=" .. tostring(math.floor(dropMs / #cols)))
 end)
