@@ -41,8 +41,12 @@ public final class Fx3D {
     private static final long GROW_MS = 1100;                // a puff grows from 45% to full size in this time
     private static final float GOLDEN = 2.39996f;
     private static final int MAX_CLOUDS = 12;
-    private static final float VEIL_EDGE = 3.5f;             // m inside the cloud edge until the view is fully veiled
-    private static final float VEIL_MAX = 0.9f;
+    // Camera inside a cloud: a light full-screen tint, not a wall. The activator always starts at the
+    // cloud's centre (gas spawns on the player), and 0.9 left the screen solid purple for ~6 s
+    // (10/28 recording). Puffs around the camera also fade out (VS nearK) so the view reaches ~10 m.
+    private static final float VEIL_EDGE = 8f;               // m inside the cloud edge until the tint is at full strength
+    private static final float VEIL_MAX = 0.35f;
+    private static final float INSIDE_THIN = 0.65f;          // puffs of the cloud the camera is in keep 35% of their opacity
 
     // ── tracers ────────────────────────────────────────────────────────────
     private static final float TR_SPEED = 160f, TR_STREAK = 4f, TR_WIDTH = 0.07f;
@@ -290,11 +294,17 @@ public final class Fx3D {
                 out = out * out * (3f - 2f * out);
                 float spreadOut = 1f + 0.10f * lifeFrac;
                 float rise = 0.6f * lifeFrac;
+                // how deep the camera is inside this cloud (0 outside .. 1 at VEIL_EDGE in). Used to thin the
+                // cloud's own puffs so the view inside is a haze, while from outside it stays a solid mass.
+                double hd = Math.hypot(cx - c.x, cy - c.y);
+                float edge = c.r * spreadOut;
+                float inside = (hd < edge && camU - c.baseU < c.top) ? clamp((float) (edge - hd) / VEIL_EDGE, 0f, 1f) : 0f;
+                float thin = 1f - INSIDE_THIN * inside;
                 for (int i = 0, o = 0; i < c.count; i++, o += 6) {
                     float k = clamp((age - c.puffs[o + 4]) / (float) GROW_MS, 0f, 1f);
                     if (k <= 0f) continue;
                     float ease = 1f - (1f - k) * (1f - k) * (1f - k);
-                    float a = PUFF_ALPHA * ease * out;
+                    float a = PUFF_ALPHA * ease * out * thin;
                     if (a < 0.01f) continue;
                     float size = c.puffs[o + 3] * (0.45f + 0.55f * ease) * (1f + 0.15f * lifeFrac);
                     double wx = c.x + c.puffs[o] * spreadOut, wy = c.y + c.puffs[o + 1] * spreadOut;
@@ -302,12 +312,10 @@ public final class Fx3D {
                     float dist = px * px + py * py + pz * pz;
                     puffs.add(new Item(M_PUFF, px, py, pz, 0, c.baseU - camU, 0, size, c.cr, c.cg, c.cb, a, c.puffs[o + 5], dist));
                 }
-                // camera inside the cloud: veil the whole view in its colour
-                double hd = Math.hypot(cx - c.x, cy - c.y);
-                float edge = c.r * spreadOut;
+                // camera inside the cloud: light tint of the whole view in its colour
                 float grown = clamp(age / (float) (c.spread + GROW_MS), 0f, 1f);
-                if (hd < edge && camU - c.baseU < c.top) {
-                    float v = clamp((float) (edge - hd) / VEIL_EDGE, 0f, 1f) * grown * out * VEIL_MAX;
+                if (inside > 0f) {
+                    float v = inside * grown * out * VEIL_MAX;
                     if (v > veil[3]) { veil[0] = c.cr; veil[1] = c.cg; veil[2] = c.cb; veil[3] = v; }
                 }
             }
@@ -392,7 +400,7 @@ public final class Fx3D {
                 p = a + right * (q.x - 0.5) * size + up * (q.y - 0.5) * size;
                 if (mode == 2) {
                     float rad = size * 0.5;
-                    nearK = smoothstep(rad * 0.35, rad * 1.1, length(a - eye));
+                    nearK = smoothstep(rad * 0.8, rad * 3.0, length(a - eye));
                 }
             }
             vY = p.y;
