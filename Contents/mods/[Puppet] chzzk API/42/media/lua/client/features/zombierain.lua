@@ -8,6 +8,7 @@ local fx = require("utils/fx")
 local deltaTime = require("utils/deltaTime")
 local mutantspawn = require("features/mutantspawn")
 local vxf = require("utils/vehtransform")
+local vpView = require("utils/viewpointView")
 
 -- ── 좀비 레인 (zombie_rain) 클라이언트 ── [z 리프트 + 최상층 스퀘어 1칸] ─────────
 -- 역할 4가지:
@@ -315,9 +316,21 @@ end
 -- 아예 불리지 않아 그림자가 안 그려졌다. OnPreUIDraw(월드 렌더 후, UI 전)로 옮긴다.
 -- 대가: 바닥 위가 아니라 월드 전체 위에 그려져 캐릭터·차량도 그림자에 덮인다
 -- (반투명 그림자라 실제 그림자처럼 보인다).
+-- [Viewpoint] 1·3인칭(Viewpoint 3D 시점)에서는 그리지 않는다. 아이소 화면 좌표로 그린 2D 그림자가
+-- 3D 화면과 어긋난 위치에 뜬다. 그 시점에서 기체(차량)는 Viewpoint 가 3D 모델로 그리고
+-- 차량 그림자 패스로 실제 그림자를 드리운다(utils/viewpointView.lua).
+local _shadowHiddenLogged = false
 local function drawFlights()
     if #_flights == 0 then return end
     if not SHADOW_TEX then return end
+    if vpView.isPerspective() then
+        if not _shadowHiddenLogged then
+            _shadowHiddenLogged = true
+            print("[PongDuRain] airdrop shadow hidden (viewpoint " .. vpView.mode() .. " view)")
+        end
+        return
+    end
+    _shadowHiddenLogged = false
     -- OnPreUIDraw 는 일시정지 중에도 매 프레임 불린다. 마지막 틱 이후 PAUSE_GAP_MS 가 지났으면
     -- (일시정지 중, 또는 재개 직후 OnTick 이 시각을 밀기 전) 마지막 틱 시각에 멈춰 그린다.
     local now = getTimestampMs()
