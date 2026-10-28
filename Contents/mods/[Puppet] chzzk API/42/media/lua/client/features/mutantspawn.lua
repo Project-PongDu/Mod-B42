@@ -33,6 +33,10 @@ end
 --               AnimSets/zombie-crawler/*/roach_*.xml 노드가 PuppetRoach
 --               애님 변수 조건으로 3배속 크롤을 재생 (조건 수가 많은 노드가
 --               우선 선택되는 PZ 애님 규칙, Hitman 애님 변형과 동일 기법).
+--    레커     : 일반 걸음. 대상이 1.5~5칸이면 예고 후 직선 돌진, 닿으면 어깨빵으로
+--               넘어뜨리고 피해, 벽·문에 막히면 문·창문·바리케이드를 부수고 자기가 넘어진다.
+--               단계 결정은 서버(server/PongDuWreckerServer.lua), 연출·이동은 features/wrecker.lua.
+--               여기서는 종류 등록·체력·이름표만 한다.
 --
 --  권한 구조: 좀비는 클라이언트 권한이므로 서버는 스폰 + modData 마킹만 하고
 --  (server.lua MutantSpawn 핸들러), 실제 스탯/행동은 각 클라이언트의
@@ -40,10 +44,10 @@ end
 --  풀리면 PuppetMutantInit 가드가 리셋되므로 다음 틱에 자동 재적용된다.
 -- ═══════════════════════════════════════════════════════════════════════════
 
-local KINDS = { "screamer", "brute", "roach", "tracer" }
+local KINDS = { "screamer", "brute", "roach", "tracer", "wrecker" }
 
 -- 샌드박스 타입 필터: PongDu.Mutant_<종류> 체크된 것만 등장 풀에 포함.
--- 4종 전부 해제면 스프린터 1마리로 폴백
+-- 5종 전부 해제면 스프린터 1마리로 폴백
 -- (서버 spawnSpecialZombie는 kind="sprinter"를 그대로 처리 -- modData 마킹 +
 --  MutantMark 브로드캐스트, 클라 initMutant가 walkType 적용).
 local KIND_OPTION = {
@@ -51,6 +55,7 @@ local KIND_OPTION = {
     brute    = "Mutant_Brute",
     roach    = "Mutant_Roach",
     tracer   = "Mutant_Tracer",
+    wrecker  = "Mutant_Wrecker",
 }
 
 local function pickKind()
@@ -70,6 +75,7 @@ local haloKey = {
     brute    = "IGUI_mutant_name_brute",
     roach    = "IGUI_mutant_name_roach",
     tracer   = "IGUI_mutant_name_tracer",
+    wrecker  = "IGUI_mutant_name_wrecker",
     sprinter = "IGUI_mutant_name_sprinter",
 }
 
@@ -126,6 +132,7 @@ local HEALTH_OPT = {
     screamer = "PongDu.Mutant_Health_Screamer",
     roach    = "PongDu.Mutant_Health_Roach",
     tracer   = "PongDu.Mutant_Health_Tracer",
+    wrecker  = "PongDu.Mutant_Health_Wrecker",
 }
 
 local function mutantHealth(kind)
@@ -162,6 +169,8 @@ local function initMutant(zombie, kind)
         -- 이속에 아무 영향이 없다. 실제 이속 조절은 locomotion 애님 노드의
         -- m_SpeedScale 오버라이드로만 가능(TR locomotion 노드, 별도 작업).
         zombie:setWalkType("sprint" .. tostring(ZombRand(5) + 1))
+    elseif kind == "wrecker" then
+        -- 레커: 걸음은 기본값 유지. 돌진은 서버 단계 방송을 받아 features/wrecker.lua 가 처리한다.
     end
     -- 체력은 분기 뒤에 일괄 적용한다. 브루트는 위에서 DoZombieStats()를 부르는데
     -- 그 안에서 Toughness 기준으로 setHealth가 다시 걸리므로(IsoZombie.java:3350)
@@ -1011,6 +1020,7 @@ local NAME_KEY = {
     roach    = "IGUI_mutant_name_roach",
     sprinter = "IGUI_mutant_name_sprinter",
     tracer   = "IGUI_mutant_name_tracer",
+    wrecker  = "IGUI_mutant_name_wrecker",
 }
 
 local TAG_COLOR = {      -- 스크리머/브루트는 CDDA 원본 색, 로치는 바퀴 갈색
@@ -1019,6 +1029,7 @@ local TAG_COLOR = {      -- 스크리머/브루트는 CDDA 원본 색, 로치는
     roach    = {181, 101, 29},
     sprinter = {255, 165, 0},
     tracer   = {0, 200, 180},   -- 파쿠르 테마 청록
+    wrecker  = {230, 200, 0},   -- 중장비 노랑
 }
 
 local _showTags = {}     -- [onlineID] = { zombie=, ttl=, tdo=TextDrawObject }

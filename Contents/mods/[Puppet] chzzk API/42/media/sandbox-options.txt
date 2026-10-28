@@ -716,6 +716,11 @@ option PongDu.Mutant_Tracer = {
     page = PongDu_Debuff, translation = PongDu_Mutant_Tracer,
 }
 
+option PongDu.Mutant_Wrecker = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Wrecker,
+}
+
 option PongDu.Mutant_Health_Screamer = {
     type = double, min = 0.50, max = 30, default = 3.00,
     page = PongDu_Debuff, translation = PongDu_Mutant_Health_Screamer,
@@ -734,6 +739,36 @@ option PongDu.Mutant_Health_Roach = {
 option PongDu.Mutant_Health_Tracer = {
     type = double, min = 0.50, max = 30, default = 3.00,
     page = PongDu_Debuff, translation = PongDu_Mutant_Health_Tracer,
+}
+
+option PongDu.Mutant_Health_Wrecker = {
+    type = double, min = 0.50, max = 30, default = 5.00,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Health_Wrecker,
+}
+
+option PongDu.Wrecker_Cooldown = {
+    type = integer, min = 3, max = 60, default = 10,
+    page = PongDu_Debuff, translation = PongDu_Wrecker_Cooldown,
+}
+
+option PongDu.Wrecker_ChargeDistance = {
+    type = integer, min = 4, max = 20, default = 10,
+    page = PongDu_Debuff, translation = PongDu_Wrecker_ChargeDistance,
+}
+
+option PongDu.Wrecker_HitDamage = {
+    type = integer, min = 0, max = 100, default = 20,
+    page = PongDu_Debuff, translation = PongDu_Wrecker_HitDamage,
+}
+
+option PongDu.Wrecker_FractureChance = {
+    type = integer, min = 0, max = 100, default = 10,
+    page = PongDu_Debuff, translation = PongDu_Wrecker_FractureChance,
+}
+
+option PongDu.Wrecker_BreakObstacles = {
+    type = boolean, default = true,
+    page = PongDu_Debuff, translation = PongDu_Wrecker_BreakObstacles,
 }
 
 option PongDu.Divider_RiseUp = {
@@ -850,6 +885,11 @@ option PongDu.Rain_Count_Roach = {
 option PongDu.Rain_Count_Tracer = {
     type = integer, min = 0, max = 500, default = 0,
     page = PongDu_Debuff, translation = PongDu_Rain_Count_Tracer,
+}
+
+option PongDu.Rain_Count_Wrecker = {
+    type = integer, min = 0, max = 500, default = 0,
+    page = PongDu_Debuff, translation = PongDu_Rain_Count_Wrecker,
 }
 
 option PongDu.Rain_ShowRadius = {
