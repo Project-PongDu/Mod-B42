@@ -16,8 +16,12 @@
 --   * 모든 클라: sprint 중 자기 로컬 플레이어가 레커와 몸이 부딪히면(OnCharacterCollide, 원본과 같음)
 --     그 플레이어를 넘어뜨리고(바닐라 스프린터 충돌과 같은 호출 순서, IsoGameCharacter.java:14828~14842)
 --     서버에 Hit 를 보고한다. 돌진은 멈추지 않으므로 같은 돌진에 여러 명이 맞을 수 있다(플레이어마다 1번).
---   * 모든 클라: warn 을 받으면 레커 위치에서 예고음(원본 사운드)을 내고, 예고 클립 재생 위치를
---     W.VAR_PROGRESS 로 넘긴다(원본 ActionProgress).
+--   * 모든 클라: warn 을 받으면 예고음(원본 사운드)을 원본과 같이 좀비 목소리 채널(playVocals)로 내고
+--     예고 동안 바닐라 좀비 울음(zombie.vocalEvent)을 끈다. 단계가 바뀌면 예고음을 멈춘다
+--     (원본 PZM_ActionPresentation PZM_applyPhaseVocal/PZM_suppressVanillaVocal).
+--     예고 클립 재생 위치는 W.VAR_PROGRESS 로 넘긴다(원본 ActionProgress).
+--   * 소유 클라: sprint 중 자기 쪽 위치로 W.CHARGE_DISTANCE 칸을 가면 서버에 Arrive 를 보내고
+--     바로 recovery 로 넘어간다(서버 위치는 늦게 따라와 서버만 재면 한참 더 간다).
 
 require "PongDuWrecker"
 
@@ -93,6 +97,12 @@ end
 -- 고정을 풀고 현재 애니메이션 상태에 맞는 바닐라 AI 상태로 되돌린다 (원본 PZM_ActionStateAdapter 방식).
 --   walktoward : 대상이 있으면 그쪽 경로 + WalkToward, 없으면 Idle
 --   idle       : 대상이 있으면 경로 + WalkToward (고정 중 애니메이션이 idle 로 떨어졌을 수 있다)
+--   attack     : 대상이 공격 거리 밖이면(bAttack=false) 공격을 끝낸 것으로 하고(ZombieBiteDone,
+--                actiongroups zombie/attack/to_idle.xml) 경로 + WalkToward. [원본과 다름]
+--                돌진 중 플레이어 곁을 지나면 애니메이션이 lunge->attack 으로 넘어가고(bAttack,
+--                lunge/to_attack.xml) 돌진 클립이 바닐라 공격 클립을 덮어 ZombieBiteDone 이 안 서서
+--                attack 에 남는다. 원본처럼 AttackState 로 돌리면 멀리 있는 대상을 향해 헛공격 모션을 한다.
+--                대상이 공격 거리 안이면 원본대로 AttackState (물기).
 --   그 외      : 애니메이션 상태 이름으로 등록된 AI 상태 (attack, lunge, climbfence 등)
 --   등록 없음  : 대상 있으면 WalkToward, 없으면 Idle
 local function resumeVanilla(z)
@@ -114,6 +124,11 @@ local function resumeVanilla(z)
         z:pathToCharacter(t)
         z:changeState(WalkTowardState.instance())
         how = "walktoward(from idle)"
+    elseif name == "attack" and t and not z:getVariableBoolean("bAttack") then
+        z:setVariable("ZombieBiteDone", true)
+        z:pathToCharacter(t)
+        z:changeState(WalkTowardState.instance())
+        how = "walktoward(attack out of reach)"
     elseif resume then
         z:changeState(resume)
         how = tostring(raw)
@@ -163,7 +178,43 @@ local function warnTarget(e)
     return nil
 end
 
+-- ── 예고음 (원본 PZM_applyPhaseVocal / PZM_suppressVanillaVocal / PZM_stopCustomVocal) ──
+local function muteVanillaVocal(z)
+    pcall(function()
+        local h = z.vocalEvent
+        if h ~= nil and h ~= 0 then
+            z:getEmitter():stopSoundLocal(h)
+            z.vocalEvent = 0
+        end
+    end)
+end
+
+local function stopVocal(e)
+    local h = e.vocal
+    e.vocal = nil
+    e.muteVanilla = false
+    if h ~= nil and h ~= 0 and e.z then
+        local ok, err = pcall(function() e.z:getEmitter():stopSoundLocal(h) end)
+        if not ok then print(LOG .. "warn vocal stop failed zid=" .. tostring(e.zid) .. " err=" .. tostring(err)) end
+    end
+end
+
+local function startWarnVocal(e)
+    stopVocal(e)
+    local z = e.z
+    e.muteVanilla = true
+    muteVanillaVocal(z)
+    local ok, h = pcall(function() return z:getEmitter():playVocals(W.WARN_SOUND) end)
+    if ok and h ~= nil and h ~= 0 then
+        e.vocal = h
+    else
+        e.muteVanilla = false
+        print(LOG .. "warn vocal failed zid=" .. tostring(e.zid) .. " ok=" .. tostring(ok) .. " ret=" .. tostring(h))
+    end
+end
+
 local function finish(k, e, reason)
+    stopVocal(e)
     release(e, "end")
     clearAnim(e.z)
     _act[k] = nil
@@ -263,8 +314,28 @@ local function checkCrash(e, tnow)
         ["zid"] = e.zid, ["seq"] = e.seq,
         ["hx"] = sq and sq:getX() or math.floor(z:getX()),
         ["hy"] = sq and sq:getY() or math.floor(z:getY()),
+        ["hz"] = sq and sq:getZ() or math.floor(z:getZ()),
         ["dir"] = dir or "",
     }, z)
+end
+
+-- 10칸 도달 (소유 클라): 서버에 알리고 바로 회복으로 넘어간다. 서버 recovery 통지가 오면 같은 단계라 그대로 잇는다.
+local function checkArrive(e, tnow)
+    if e.arriveSent or not e.sx then return end
+    local z = e.z
+    local dx, dy = z:getX() - e.sx, z:getY() - e.sy
+    local d = math.sqrt(dx * dx + dy * dy)
+    if d < W.CHARGE_DISTANCE then return end
+    e.arriveSent = true
+    print(LOG .. "arrive zid=" .. tostring(e.zid) .. " seq=" .. tostring(e.seq)
+        .. " d=" .. string.format("%.2f", d) .. " ms=" .. tostring(tnow - e.t0))
+    e.ph = PH.RECOVERY
+    e.t0 = tnow
+    local f = z:getForwardDirection()
+    e.fx, e.fy = f:getX(), f:getY()
+    z:setVariable(W.VAR_PHASE, PH.RECOVERY)
+    local reporter = getSpecificPlayer(0) or getPlayer()
+    W.sendClaim(reporter, "Arrive", { ["zid"] = e.zid, ["seq"] = e.seq, ["d"] = string.format("%.1f", d) }, z)
 end
 
 local function crashFall(e)
@@ -306,8 +377,11 @@ W.clientHandler = function(args, zobj)
         e = { hitLocal = {} }
         _act[k] = e
     end
+    local newSeq = tonumber(args["seq"])
+    local changed = e.ph ~= ph or e.seq ~= newSeq
+    if changed then stopVocal(e) end
     e.z, e.zid, e.ph = z, zid, ph
-    e.seq = tonumber(args["seq"])
+    e.seq = newSeq
     e.dx, e.dy = tonumber(args["dx"]), tonumber(args["dy"])
     e.tid = tonumber(args["tid"])
     e.t0 = getTimestampMs()
@@ -326,7 +400,7 @@ W.clientHandler = function(args, zobj)
     end
 
     if ph == PH.WARN then
-        z:playSound(W.WARN_SOUND)
+        if changed then startWarnVocal(e) end
         z:setVariable(W.VAR_PROGRESS, 0)
     end
 
@@ -334,6 +408,8 @@ W.clientHandler = function(args, zobj)
     if ph == PH.SPRINT then
         e.hitLocal = {}
         e.crashSent = false
+        e.arriveSent = false
+        e.sx, e.sy = z:getX(), z:getY()
         e.lx, e.ly, e.lastLog = z:getX(), z:getY(), e.t0
         -- 돌진 방향: 이 클라에서 본 대상 쪽으로 한 번 잡는다. 대상이 없으면 서버 방향 (원본 PZM_captureSprintFacing)
         if isOwner(z) then
@@ -377,6 +453,7 @@ Events.OnTick.Add(function()
         elseif tnow - e.t0 > SAFETY_MS then
             finish(k, e, "safety timeout ph=" .. tostring(e.ph))
         elseif e.ph ~= PH.CRASH then
+            if e.muteVanilla then muteVanillaVocal(z) end
             local owner = isOwner(z)
             local policy = nil
             if owner then
@@ -420,10 +497,13 @@ Events.OnTick.Add(function()
             end
             if e.ph == PH.SPRINT then
                 if owner and policy == "hold" then checkCrash(e, tnow) end
+                if owner and not e.crashSent then checkArrive(e, tnow) end
                 if owner and tnow - e.lastLog >= SPRINT_LOG_MS then
                     local dx, dy = z:getX() - e.lx, z:getY() - e.ly
+                    local tx, ty = z:getX() - (e.sx or e.lx), z:getY() - (e.sy or e.ly)
                     print(LOG .. "sprint progress zid=" .. tostring(e.zid)
                         .. " moved=" .. string.format("%.2f", math.sqrt(dx * dx + dy * dy))
+                        .. " total=" .. string.format("%.2f", math.sqrt(tx * tx + ty * ty))
                         .. " state=" .. tostring(z:getCurrentActionContextStateName())
                         .. " ai=" .. tostring(z:getCurrentStateName()))
                     e.lx, e.ly, e.lastLog = z:getX(), z:getY(), tnow

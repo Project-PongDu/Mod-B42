@@ -33,7 +33,7 @@ end
 --               AnimSets/zombie-crawler/*/roach_*.xml 노드가 PuppetRoach
 --               애님 변수 조건으로 3배속 크롤을 재생 (조건 수가 많은 노드가
 --               우선 선택되는 PZ 애님 규칙, Hitman 애님 변형과 동일 기법).
---    레커     : 빠른 걸음(바닐라 fast shambler) 고정, 물지 않음(setNoTeeth). 대상이 5칸 안이면
+--    레커     : 빠른 걸음(바닐라 fast shambler) 고정, 평소엔 일반 좀비처럼 문다(원본 레커와 같음). 대상이 5칸 안이면
 --               예고 후 직선 돌진, 닿은 플레이어는 넘어뜨리고 피해(돌진은 계속, 여러 명 관통),
 --               벽·문·울타리에 막히면 문·창문·바리케이드를 부수거나 울타리를 휘고 자기가 넘어진다.
 --               단계 결정은 서버(server/PongDuWreckerServer.lua), 연출·이동은 features/wrecker.lua.
@@ -175,9 +175,8 @@ local function initMutant(zombie, kind)
         -- speedType 을 2 로 박아 두므로 이후 DoZombieStats 도 같은 속도로 다시 만든다.
         -- 돌진은 서버 단계 방송을 받아 features/wrecker.lua 가 처리한다.
         zombie:doFastShambler()
-        -- 물지 않는다: 바닐라 공격 모션은 나와도 AttackCollisionCheck 가 피해를 건너뛴다
-        -- (AttackState.java:151). 플래그는 네트워크로 안 가므로 클라마다 건다(공격 판정은 소유 클라).
-        zombie:setNoTeeth(true)
+        -- 무는 능력은 건드리지 않는다 (원본 PZM_MutantProperties 의 Wrecker 에 noTeeth 없음).
+        -- 돌진 중엔 AI 가 무동작 상태로 고정돼 AttackState 가 없으므로 물지 못한다.
     end
     -- 체력은 분기 뒤에 일괄 적용한다. 브루트는 위에서 DoZombieStats()를 부르는데
     -- 그 안에서 Toughness 기준으로 setHealth가 다시 걸리므로(IsoZombie.java:3350)
@@ -252,10 +251,6 @@ local function guardStats(zombie, kind)
         if not wt or string.sub(wt, 1, 6) == "sprint" or string.sub(wt, 1, 4) == "slow" then
             reason = "walkType=" .. tostring(wt)
         end
-    end
-    -- 레커 무는 능력: 좀비 재사용 초기화(IsoZombie.java:4478)로 꺼질 수 있다
-    if not reason and kind == "wrecker" and not zombie:isNoTeeth() then
-        reason = "noTeeth=false"
     end
 
     -- ② 크롤: 로치가 아닌데 정당한 사유 없이 기고 있음(크롤러 버킷 배정).

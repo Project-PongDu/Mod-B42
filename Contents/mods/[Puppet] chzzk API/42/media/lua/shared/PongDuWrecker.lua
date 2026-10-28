@@ -6,15 +6,18 @@
 --   돌진 중 닿은 플레이어는 넘어지고 피해를 입으며, 돌진은 멈추지 않고 계속된다(여러 명 관통).
 --   돌진 중 벽·문·창문·울타리에 막히면 충돌(crash): 앞을 막은 문·창문·바리케이드를 부수고
 --   휘는 울타리는 휘거나(첫 충돌) 무너뜨린다(이미 휜 것). 레커는 넘어진다.
---   레커는 물지 않는다(setNoTeeth, AttackState.java:151 의 AttackCollisionCheck 가 피해를 건너뜀).
+--   평소에는 일반 좀비처럼 물고 할퀸다(원본 레커와 같음). 돌진 중에는 AI 가 고정돼 물지 못한다.
 --   붙어 있어도 돌진한다(TRIGGER_MIN 0, 원본 레커와 같음).
+--   돌진 거리 10칸은 소유 클라가 자기 쪽 위치로 잰다(서버 위치는 소유 클라 패킷이라 늦게 따라온다.
+--   서버만 재면 실측 18~26칸을 가서야 멈췄다). 소유 클라가 Arrive 를 보내고 바로 회복으로 넘어간다.
 --
 -- [원본 레커(The Mutants, PZM_Wrecker_*)와의 관계]
 --   클립·예고음은 원본 것을 그대로 쓰고(anims_X/Zombie/Zombie_PZM_Wrecker_*.glb. 버전 폴더(42/)의
 --   anims_X 는 common/media/anims_X 가 없으면 Zombie·Bob·Kate 같은 메시 폴더만 읽힌다(ModelManager.java:1838~1865),
 --   sound/PongDuWrecker_ChargeWarn.ogg), 시간·거리·방향·파괴·취소 규칙도 원본 값을 따른다.
---   원본과 다른 점은 요청으로 바꾼 것뿐이다: 랜덤 외형(원본 남자 고정), 물지 않음,
---   피해(원본 차량충돌 공식 -> 전체 체력 20 + 부위 부상), 체력 샌드박스, 돌진 거리 10칸 상한.
+--   원본과 다른 점은 요청으로 바꾼 것뿐이다: 랜덤 외형(원본 남자 고정),
+--   피해(원본 차량충돌 공식 -> 전체 체력 20 + 부위 부상), 체력 샌드박스, 돌진 거리 10칸 상한,
+--   돌진 속도 1.5배, 맞은 플레이어 넘어짐 클립, 돌진 후 헛공격 방지(client/features/wrecker.lua resumeVanilla).
 --
 -- [바닐라 상태와의 공존] (원본 PZM_ActionStateAdapter 와 같은 방식)
 --   이동 고정은 AI 상태만 무동작 상태로 바꾸고 애니메이션 상태(ActionContext)는 그대로 둔다.
@@ -67,16 +70,17 @@ W.CRASH_MS       = 17      -- 원본 1틱. 바로 바닐라 넉다운에 넘긴�
 W.COOLDOWN_MS    = 10000   -- 원본 600틱. 돌진(sprint) 시작부터 다음 돌진 가능까지
 W.CANCEL_RETRY_MS = 1000   -- 원본 60틱. 돌진이 중간에 취소되면 이만큼 뒤 다시 시도
 
--- 발동 거리 (칸). 물지 않으므로 붙어 있어도 돌진한다 (원본 TRIGGER_MIN_DISTANCE = 0).
+-- 발동 거리 (칸). 붙어 있어도 돌진한다 (원본 TRIGGER_MIN_DISTANCE = 0).
 W.TRIGGER_MIN = 0
 W.TRIGGER_MAX = 5
 
 -- 돌진 수치 (하드코딩)
-W.CHARGE_DISTANCE = 10    -- 한 번 돌진의 최대 거리 (칸). 원본은 클립이 이 거리에 맞춰져 있고 검사는 안 한다
+W.CHARGE_DISTANCE = 10    -- 한 번 돌진의 최대 거리 (칸). 원본은 검사 안 함. 소유 클라가 재서 Arrive 로 알린다
 W.HIT_DAMAGE      = 20    -- 전체 체력(100) 기준으로 깎는 양
 W.FRACTURE_CHANCE = 30    -- 부상 부위마다 골절 확률 (%), 나머지는 깊은 상처
 
--- 예고음 (원본 PZTheMutants_Wrecker_ChargeWarn 과 같은 파일·설정, scripts/t3_mutant_sounds.txt)
+-- 예고음 (원본 PZTheMutants_Wrecker_ChargeWarn 과 같은 파일·설정, scripts/t3_mutant_sounds.txt).
+-- 재생도 원본과 같이 좀비 목소리 채널(getEmitter():playVocals)로 내고, 예고 동안 바닐라 좀비 울음은 끈다.
 W.WARN_SOUND = "PongDuWrecker_ChargeWarn"
 
 -- 소유 클라가 AI 이동을 멈출 때 빌리는 바닐라 상태. IsoZombie 가 이 이름을
@@ -95,8 +99,9 @@ W.HOLD_STATES = {
     recovery = { walktoward = "hold", lunge = "hold", idle = "hold", ["face-target"] = "hold", attack = "hold",
                  thump = "hold" },
 }
--- 서버가 돌진(warn)을 시작해도 되는 상태
-W.START_STATES = HOLD_COMMON
+-- 서버가 돌진(warn)을 시작해도 되는 상태 (원본 WreckerActions.StartAnimationStates: walktoward, lunge 만).
+-- attack·idle 에서 시작하면 돌진이 끝날 때 애니메이션이 attack 에 남아 헛공격 모션이 나온다.
+W.START_STATES = { walktoward = true, lunge = true }
 
 
 W.clientHandler = nil   -- function(args, zombie)                  : client/features/wrecker.lua
@@ -142,7 +147,7 @@ function W.sendPhase(args, zombie)
     end
 end
 
--- 클라 -> 서버: 명중(Hit)·충돌(Crash) 보고. args = { zid, seq }
+-- 클라 -> 서버: 명중(Hit)·충돌(Crash)·10칸 도달(Arrive) 보고. args = { zid, seq, ... }
 -- 서버 -> 모든 클라: 이 플레이어가 맞아 넘어진다 (다른 클라에서도 같은 넘어짐 클립이 나오게). args = { pid }
 function W.sendFall(args)
     if isServer() then

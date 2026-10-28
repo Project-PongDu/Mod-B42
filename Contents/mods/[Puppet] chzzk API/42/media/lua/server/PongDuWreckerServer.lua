@@ -2,12 +2,13 @@
 -- 설계는 shared/PongDuWrecker.lua 머리 주석 참고.
 --
 -- [흐름]
---   2초마다 셀 좀비 목록에서 레커(modData PuppetMutant == "wrecker")를 모으고(물지 않게 setNoTeeth),
+--   2초마다 셀 좀비 목록에서 레커(modData PuppetMutant == "wrecker")를 모으고,
 --   0.1초마다 레커별 단계를 진행한다.
 --     none     : 쿨다운이 끝났고 대상 플레이어가 0~5칸, 같은 층, 사이가 트여 있고, 차에 타지 않았고
 --                레커가 고정 가능한 애니메이션 상태(W.START_STATES)면 warn
 --     warn     : 1.5초. 클라가 대상을 계속 바라본다. 끝나면 sprint (방향은 이때 대상 쪽으로 한 번 잡는다)
---     sprint   : W.CHARGE_DISTANCE 칸을 갔거나 4초가 지나면 recovery
+--     sprint   : 소유 클라 Arrive 보고(자기 쪽 위치로 W.CHARGE_DISTANCE 칸 도달)나 4초가 지나면 recovery.
+--                서버 위치로도 재지만 소유 클라 패킷이 늦어 예비용이다(실측 18~26칸에서야 걸렸다)
 --                피격자 클라 Hit 보고 -> 그 플레이어에게 피해. 돌진은 계속된다(여러 명 관통)
 --                소유 클라 Crash 보고(부딪힌 칸 + 방향) -> 그 면의 장애물 파괴 + crash(레커 넘어짐)
 --     recovery : 0.833초 뒤 none (돌진 끝 직후 늦게 도착한 Hit 도 이 단계까지 받는다)
@@ -18,7 +19,10 @@
 --
 -- [보고 검증] seq(돌진마다 증가)가 다르면 지난 돌진의 늦은 보고로 보고 버린다.
 --   Hit 은 보낸 본인에게만 피해를 준다(다른 플레이어를 지정할 수 없다).
---   Crash 는 보낸 플레이어가 레커 40칸 안일 때만 받는다.
+--   Crash 는 보낸 플레이어가 레커 40칸 안이고 부딪힌 칸이 레커와 같은 층일 때만 받는다
+--   (원본 resolveClaimFace 와 같이 층만 본다. 서버 레커 위치는 늦게 따라와 가로 거리로 거르면
+--   정상 충돌도 버려진다 -> 이전 'impact square too far' 로 파괴 0).
+--   Arrive 는 sprint 중일 때만 받는다.
 
 if isClient() then return end
 
@@ -34,7 +38,6 @@ local SCAN_MS        = 2000
 local TICK_MS        = 100
 local SPAWN_GRACE_MS = 2000    -- 처음 발견한 레커는 이만큼 기다린 뒤 돌진 후보
 local CLAIM_RANGE    = 40      -- Crash 보고자와 레커의 최대 거리 (칸)
-local IMPACT_RANGE   = 2       -- Crash 보고 칸과 서버 레커 위치의 최대 차이 (칸)
 local THUMP_BIG      = 30000   -- IsoObject:Thump 이벤트 수 (short 범위 안)
 local MAX_DESTROY_PASSES = 32  -- 한 면에 겹친 장애물(바리케이드+문 등)을 차례로 벗기는 최대 횟수
 
@@ -385,13 +388,22 @@ W.serverHandler = function(command, player, args, zombieObj)
             return
         end
         local hx, hy = tonumber(args["hx"]), tonumber(args["hy"])
-        if hx and hy and math.abs(hx - z:getX()) <= IMPACT_RANGE and math.abs(hy - z:getY()) <= IMPACT_RANGE then
+        local hz = tonumber(args["hz"]) or math.floor(z:getZ())
+        if hx and hy and hz == math.floor(z:getZ()) then
             breakObstacles(z, hx, hy, args["dir"])
         else
-            print(LOG .. "break skipped: impact square " .. tostring(hx) .. "," .. tostring(hy)
-                .. " too far from wrecker " .. string.format("%.1f,%.1f", z:getX(), z:getY()))
+            print(LOG .. "break skipped: impact square " .. tostring(hx) .. "," .. tostring(hy) .. "," .. tostring(hz)
+                .. " not on wrecker level " .. string.format("%.1f,%.1f,%d", z:getX(), z:getY(), math.floor(z:getZ())))
         end
         toPhase(z, st, PH.CRASH, W.CRASH_MS, tnow, "crash " .. who)
+    elseif command == "Arrive" then
+        if st.phase ~= PH.SPRINT then
+            print(LOG .. "Arrive ignored: phase=" .. tostring(st.phase) .. " from=" .. who)
+            return
+        end
+        local dx, dy = z:getX() - st.sx, z:getY() - st.sy
+        toPhase(z, st, PH.RECOVERY, W.RECOVERY_MS, tnow, "distance owner=" .. tostring(args["d"])
+            .. " server=" .. string.format("%.1f", math.sqrt(dx * dx + dy * dy)) .. " from=" .. who)
     else
         print(LOG .. "unknown command " .. tostring(command) .. " from=" .. who)
     end
@@ -415,7 +427,6 @@ local function scan(tnow)
         if z and not z:isDead() and W.isWrecker(z) then
             seen[z] = true
             byZid[zidOf(z)] = z
-            if not z:isNoTeeth() then z:setNoTeeth(true) end   -- 서버가 직접 굴리는 좀비용 (클라는 mutantspawn)
             if not _st[z] then
                 _st[z] = { phase = PH.NONE, seq = 0, cooldownUntil = tnow + SPAWN_GRACE_MS, hit = {} }
                 print(LOG .. "tracking wrecker zid=" .. tostring(zidOf(z)))
