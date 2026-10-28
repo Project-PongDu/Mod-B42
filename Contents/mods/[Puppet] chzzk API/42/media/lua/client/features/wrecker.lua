@@ -35,6 +35,10 @@ local WATCH_LOG_MS     = 1000
 -- 다른 상태면 그 자세로 굳으므로 짝을 맞춰 준다.
 local RESYNC_STATES = { climbfence = true, climbwindow = true }
 
+local FALL_VAR_MIN_MS  = 500    -- 넘어짐 변수는 최소 이만큼 유지 (bumped 진입 전 지우지 않게)
+local FALL_VAR_MAX_MS  = 6000   -- 넘어짐 변수 최대 유지 시간
+
+local _fallVar = {}   -- [IsoPlayer] = 켠 시각 (넘어짐 변수 정리용)
 local _act   = {}   -- [키] = { z, zid, ph, seq, dx, dy, t0, held, hitLocal, crashSent, lastLog, lx, ly, policy }
 local _watch = {}   -- [키] = { z, zid, untilMs, lastLog }
 
@@ -170,8 +174,23 @@ local function finish(k, e, reason)
 end
 
 -- ── 피격 (모든 클라, 자기 로컬 플레이어) ──────────────────────────────────────
+-- 넘어짐 클립 선택 변수: 켜면 PongDuSlammerFall 노드가 바닐라 밀려 넘어짐을 덮는다.
+-- bumped 상태를 벗어나면 OnTick 이 지운다.
+local function markFall(player)
+    player:setVariable(W.VAR_PLAYER_FALL, true)
+    _fallVar[player] = getTimestampMs()
+end
+
 local function bumpFall(player, z)
     if player:isBumped() or player:isOnFloor() then return end
+    -- 울타리 넘기 실패 클립은 앞으로 몸을 던지며 구른다. 돌진 방향(슬래머가 보는 쪽)으로
+    -- 몸을 돌려 놓아야 밀린 방향으로 날아간다. BumpedState.enter 가 애니 각도를 방향으로 쓰므로
+    -- 애니 각도까지 같이 돌린다(setTargetAndCurrentDirection).
+    local f = z:getForwardDirection()
+    if f and (f:getX() ~= 0 or f:getY() ~= 0) then
+        player:setTargetAndCurrentDirection(f:getX(), f:getY())
+    end
+    markFall(player)
     player:clearVariable("BumpFallType")
     player:setBumpType("stagger")
     player:setBumpDone(false)
@@ -334,8 +353,18 @@ end
 
 -- 서버 MP 수신
 Events.OnServerCommand.Add(function(module, command, args)
-    if module ~= W.NET or command ~= "Phase" then return end
-    W.clientHandler(args, nil)
+    if module ~= W.NET then return end
+    if command == "Phase" then
+        W.clientHandler(args, nil)
+    elseif command == "Fall" then
+        -- 다른 플레이어가 맞음: 이 클라에 보이는 그 플레이어도 같은 클립으로 넘어지게 변수를 켠다
+        local pid = tonumber(args and args["pid"])
+        local p = pid and getPlayerByOnlineID and getPlayerByOnlineID(pid)
+        if p and not p:isLocalPlayer() then
+            markFall(p)
+            print(LOG .. "remote fall player=" .. tostring(p:getUsername()))
+        end
+    end
 end)
 
 -- ── 매 틱 ────────────────────────────────────────────────────────────────────
@@ -400,6 +429,20 @@ Events.OnTick.Add(function()
                     e.lx, e.ly, e.lastLog = z:getX(), z:getY(), tnow
                 end
             end
+        end
+    end
+
+    -- 넘어짐 변수 정리: bumped 를 벗어났으면(일어나기 시작) 끈다
+    for p, t0 in pairs(_fallVar) do
+        local age = tnow - t0
+        local st = p and W.normState(p:getCurrentActionContextStateName())
+        if not p or age > FALL_VAR_MAX_MS or (age > FALL_VAR_MIN_MS and st ~= "bumped") then
+            if p then
+                p:clearVariable(W.VAR_PLAYER_FALL)
+                print(LOG .. "fall var cleared player=" .. tostring(p:getUsername()) .. " state=" .. tostring(st)
+                    .. " age=" .. tostring(age))
+            end
+            _fallVar[p] = nil
         end
     end
 

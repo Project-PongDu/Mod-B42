@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 슬래머(돌진 특수좀비) 돌진에 맞은 플레이어의 넘어짐 (client/features/wrecker.lua).
+     바닐라 밀려 넘어짐(bumpFall / walkBumpFallFront / walkBumpFallBehind) 대신
+     바닐라 '전력질주 중 울타리 넘기 실패' 클립(climbfence/vaultOverSprintFail.xml 의 Bob_ValultOver_SprintFail)을 튼다.
+     조건: BumpFall=true + PongDuSlammerFall=true. 우선순위 10 으로 바닐라 bumped 노드(우선순위 0)를 이긴다.
+     PongDuSlammerFall 은 맞은 클라가 직접, 다른 클라는 서버 Fall 방송을 받아 켜고, bumped 를 벗어나면 끈다.
+     이벤트는 bumpFall.xml 과 같은 역할: FallOnFront(엎어져 일어남), 끝에 BumpFallAnimFinished=true(-> getup 전이).
+     소리는 울타리 넘기 실패와 같게 FallHeavy + PainFromFallLow (넘어짐 소리 TripOverObstacle 은 BumpedState.enter 가 낸다). -->
+<animNode>
+	<m_Name>PongDuSlammerFall</m_Name>
+	<m_AnimName>Bob_ValultOver_SprintFail</m_AnimName>
+	<m_ConditionPriority>10</m_ConditionPriority>
+	<m_Looped>false</m_Looped>
+	<m_BlendTime>0.16</m_BlendTime>
+	<m_EarlyTransitionOut>true</m_EarlyTransitionOut>
+	<m_SpeedScale>0.72</m_SpeedScale>
+	<m_Conditions>
+		<m_Name>BumpFall</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+	<m_Conditions>
+		<m_Name>PongDuSlammerFall</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+	<m_Events>
+		<m_EventName>FallOnFront</m_EventName>
+		<m_TimePc>0.5</m_TimePc>
+		<m_ParameterValue>true</m_ParameterValue>
+	</m_Events>
+	<m_Events>
+		<m_EventName>SetVariable</m_EventName>
+		<m_Time>End</m_Time>
+		<m_ParameterValue>BumpFallAnimFinished=true</m_ParameterValue>
+	</m_Events>
+	<m_Events>
+		<m_EventName>PlaySound</m_EventName>
+		<m_TimePc>0.4</m_TimePc>
+		<m_ParameterValue>FallHeavy</m_ParameterValue>
+	</m_Events>
+	<m_Events>
+		<m_EventName>PlayerVoiceSound</m_EventName>
+		<m_Time>Start</m_Time>
+		<m_ParameterValue>PainFromFallLow</m_ParameterValue>
+	</m_Events>
+</animNode>

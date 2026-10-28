@@ -10,7 +10,8 @@
 --   붙어 있어도 돌진한다(TRIGGER_MIN 0, 원본 레커와 같음).
 --
 -- [원본 레커(The Mutants, PZM_Wrecker_*)와의 관계]
---   클립·예고음은 원본 것을 그대로 쓰고(anims_X/PongDu/Zombie_PZM_Wrecker_*.glb,
+--   클립·예고음은 원본 것을 그대로 쓰고(anims_X/Zombie/Zombie_PZM_Wrecker_*.glb. 버전 폴더(42/)의
+--   anims_X 는 common/media/anims_X 가 없으면 Zombie·Bob·Kate 같은 메시 폴더만 읽힌다(ModelManager.java:1838~1865),
 --   sound/PongDuWrecker_ChargeWarn.ogg), 시간·거리·방향·파괴·취소 규칙도 원본 값을 따른다.
 --   원본과 다른 점은 요청으로 바꾼 것뿐이다: 랜덤 외형(원본 남자 고정), 물지 않음,
 --   피해(원본 차량충돌 공식 -> 전체 체력 20 + 부위 부상), 체력 샌드박스, 돌진 거리 10칸 상한.
@@ -46,6 +47,9 @@ W.KIND = "wrecker"
 W.VAR_PHASE = "PongDuWreckerPhase"
 -- 예고 클립 재생 위치 (0~1). 예고 노드가 m_TrackTimeToVariable 로 읽는다 (원본 ActionProgress)
 W.VAR_PROGRESS = "PongDuWreckerProgress"
+-- 맞은 플레이어 변수. 켜져 있으면 넘어짐 노드(AnimSets/player/bumped/PongDuSlammerFall.xml)가
+-- 바닐라 밀려 넘어짐 대신 '전력질주 울타리 넘기 실패' 클립(Bob_ValultOver_SprintFail)을 튼다.
+W.VAR_PLAYER_FALL = "PongDuSlammerFall"
 
 W.PH = {
     NONE     = "none",
@@ -139,6 +143,13 @@ function W.sendPhase(args, zombie)
 end
 
 -- 클라 -> 서버: 명중(Hit)·충돌(Crash) 보고. args = { zid, seq }
+-- 서버 -> 모든 클라: 이 플레이어가 맞아 넘어진다 (다른 클라에서도 같은 넘어짐 클립이 나오게). args = { pid }
+function W.sendFall(args)
+    if isServer() then
+        sendServerCommand(W.NET, "Fall", args)
+    end
+end
+
 function W.sendClaim(player, command, args, zombie)
     if isClient() then
         sendClientCommand(player, W.NET, command, args)

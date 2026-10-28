@@ -371,7 +371,10 @@ W.serverHandler = function(command, player, args, zombieObj)
         st.hit[key] = true
         print(LOG .. "hit zid=" .. tostring(zidOf(z)) .. " seq=" .. tostring(st.seq) .. " victim=" .. who
             .. " phase=" .. tostring(st.phase))
-        if player then applyHit(player) end
+        if player then
+            W.sendFall({ ["pid"] = player:getOnlineID() })
+            applyHit(player)
+        end
     elseif command == "Crash" then
         if st.phase ~= PH.SPRINT then
             print(LOG .. "Crash ignored: phase=" .. tostring(st.phase) .. " from=" .. who)
