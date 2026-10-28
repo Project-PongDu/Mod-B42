@@ -31,4 +31,20 @@ module Base
         }
     }
 
+    /* Wrecker charge warn: same file and settings as The Mutants PZTheMutants_Wrecker_ChargeWarn */
+    sound PongDuWrecker_ChargeWarn
+    {
+        category = Zombie,
+        is3D = true,
+        maxInstancesPerEmitter = 1,
+
+        clip
+        {
+            file = media/sound/PongDuWrecker_ChargeWarn.ogg,
+            volume = 0.7,
+            distanceMin = 2,
+            distanceMax = 100,
+        }
+    }
+
 }

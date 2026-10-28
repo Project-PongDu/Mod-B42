@@ -582,6 +582,16 @@ local ANIM_SETTLE_MS   = 400   -- laydown 후 첫 검사까지 유예 (애니 �
 local ENFORCE_MS       = 3000  -- 눕히기 강제 유지 기간 — 이 안에선 rescue 금지
 local TRACK_CAP_MS     = 30000 -- 추적 하드캡 (북키핑 정리용 — 조치 없음)
 local UNPIN_FLAG_AT    = 8     -- 기상 타이머가 이 값 이하로 내려오면 밟힘 리셋 우회 시작
+-- B42 에서는 pin(setReanimatedPlayer(true))을 끈다.
+--   1) 효과 없음: B42 ZombieOnGroundState.execute 의 밟힘 리셋 조건은
+--      isBeingSteppedOn() && getReanimatedPlayer() == null 이다. getReanimatedPlayer() 는
+--      플래그가 아니라 '이 좀비가 된 플레이어' 참조라 플래그를 올려도 우회되지 않는다.
+--   2) 알몸 부활의 원인: 플래그가 켜지면 isUsingWornItems()=true 가 되고(IsoZombie.java:4725),
+--      그동안 getItemVisuals() 가 불릴 때마다 좀비 자신의 itemVisuals 를 wornItems 내용으로
+--      덮어쓴다(IsoZombie.java:4709~4720, WornItems.java:156). 클라의 부활 좀비는 wornItems 가
+--      비어 있으므로 옷이 지워지고, pin 을 풀어도 지워진 채 남는다. 다시 죽이면 서버가 보낸
+--      시체 데이터로 옷이 돌아온다(보고된 증상과 일치).
+local PIN_ENABLED      = false
 
 -- Kahlua엔 표준 next()가 노출돼 있지 않다 — pairs로 공백 판정.
 local function isEmpty(t)
@@ -763,7 +773,7 @@ local function checkLaid(z, zid, rec, now)
             if not rec.pinned then
                 local timer
                 pcall(function() timer = z:getReanimateTimer() end)
-                if timer and timer <= UNPIN_FLAG_AT then
+                if PIN_ENABLED and timer and timer <= UNPIN_FLAG_AT then
                     -- ★수정: 켜기 전에 원래 값을 기록해둬야 unpin에서 복원 가능.
                     -- 일반 좀비는 orig=false라 기존과 동일하게 동작하고,
                     -- 좀비화/강령술 플레이어 좀비는 orig=true가 보존된다.
