@@ -992,17 +992,11 @@ local function updateRoach(zombie)
 end
 
 -- ── 적용기 본체 ───────────────────────────────────────────────────────────────
--- 종류는 아웃핏 이름으로 알아낸다. 아웃핏 이름은 좀비마다 modData 에 캐시한다(PuppetOutfit):
--- 일반 좀비는 매 틱 문자열 비교 한 번으로 끝난다. 객체 재사용(resetForReuse)은 modData 를
--- 지우므로 캐시도 같이 지워진다. 옷을 아직 안 입은 순간(nil)은 캐시하지 않고 다음 틱에 다시 본다.
+-- 종류는 persistentOutfitID 의 아웃핏 번호로 알아낸다(PongDuMutantId.kindOf).
+-- 아웃핏 이름(getOutfitName)은 재사용된 좀비 객체에서 이전 좀비 것이 남아 일반 좀비를
+-- 특좀으로 읽을 수 있어 쓰지 않는다. 옷 ID 는 패킷으로 바로 오므로 옷을 입기 전에도 판정된다.
 local function outfitKind(zombie, md)
-    local name = md["PuppetOutfit"]
-    if name == nil then
-        name = zombie:getOutfitName()
-        if name == nil then return nil end
-        md["PuppetOutfit"] = name
-    end
-    return PongDuMutantId.kindOfOutfitName(name)
+    return PongDuMutantId.kindOf(zombie)
 end
 
 local function applyMutant(zombie)
@@ -1013,7 +1007,8 @@ local function applyMutant(zombie)
         -- 특좀이 아니다. 예전 표식이 남아 있으면(이전 버전 세이브의 시체 modData 등) 지운다.
         if md["PuppetMutant"] then
             print("[PuppetMutant] cleared legacy mark kind=" .. tostring(md["PuppetMutant"])
-                .. " outfit=" .. tostring(md["PuppetOutfit"]) .. " zid=" .. tostring(curZid))
+                .. " outfit=" .. tostring(zombie:getOutfitName()) .. " pid=" .. tostring(zombie:getPersistentOutfitID())
+                .. " zid=" .. tostring(curZid))
             md["PuppetMutant"] = nil
             md["PuppetMutantSender"] = nil
             md["PuppetMutantZid"] = nil

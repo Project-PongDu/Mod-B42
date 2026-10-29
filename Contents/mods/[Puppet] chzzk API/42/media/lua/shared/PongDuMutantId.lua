@@ -63,10 +63,61 @@ function M.kindOfOutfitName(name)
     return M.SLOT_KIND[string.sub(name, PREFIX_LEN + 1)]
 end
 
---- IsoZombie / IsoDeadBody -> 종류. 옷을 아직 안 입은 순간(클라에서 패킷으로 막 생긴
---- 좀비 등)은 getOutfitName 이 nil 이라 nil 을 돌려준다 -> 호출측이 다음 틱에 다시 본다.
+--- persistentOutfitID -> 아웃핏 번호 (성별 비트 제거, 상위 16비트). 0/비숫자는 nil
+function M.outfitIndexOf(pid)
+    if type(pid) ~= "number" or pid == 0 then return nil end
+    local p = pid
+    if p < 0 then p = p + 4294967296 end                  -- 성별 비트가 켜진 음수 pid
+    if p >= 2147483648 then p = p - 2147483648 end
+    return math.floor(p / 65536)
+end
+
+--- 아웃핏 번호 -> 종류 표. PersistentOutfits.initOutfitList 는 여성 아웃핏을 이름순으로
+--- 먼저 번호 매기므로(0..F-1), getAllOutfits(true)(같은 이름순 정렬) 의 위치가 곧 번호다.
+--- PongDuMutant_* 는 여성·남성 양쪽에 다 있어 남성 좀비도 같은 번호를 쓴다.
+--- 목록이 아직 없으면 nil (다음 호출 때 다시 만든다).
+M._indexKind = nil
+local function indexKindTable()
+    if M._indexKind then return M._indexKind end
+    local ok, list = pcall(getAllOutfits, true)
+    if not ok or not list or list:size() == 0 then return nil end
+    local t, n = {}, 0
+    for i = 0, list:size() - 1 do
+        local kind = M.kindOfOutfitName(list:get(i))
+        if kind then
+            t[i] = kind
+            n = n + 1
+        end
+    end
+    M._indexKind = t
+    M.log("outfit index table built mutants=" .. n .. " female=" .. list:size())
+    return t
+end
+
+--- persistentOutfitID -> 종류 (특좀이 아니면 nil). 표를 못 만들면 false
+function M.kindOfPid(pid)
+    local idx = M.outfitIndexOf(pid)
+    if not idx then return nil end
+    local t = indexKindTable()
+    if not t then return false end
+    return t[idx]
+end
+
+--- IsoZombie / IsoDeadBody -> 종류.
+--- 좀비는 persistentOutfitID 의 아웃핏 번호로 본다. getOutfitName(HumanVisual.outfit)은
+--- 재사용된 좀비 객체에서 이전 좀비의 이름이 남는다: HumanVisual.clear 가 outfit 을 지우지 않고,
+--- 클라는 모델이 붙을 때에야 옷을 입혀서(ModelManager.dressInRandomOutfit) 그 전 틱들은
+--- 이전 좀비의 아웃핏 이름이 보인다. 옷 ID 는 첫 패킷으로 바로 들어와 이 문제가 없다.
+--- (10/30 실측: 호드매니저로 연달아 부른 배치가 직전 배치의 아웃핏 이름으로 읽혀 약 580마리가
+---  엉뚱한 특좀으로 초기화됨. Zed_Test·Survivalist02_Late 일반 좀비도 특좀으로 읽힘)
+--- 시체는 옷 ID getter 가 없어(IsoDeadBody) 이름으로 본다. 아웃핏 목록을 아직 못 읽었을
+--- 때만 이름으로 대신한다.
 function M.kindOf(obj)
     if not obj then return nil end
+    if instanceof(obj, "IsoZombie") then
+        local kind = M.kindOfPid(obj:getPersistentOutfitID())
+        if kind ~= false then return kind end
+    end
     return M.kindOfOutfitName(obj:getOutfitName())
 end
 
