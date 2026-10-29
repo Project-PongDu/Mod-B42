@@ -14,7 +14,7 @@
 --    사라지고, 파일럿이 "vehicle not streamed yet" 만 계속 뱉었다.
 --    (로그 근거: [PongDu][Orphan] removed vid=255 직후 12ms 뒤 pilot tick 실패,
 --     10초 주기로 반복)
---  staleSweep 도 좀비 ModData 를 지우므로 클라에서 돌면 특좀 표식이 날아간다.
+--  (예전 staleSweep 도 같은 이유로 서버 전용이었다 -- 지금은 제거됨.)
 --
 --  SP 는 isClient()/isServer() 둘 다 false 이므로 not isClient() 로 걸러야
 --  서버 + SP 에서만 돌고 MP 클라에서만 빠진다.
@@ -53,49 +53,9 @@ Events.OnZombieCreate.Add(function(z)
     end
 end)
 
--- ── 특수좀비 영속 레지스트리 (부활 유지의 핵심) ──────────────────────────────
--- persistentOutfitID는 좀비 외형을 사망->시체(reanimated.bin)->부활 내내
--- 유지시키는 영속 ID다. 단, 원시값은 모자 상태가 16번 비트로 박혀 있어
--- 모자가 벗겨지면 값이 변한다 -> 히트맨과 동일하게 HitmanUtils.GetZombieID로
--- 모자 비트를 마스킹한 정규화 ID를 키로 쓴다 (등록/조회 양쪽 동일 함수).
--- 글로벌 ModData는 서버 세이브에 저장되므로 서버 재시작 후 부활에도 유효.
-local function mutantKey(zed)
-    return PongDuZombieId.GetString(zed)
-end
-
--- 레지스트리 항목: {["k"]=종류, ["s"]=후원자}. 구버전 문자열 항목과의
--- 호환을 위해 읽기는 반드시 regEntry를 거친다.
-local function regEntry(v)
-    if type(v) == "table" then return v["k"], v["s"] end
-    return v, nil
-end
-
-local function registerMutant(zed, kind, sender)
-    local key = mutantKey(zed)
-    if not key then return end
-    local reg = ModData.getOrCreate("PuppetMutants")
-    reg[key] = { ["k"] = kind, ["s"] = sender }
-    ModData.transmit("PuppetMutants")
-    print("[PongDu][REG] register key=" .. tostring(key)
-        .. " kind=" .. tostring(kind) .. " sender=" .. tostring(sender)
-        .. " zid=" .. tostring(zed:getOnlineID()))
-end
-
--- Make a zombie into a sprinter.
-local function makeSprinter(a)
-    local b = getSandboxOptions():getOptionByName("ZombieLore.Speed"):getValue()
-    getSandboxOptions():set("ZombieLore.Speed", 1)
-    a:makeInactive(true)
-    a:makeInactive(false)
-    local c = a.speedType or a:getVariableString("zombieWalkType")
-    a:setWalkType("sprint" .. tostring(a.speedType))
-    a:DoZombieStats()
-    getSandboxOptions():set("ZombieLore.Speed", b)
-    a:getModData()["isSprinter"] = true
-    registerMutant(a, "sprinter")     -- 부활 유지용 영속 등록
-    -- (구 "SpawnedSprinter" 송신은 수신처가 없는 죽은 코드라 제거.
-    --  이름표/스탯 적용은 아래 PongDuMutant/MutantMark 브로드캐스트가 담당.)
-end
+-- ── 특수좀비 정체성 ──────────────────────────────────────────────────────────
+-- 특좀 종류·후원자는 좀비가 입은 전용 아웃핏(PongDuMutant_<슬롯>)과 옷 ID 변형 번호로
+-- 정해진다 (shared/PongDuMutantId.lua). modData 표식·영속 레지스트리·분실 추적은 쓰지 않는다.
 
 -- Spawn zombies at (x,y,z), with optional sprinter/sender settings.
 local function spawnZombies(x, y, z, amount, useHighStats, sprint, sender)
@@ -119,7 +79,13 @@ local function spawnZombies(x, y, z, amount, useHighStats, sprint, sender)
             getSandboxOptions():set("ZombieLore.Memory",    highMemory)
             getSandboxOptions():set("ZombieLore.Hearing",   highHearing)
         end
-        lastSpawned = addZombiesInOutfit(x, y, z, 1, nil, nil)
+        -- 스프린터는 뮤턴트 스프린터 전용 아웃핏(PongDuMutant_06)으로 소환한다.
+        if sprint then
+            lastSpawned = addZombiesInOutfit(x, y, z, 1, PongDuMutantId.outfitOf("sprinter"),
+                PongDuMutantId.femaleChance("sprinter"))
+        else
+            lastSpawned = addZombiesInOutfit(x, y, z, 1, nil, nil)
+        end
         if lastSpawned and lastSpawned:size() > 0 then
             lastSpawned:get(0):DoZombieStats()
             lastSpawned:get(0):makeInactive(true)
@@ -133,26 +99,13 @@ local function spawnZombies(x, y, z, amount, useHighStats, sprint, sender)
         if lastSpawned and lastSpawned:size() > 0 then
             spawnedIds[#spawnedIds + 1] = lastSpawned:get(0):getOnlineID()
             if sprint then
-                lastSpawned:get(0):setWalkType("sprint4")
-                -- 뛰좀도 특좀 파이프라인에 태워 부활 시 뜀을 복원한다.
-                -- sprint는 walkType(비영속)이라 reanimateNow 후 일반 걸음이 되는데,
-                -- PuppetMutant="sprinter"를 시체에 계승시키면 RiseUp이 이를 읽어
-                -- MutantRevive를 브로드캐스트하고, 클라 initMutant의 sprinter 분기가
-                -- 부활 좀비에 sprint walkType을 재적용한다. zid 스탬프 필수 —
-                -- 안 하면 staleSweep이 즉시 지운다.
                 local zsp = lastSpawned:get(0)
-                zsp:getModData()["PuppetMutant"] = "sprinter"
-                zsp:getModData()["PuppetMutantZid"] = zsp:getOnlineID()
-                if sender and sender ~= "" then
-                    zsp:getModData()["PuppetMutantSender"] = sender
-                end
-                -- 특좀과 동일하게 MutantMark 브로드캐스트 -> 소환 즉시 클라가
-                -- "누구의 스프린터" 이름표를 표시(부활 때만 뜨던 것을 스폰부터).
-                sendServerCommand("PongDuMutant", "MutantMark", {
-                    ["zedId"]  = zsp:getOnlineID(),
-                    ["kind"]   = "sprinter",
-                    ["sender"] = sender or "",
-                })
+                zsp:setWalkType("sprint4")
+                -- 후원자 번호를 옷 ID 변형 번호에 넣는다 (같은 호출 안 -> 첫 패킷에 실림).
+                -- 종류·이름표·부활 유지는 아웃핏이 담당하므로 modData 표식·MutantMark 는 없다.
+                local idx = PongDuMutantId.applyDonor(zsp, sender)
+                print("[PongDuServer] sprinter spawned zid=" .. tostring(zsp:getOnlineID())
+                    .. " outfit=" .. tostring(zsp:getOutfitName()) .. " donorSlot=" .. tostring(idx))
             else
                 -- "walk" 는 바닐라 walkType 이 아니다. 바닐라 걸음 노드 조건은 1~5 / slow1~3 /
                 -- sprint1~5 뿐이라(AnimSets/zombie/walktoward) "walk" 면 애니메이션 없는
@@ -179,60 +132,28 @@ local function spawnZombies(x, y, z, amount, useHighStats, sprint, sender)
 end
 
 -- ── 뮤턴트 소환 (mutant_spawn) ────────────────────────────────────────────────
--- 스크리머/브루트/로치. CDDA 모드 의존 없음 — 서버는 스폰 + modData 마킹만
--- 하고, 스탯·행동(HP/스프린트/괴력/비명/밀치기/3배속 크롤)은 각 클라이언트의
--- 적용기(features/mutantspawn.lua, OnZombieUpdate)가 처리한다 (좀비 클라 권한).
+-- 서버는 종류별 전용 아웃핏으로 소환하고 후원자 번호만 박는다. 스탯·행동(HP/스프린트/괴력/
+-- 비명/밀치기/3배속 크롤)은 각 클라이언트의 적용기(features/mutantspawn.lua, OnZombieUpdate)가
+-- 아웃핏으로 종류를 알아내 처리한다 (좀비 클라 권한).
 local function spawnSpecialZombie(x, y, z, kind, sender)
-    local zeds = addZombiesInOutfit(x, y, z, 1, nil, nil)
-    if not zeds or zeds:size() == 0 then return false end
-    local zed = zeds:get(0)
+    local zed = PongDuMutantId.spawn(x, y, z, kind, sender)
+    if not zed then return false end
     zed:DoZombieStats()
     zed:makeInactive(true)
     zed:makeInactive(false)
-    zed:getModData()["PuppetMutant"] = kind
-    -- 서버측 소유 zid 스탬프: B41은 죽은 좀비의 IsoZombie 객체를 풀에 반환 후
-    -- 재사용하는데 modData가 안 지워진다. 죽은 특좀 객체가 호드매니저 등으로
-    -- 재활용되면 PuppetMutant가 딸려와 그 좀비 시체가 특좀으로 부활한다.
-    -- 소유 zid를 박아두면, 살아있는 동안 아래 stale-스윕이 "md의 zid ≠ 현재
-    -- zid"로 재활용 좀비를 판별해 md를 지운다 -> 시체가 깨끗해짐.
-    zed:getModData()["PuppetMutantZid"] = zed:getOnlineID()
+    -- 후원자 번호를 옷 ID 변형 번호에 넣고 다시 입힌다. 소환과 같은 Lua 호출 안에서 해야
+    -- 클라가 받는 첫 ZombiePacket 에 새 옷 ID 가 실린다.
+    local idx = PongDuMutantId.applyDonor(zed, sender)
     if sender and sender ~= "" then
         zed:getModData()["_cs"] = sender .. getText("IGUI_donation_zombie_owner")
-        -- 원본 sender도 modData에 저장 -> 시체에 계승되어 RiseUp이 부활 시
-        -- 좌표 없이도 후원자 이름표를 복원할 수 있다 (이동-무관).
-        zed:getModData()["PuppetMutantSender"] = sender
     end
-    zed:transmitModData()
-    -- 서버발 zombie transmitModData는 클라에 전달이 안 되므로(스프린터의
-    -- 구 SpawnedSprinter 죽은 코드와 같은 함정 -- 해당 송신은 제거됨) 폭격과 동일한 검증된 채널로
-    -- 전 클라에 zedId+kind를 브로드캐스트 -> 클라 적용기가 onlineID로 매칭.
-    sendServerCommand("PongDuMutant", "MutantMark", {
-        ["zedId"]  = zed:getOnlineID(),
-        ["kind"]   = kind,
-        ["sender"] = sender or "",
-    })
-    registerMutant(zed, kind, sender) -- 부활 유지용 영속 등록 (후원자 포함)
+    print("[PongDuServer] mutant spawned kind=" .. tostring(kind)
+        .. " zid=" .. tostring(zed:getOnlineID())
+        .. " outfit=" .. tostring(zed:getOutfitName())
+        .. " female=" .. tostring(zed:isFemale())
+        .. " donorSlot=" .. tostring(idx))
     return zed:getOnlineID()   -- 어그로 스코프용 (실패 경로는 위에서 false)
 end
-
--- 부활 좀비 재등록: 클라 적용기가 부활 좀비에 능력을 입힌 뒤 그놈의 "새" pid를
--- 보고하면 레지스트리에 추가 -> 다음 사망->부활 사이클도 자동 유지된다.
--- 여러 클라가 중복 보고해도 멱등 (값 같으면 transmit 생략).
-Events.OnClientCommand.Add(function(module, command, player, data)
-    if module == "PongDuMutant" and command == "MutantReregister" then
-        local key    = tostring(data and data["key"] or "")
-        local kind   = data and data["kind"]
-        local sender = data and data["sender"]
-        if key ~= "" and key ~= "N/A" and kind then
-            local reg = ModData.getOrCreate("PuppetMutants")
-            local ck, cs = regEntry(reg[key])
-            if ck ~= kind or cs ~= sender then
-                reg[key] = { ["k"] = kind, ["s"] = sender }
-                ModData.transmit("PuppetMutants")
-            end
-        end
-    end
-end)
 
 -- Handle "PongDuZombie / ZedSpawn" client command.
 local function srvlog(msg)
@@ -444,7 +365,7 @@ end
 -- 자기 소유 좀비 기준이라 총합이 7을 훌쩍 넘는다. 폭격처럼 "반경 전체"가
 -- 아니라 "정확히 N마리"가 스펙이므로 선정은 서버 권위여야 한다.
 --
--- 우선순위: 특수좀비(modData PuppetMutant) 먼저, 같은 등급 안에서는 가까운 순.
+-- 우선순위: 특수좀비(전용 아웃핏) 먼저, 같은 등급 안에서는 가까운 순.
 -- 특수좀비가 N마리에 못 미치면 나머지는 일반좀비로 채운다.
 -- 저격수는 "한 곳에 자리잡고" 쏘지만, 대상은 매 발마다 다시 고른다 --
 -- 플레이어가 반경 안에서 움직이면 그때그때 플레이어와 가장 가까운(특좀 우선)
@@ -582,8 +503,7 @@ local function pickSniperTarget(job)
             local dx, dy = z:getX() - cx, z:getY() - cy
             local d2 = dx * dx + dy * dy
             if d2 <= r2 then
-                local md = z:getModData()
-                local isMut = (md and md["PuppetMutant"]) and 1 or 0
+                local isMut = PongDuMutantId.kindOf(z) and 1 or 0
                 if isMut > bm or (isMut == bm and d2 < (bd or math.huge)) then
                     best, bd, bm = z, d2, isMut
                 end
@@ -1352,81 +1272,11 @@ DOServer["PongDuFx"]["Play"] = function(player, data)
         .. " targets=" .. tostring(relayed))
 end
 
--- ── 사망 좌표 마크 (버그① 근본 수정) ──────────────────────────────────────────
--- HitmanUtils.GetZombieID(corpse)는 IsoDeadBody에 getPersistentOutfitID가
--- 아예 없어서 100% 예외를 던진다(Object tried to call nil in GetZombieID —
--- 서버 로그로 확증, readable=0/marked=0 항상). 즉 "시체가 특수좀비였는지"를
--- pid로 판별하는 건 구조적으로 불가능. kind를 아는 유일한 시점은 클라의
--- OnZombieDead뿐이므로, 죽는 순간 좌표+kind+sender를 서버가 받아 저장해두고
--- RiseUp이 시체의 좌표로 조회한다 (pid 대신 좌표가 진짜 키).
-local _deathMarks = {}
-local DEATHMARK_MS = 600000   -- 10분. 그 안에 강령술 안 하면 자연 소멸.
-
-Events.OnClientCommand.Add(function(module, command, player, data)
-    if module == "PongDuMutant" and command == "MutantDeathMark" then
-        local x, y = tonumber(data and data["x"]), tonumber(data and data["y"])
-        local kind = data and data["kind"]
-        if x and y and kind then
-            _deathMarks[#_deathMarks + 1] = {
-                x = x, y = y, z = tonumber(data["z"]) or 0,
-                kind = kind, sender = data["sender"],
-                expire = getTimestampMs() + DEATHMARK_MS,
-            }
-            print("[PongDu][DeathMark] stored kind=" .. tostring(kind)
-                .. " @" .. tostring(x) .. "," .. tostring(y))
-        end
-    end
-end)
-
--- 시체 스퀘어 좌표(±1)로 사망 마크 매칭·소모. 여러 시체가 겹치면 먼저
--- 등록된 순서로 하나씩 소모 (드문 동시사망 케이스의 알려진 한계).
-local function matchDeathMark(sq, floor)
-    local sx, sy = sq:getX(), sq:getY()
-    local now = getTimestampMs()
-    for i = #_deathMarks, 1, -1 do
-        local m = _deathMarks[i]
-        if now > m.expire then
-            table.remove(_deathMarks, i)
-        elseif math.abs(m.x - sx) <= 1 and math.abs(m.y - sy) <= 1 and m.z == floor then
-            table.remove(_deathMarks, i)
-            return m.kind, m.sender
-        end
-    end
-    return nil
-end
-
-
 -- 시체는 B41 MP에서 서버 권한(청크 데이터 + reanimated.bin 저장, 바닐라 디버그
 -- 시체제거도 /removezombies 서버 커맨드 경유)이므로 서버 한 곳에서만 처리해
 -- 클라이언트별 중복 부활을 원천 차단한다. reanimateNow()는 바닐라 디버그 메뉴
 -- "Reanimate (Zombie)"가 쓰는 강제 부활 API — 샌드박스 Reanimate 설정과 무관하게
 -- 즉시 부활시킨다 (DebugContextMenu.OnReanimateCorpse 와 동일).
-
--- 부활 재스탬프 마크: RiseUp이 특좀 시체를 부활시킨 좌표를 잠깐 기록해둔다.
--- reanimateNow로 부활한 좀비는 새 zid를 받지만 시체에서 물려받은
--- PuppetMutantZid는 원래 zid(불일치)라, staleSweep이 '재활용 껍데기'로
--- 오판해 md를 지워 다회차 부활이 깨진다. 이 마크로 "부활 직후 그 자리의
--- zid불일치 좀비"는 삭제 대신 zid를 새로 스탬프(정상 부활)하고, 마크 없는
--- 곳의 zid불일치 좀비만 삭제(풀 재활용)하도록 staleSweep이 구분한다.
-local _reviveRestamp = {}
-local REVIVE_RESTAMP_MS = 15000   -- 부활 후 이 시간 안에 재스탬프 처리
-
--- reanimateNow() 직후 방금 부활한 좀비를 스퀘어에서 찾는다.
--- 바닐라 디버그(doDebugZombieMenu)와 동일 패턴: getMovingObjects + IsoZombie.
--- 한 스퀘어에서 여러 시체가 부활할 수 있으므로 이미 잡은 onlineID는 handled로 스킵.
-local function findFreshZombie(sq, handled)
-    local mo = sq:getMovingObjects()
-    if not mo then return nil end
-    for i = 0, mo:size() - 1 do
-        local o = mo:get(i)
-        if instanceof(o, "IsoZombie") and o:isAlive()
-            and not handled[o:getOnlineID()] then
-            handled[o:getOnlineID()] = true
-            return o
-        end
-    end
-    return nil
-end
 
 -- ── 알몸 부활 차단: 시체를 fakeDead로 마킹한 뒤 부활시킨다 ───────────────────
 -- IsoDeadBody.reanimate()는 isFakeDead() 하나로 완전히 다른 두 경로를 가른다
@@ -1522,9 +1372,7 @@ DOServer["PongDuRiseUp"]["RiseUp"] = function(player, data)
     local cell = player:getCell()
     local r2 = r * r
     local raised = 0
-    local readable = 0
     local marked = 0
-    local handled = {}                     -- 이번 RiseUp에서 이미 잡은 부활 좀비 onlineID
     local cap      = SandboxVars.PongDu.RiseUp_MaxRevive
     local priority = SandboxVars.PongDu.RiseUp_Priority
     print("[PongDu][RiseUp] START x=" .. tostring(cx) .. " y=" .. tostring(cy) .. " r=" .. tostring(r)
@@ -1543,15 +1391,14 @@ DOServer["PongDuRiseUp"]["RiseUp"] = function(player, data)
                         for i = 0, smo:size() - 1 do
                             local o = smo:get(i)
                             if instanceof(o, "IsoDeadBody") then
-                                -- ★이동-무관 판별: 시체(IsoDeadBody) 자신의 modData를
-                                -- 직독한다 (상세 근거는 2패스 주석 참조).
-                                local cmd = o:getModData()
+                                -- 특좀 판별: 시체가 입은 아웃핏(IsoDeadBody.getOutfitName).
+                                -- 시체는 옷 ID 를 보관하고 reanimate 가 그대로 좀비에 복사하므로
+                                -- (IsoDeadBody.java:1985) 되살아난 좀비도 같은 특좀·같은 후원자다.
                                 cands[#cands + 1] = {
                                     body   = o,
                                     sq     = sq,
                                     floor  = floor,
-                                    kind   = cmd and cmd["PuppetMutant"],
-                                    sender = cmd and (cmd["PuppetMutantSender"] or "") or "",
+                                    kind   = PongDuMutantId.kindOf(o),
                                 }
                             end
                         end
@@ -1568,23 +1415,10 @@ DOServer["PongDuRiseUp"]["RiseUp"] = function(player, data)
         local sq     = c.sq
         local floor  = c.floor
         local b      = c.body
-        -- ★이동-무관 판별: 1패스에서 시체(IsoDeadBody) 자신의 modData를
-        -- 직독해 담아온 값이다. 소환 때 서버가 박은 PuppetMutant/Sender가
-        -- 좀비->시체 전환에 자동 계승됨(프로브로 확증:
-        -- getOK=true, PuppetMutant=brute/roach). modData는
-        -- 객체를 따라가므로 시체를 어디로 옮겨도 정확히 판별.
         local kind   = c.kind
-        local sender = c.sender
-        -- 좌표 death-mark 폴백 제거: 일반좀비 시체는 modData가
-        -- 없어 폴백으로 넘어갔고, 그 자리에 남은 특좀 마크에 걸려
-        -- 일반좀비가 특좀으로 부활하는 역방향 오탐이 났다(로그:
-        -- kind=... from fallback). 시체 modData는 진짜 특좀이면
-        -- 100% 계승되므로(from modData 검증됨) 폴백은 순수
-        -- 오탐원이라 삭제. 일반좀비 시체 -> kind=nil -> 일반 부활.
         print("[PongDu][RiseUp] corpse @" .. tostring(sq:getX())
             .. "," .. tostring(sq:getY())
             .. " kind=" .. tostring(kind))
-        if kind then readable = readable + 1 end
         -- 좀비 시체만 마킹. 플레이어 시체는 옷이 pid가 아닌
         -- 진짜 wornItems라 pid 재구성이 불가능하므로 원래대로
         -- 디스크립터 경로(setReanimatedPlayer)를 타야 맞다.
@@ -1595,63 +1429,11 @@ DOServer["PongDuRiseUp"]["RiseUp"] = function(player, data)
         end
         b:reanimateNow()
         raised = raised + 1
-        -- ── 방금 부활한 좀비 재등록 ──────────────────
-        -- registerMutant(nz,...) : 서버 권위 pid로 즉시 재등록.
-        -- 기존엔 클라가 MutantReregister로 재등록했는데, 클라가
-        -- 본 부활좀비 pid와 서버가 다음 사이클에 시체에서 읽는
-        -- pid가 어긋나면(동기화 레이스) 다음 부활이 일반좀비가
-        -- 됐다. 등록·조회를 둘 다 서버 pid(mutantKey)로 통일해
-        -- 구조적으로 일치시킨다 (버그①: 2회차 부활 일반화).
-        --
-        -- ★ setReanimateTimer(0) 제거됨: IsoZombie.ReanimateTimer는
-        --   '부활 예약'이 아니라 ZombieOnGroundState의 기상
-        --   카운트다운이다(ZombieOnGroundState:38이 유일한 writer).
-        --   0으로 밀면 시체가 바닥에서 일어나는 모션이 사라진다.
-        --   부활 예약(IsoDeadBody.reanimateTime) 방어는 아래
-        --   LoadGridsquare 살균기가 담당한다.
-        --
-        -- ★ 알려진 결함: reanimateNow()는 setReanimateTime()만 하고
-        --   실제 reanimate()는 다음 틱 IsoDeadBody.update()에서 돈다
-        --   (IsoDeadBody:1240). 따라서 이 자리에서 findFreshZombie는
-        --   항상 nil이다 (로그 확증: NOT FOUND 100/100).
-        --   특좀 능력은 reanimate()의 modData 통째 복사로 계승되어
-        --   결과적으로 동작하지만, 이 재등록은 안 걸린다.
-        --   수집을 다음 틱으로 미루는 수정 필요 (별건).
-        local nz = findFreshZombie(sq, handled)
-        if nz then
-            print("[PongDu][RiseUp] fresh zombie zid=" .. tostring(nz:getOnlineID())
-                .. " newKey=" .. tostring(mutantKey(nz)))
-            if kind then registerMutant(nz, kind, sender) end
-        else
-            print("[PongDu][RiseUp] fresh zombie NOT FOUND on sq "
-                .. tostring(sq:getX()) .. "," .. tostring(sq:getY()))
-        end
-        if kind then
-            marked = marked + 1
-            sendServerCommand("PongDuMutant", "MutantRevive", {
-                ["x"]      = sq:getX(),
-                ["y"]      = sq:getY(),
-                ["z"]      = floor,
-                ["kind"]   = kind,
-                ["sender"] = sender or "",
-                ["key"]    = nz and mutantKey(nz) or "N/A",
-            })
-            -- 서버측 재스탬프 마크: 이 자리에서 부활한 좀비는
-            -- staleSweep이 삭제 대신 zid 재스탬프하도록.
-            _reviveRestamp[#_reviveRestamp + 1] = {
-                x = sq:getX(), y = sq:getY(), z = floor,
-                kind = kind, sender = sender or "",
-                expire = getTimestampMs() + REVIVE_RESTAMP_MS,
-            }
-            srvlog("RiseUp revive-mark " .. kind .. " @" .. sq:getX() .. "," .. sq:getY())
-        end
+        -- 특좀 능력은 클라 적용기가 부활 좀비의 아웃핏으로 다시 붙인다 (재등록·부활 마크 불필요).
+        if kind then marked = marked + 1 end
     end
-    srvlog("RiseUp: " .. raised .. " corpses, " .. readable .. " death-mark hits, " .. marked .. " special marks, around " .. cx .. "," .. cy .. " r=" .. r)
-    print("[PongDu][RiseUp] DONE raised=" .. raised .. " readable=" .. readable .. " marked=" .. marked)
-    -- 요약을 클라에도 쏴서 client console.txt만으로 전 과정 관측 가능하게
-    sendServerCommand("PongDuMutant", "MutantReviveDebug", {
-        ["total"] = raised, ["readable"] = readable, ["marked"] = marked,
-    })
+    srvlog("RiseUp: " .. raised .. " corpses, " .. marked .. " mutants (by outfit), around " .. cx .. "," .. cy .. " r=" .. r)
+    print("[PongDu][RiseUp] DONE raised=" .. raised .. " mutants=" .. marked)
     -- ── 기상 연출 창 브로드캐스트 ────────────────────────────────────────────
     -- fakeDead 경로 부활 좀비는 isReanimatedPlayer=false라 클라를 눕히는 바닐라
     -- 게이트(ParseZombie/setBooleanVariables) 두 개를 전부 통과 못 한다.
@@ -1693,254 +1475,11 @@ end
 -- reanimateTime(올바른 필드)을 0으로 밀어서 이미 세이브에 예약이 박힌 오염
 -- 시체까지 소급 무효화한다.
 
--- ── 특좀 표식 유지 + 클라 재통지 (B42) ────────────────────────────────────────
--- [B42 에서 특좀 표식이 사라지는 두 경로]
---   1) 좀비 객체 재사용: B42 는 재사용 시 엔진이 modData 를 지운다 (IsoZombie.resetForReuse ->
---      getModData().wipe(), IsoZombie.java:4543). B41 처럼 "zid 불일치 = 재활용 껍데기"로 보고
---      지울 필요가 없다. zid 불일치는 RiseUp 부활 등으로 새 onlineID 를 받은 진짜 특좀이다.
---   2) 청크 언로드(가상화): 플레이어가 멀어지면 좀비는 ZombiePopulationManager 로 넘어가
---      위치·방향·persistentOutfitID·상태 플래그·경로 목표만 남고 IsoZombie(와 modData)는 버려진다
---      (popman/ZombiePopulationManager.java n_addZombie). 다시 다가가면 그 값으로 새 IsoZombie 를
---      만든다. 그래서 modData 표식은 청크를 나갔다 오면 무조건 사라진다 (2026-10-27 멀티 5C).
---      내부 고유 ID(persistentId)는 Lua 에서 읽을 수 없다(getter 없음).
---   -> 서버가 로드된 특좀을 추적해 두다가(_live) 사라지면 _lost 로 옮기고, 이후 표식 없는 좀비 중
---      persistentOutfitID 가 같고 마지막 위치에서 LOST_MATCH_R 안에 있는 좀비가 나타나면 그 좀비에
---      표식을 되살린다. 옷 ID 단독은 같은 옷을 입은 일반좀비와 겹쳐서(B41 pid 레지스트리 오탐)
---      쓰지 않고, 거리 조건을 반드시 같이 본다.
---
---   클라는 좀비 modData 를 서버에서 받지 못한다(적용기 주석 참고). 서버가 MutantMark 로 zid 를
---   알려줘야 클라가 능력을 붙인다. 재스탬프·복구한 좀비는 즉시 MutantMark, 그리고 MUTANT_SYNC_MS
---   마다 로드된 특좀 전체를 MutantSync 로 다시 알려준다 (클라 좀비 객체가 새로 만들어진 경우 대비).
---
--- 왜 폴링인가: OnZombieUpdate 는 MP 에서 클라 권한 좀비(플레이어 근처)엔 서버측 발화를
--- 안 한다. getCell():getZombieList() 는 권한과 무관하게 셀의 전 좀비를 포함한다.
-local _lastStaleSweep = 0
-local STALE_SWEEP_MS = 500       -- 0.5초
-local _lastMutantSync = 0
-local MUTANT_SYNC_MS = 3000      -- 로드된 특좀 목록 재통지 주기 (MP 만)
-local _syncLogCount = 0
-local _lastSyncLog = 0
-
-local _live = {}                 -- [IsoZombie] = { k, s, pid, x, y, z }  (객체 키: SP 는 zid 가 전부 -1)
-local _lost = {}                 -- { {k, s, pid, x, y, z, t}, ... }
-local LOST_MATCH_R  = 60         -- 가상 좀비는 경로 목표로 계속 걸어가므로 넉넉히
-local LOST_KEEP_MS  = 3 * 24 * 60 * 60 * 1000   -- 서버가 밤새 꺼져 있어도 유지되게 3일
-local LOST_MAX      = 300
-
-Events.OnZombieDead.Add(function(z)
-    if z and _live[z] then _live[z] = nil end
-end)
-
--- ── 서버 재시작 너머로 추적 유지 ──────────────────────────────────────────────
--- _live/_lost 는 메모리라 서버를 끄면 사라진다. 그런데 꺼지는 순간 로드돼 있던 특좀과
--- 이미 가상화돼 있던 특좀은 다음 기동 때 옷 ID·위치만 남은 일반 좀비로 다시 만들어진다
--- (2026-10-27 멀티: 씹힌 수만큼 서버 재시작 후 일반좀비가 서 있었다).
--- 그래서 두 목록을 글로벌 ModData 에 계속 비춰 두고(서버 세이브에 같이 저장), 기동 시
--- _lost 로 되읽는다. 로드돼 있던 것(Live 스냅샷)도 기동 후엔 전부 "잃어버린 것"이다.
-local MD_LOST, MD_LIVE = "PongDuMutantLost", "PongDuMutantLive"
-local _lostDirty = false
-
-local function copyEntry(e, t)
-    return { k = e.k, s = e.s, pid = e.pid, x = e.x, y = e.y, z = e.z, t = t or e.t }
-end
-
--- 현재 존재하는 특좀 종류. 세이브에 남은 옛 종류(이름을 바꾸기 전 "wrecker" 등)는
--- 클라에 처리기가 없어, 옷 ID·거리로 되살린 일반 좀비가 능력 없이 흰 "로치" 이름표만
--- 달게 된다 (클라 이름표가 모르는 종류를 로치 이름·흰색으로 그림). 기동 시 걸러 버린다.
-local KNOWN_KINDS = {
-    screamer = true, brute = true, roach = true, tracer = true,
-    slammer = true, sprinter = true,
-}
-
-Events.OnInitGlobalModData.Add(function()
-    if isClient() then return end
-    local now = getTimestampMs()
-    local lostT = ModData.getOrCreate(MD_LOST)
-    local liveT = ModData.getOrCreate(MD_LIVE)
-    local nLost, nLive, nDrop = 0, 0, 0
-    for _, e in pairs(lostT) do
-        if type(e) == "table" and e.pid then
-            if KNOWN_KINDS[e.k] then
-                _lost[#_lost + 1] = copyEntry(e)
-                nLost = nLost + 1
-            else
-                nDrop = nDrop + 1
-            end
-        end
-    end
-    for _, e in pairs(liveT) do
-        if type(e) == "table" and e.pid then
-            if KNOWN_KINDS[e.k] then
-                _lost[#_lost + 1] = copyEntry(e, now)
-                nLive = nLive + 1
-            else
-                nDrop = nDrop + 1
-            end
-        end
-    end
-    _lostDirty = true   -- 다음 persist 때 걸러진 목록으로 세이브가 덮인다
-    -- 영속 레지스트리(PuppetMutants)도 같은 기준으로 정리 (순회 중 삭제를 피해 키를 먼저 모은다)
-    local reg = ModData.getOrCreate("PuppetMutants")
-    local bad = {}
-    for k, v in pairs(reg) do
-        local kind = v
-        if type(v) == "table" then kind = v["k"] end
-        if not KNOWN_KINDS[kind] then bad[#bad + 1] = k end
-    end
-    for i = 1, #bad do reg[bad[i]] = nil end
-    print("[PongDu][MutantTrack] restored tracking from save: lost=" .. nLost .. " live=" .. nLive
-        .. " droppedUnknownKind=" .. nDrop .. " registryDropped=" .. #bad)
-end)
-
-local function persistTracking()
-    local liveT = ModData.getOrCreate(MD_LIVE)
-    for k in pairs(liveT) do liveT[k] = nil end
-    local i = 0
-    for _, info in pairs(_live) do
-        if info.pid and info.pid ~= 0 then
-            i = i + 1
-            liveT[i] = copyEntry(info, 0)
-        end
-    end
-    if _lostDirty then
-        _lostDirty = false
-        local lostT = ModData.getOrCreate(MD_LOST)
-        for k in pairs(lostT) do lostT[k] = nil end
-        for j = 1, #_lost do lostT[j] = copyEntry(_lost[j]) end
-    end
-end
-
-local function markToClients(zid, kind, sender)
-    if not isServer() then return end
-    sendServerCommand("PongDuMutant", "MutantMark", {
-        ["zedId"]  = zid,
-        ["kind"]   = kind,
-        ["sender"] = sender or "",
-    })
-end
-
--- 표식 없는 좀비 z 에 맞는 _lost 항목을 찾는다 (같은 옷 ID + 가장 가까운 것).
-local function matchLost(z)
-    if #_lost == 0 then return nil end
-    local pid = z:getPersistentOutfitID()
-    if not pid or pid == 0 then return nil end
-    local zx, zy = z:getX(), z:getY()
-    local best, bestD = nil, nil
-    for i = 1, #_lost do
-        local e = _lost[i]
-        if e.pid == pid then
-            local dx, dy = zx - e.x, zy - e.y
-            local d = math.sqrt(dx * dx + dy * dy)
-            if d <= LOST_MATCH_R and (bestD == nil or d < bestD) then
-                best, bestD = i, d
-            end
-        end
-    end
-    if not best then return nil end
-    local e = table.remove(_lost, best)
-    _lostDirty = true
-    return e, bestD
-end
-
-local function staleSweep()
-    local now = getTimestampMs()
-    if now - _lastStaleSweep < STALE_SWEEP_MS then return end
-    _lastStaleSweep = now
-    -- 만료된 부활 마크 정리 (로그 구분용으로만 남긴다)
-    for i = #_reviveRestamp, 1, -1 do
-        if now > _reviveRestamp[i].expire then table.remove(_reviveRestamp, i) end
-    end
-    for i = #_lost, 1, -1 do
-        if now - _lost[i].t > LOST_KEEP_MS then table.remove(_lost, i) _lostDirty = true end
-    end
-    local cell = getCell()
-    if not cell then return end
-    local zeds = cell:getZombieList()
-    if not zeds then return end
-
-    local mp = isServer()
-    local doSync = mp and (now - _lastMutantSync >= MUTANT_SYNC_MS)
-    if doSync then _lastMutantSync = now end
-    local syncList = doSync and {} or nil
-
-    local seen = {}
-    local restamped, restored = 0, 0
-    for i = 0, zeds:size() - 1 do
-        local z = zeds:get(i)
-        if not z:isDead() then
-            local md = z:getModData()
-            local kind = md["PuppetMutant"]
-            local zid = z:getOnlineID()
-            if not kind then
-                local e, d = matchLost(z)
-                if e then
-                    md["PuppetMutant"] = e.k
-                    md["PuppetMutantZid"] = zid
-                    if e.s and e.s ~= "" then md["PuppetMutantSender"] = e.s end
-                    kind = e.k
-                    restored = restored + 1
-                    print(string.format("[PongDu][MutantTrack] restored kind=%s zid=%s pid=%s dist=%.1f lostFor=%dms",
-                        tostring(e.k), tostring(zid), tostring(e.pid), d, now - e.t))
-                    markToClients(zid, kind, e.s)
-                end
-            elseif md["PuppetMutantZid"] ~= zid then
-                print("[PongDu][MutantTrack] re-stamp kind=" .. tostring(kind)
-                    .. " oldZid=" .. tostring(md["PuppetMutantZid"]) .. " newZid=" .. tostring(zid))
-                md["PuppetMutantZid"] = zid
-                restamped = restamped + 1
-                markToClients(zid, kind, md["PuppetMutantSender"])
-            end
-            if kind then
-                seen[z] = true
-                _live[z] = {
-                    k = kind, s = md["PuppetMutantSender"] or "",
-                    pid = z:getPersistentOutfitID(),
-                    x = z:getX(), y = z:getY(), z = z:getZ(),
-                }
-                if syncList then
-                    syncList[#syncList + 1] = {
-                        ["id"] = zid,
-                        ["k"]  = kind,
-                        ["s"]  = md["PuppetMutantSender"] or "",
-                    }
-                end
-            end
-        end
-    end
-
-    -- 지난 스윕에 있던 특좀이 이번에 없으면 = 가상화(청크 언로드) 또는 객체 재사용. 위치를 남긴다.
-    -- (죽은 특좀은 OnZombieDead 에서 _live 에서 빠진다.)
-    local lostNow = 0
-    for z, info in pairs(_live) do
-        if not seen[z] then
-            _live[z] = nil
-            if info.pid and info.pid ~= 0 then
-                _lost[#_lost + 1] = { k = info.k, s = info.s, pid = info.pid,
-                                      x = info.x, y = info.y, z = info.z, t = now }
-                lostNow = lostNow + 1
-                _lostDirty = true
-                if #_lost > LOST_MAX then table.remove(_lost, 1) end
-            end
-        end
-    end
-    if lostNow > 0 then
-        print("[PongDu][MutantTrack] unloaded mutants=" .. lostNow .. " (tracking " .. #_lost .. ")")
-    end
-    persistTracking()
-    if restamped + restored > 0 then
-        print("[PongDu][MutantTrack] sweep restamped=" .. restamped .. " restored=" .. restored)
-    end
-    if syncList and #syncList > 0 then
-        sendServerCommand("PongDuMutant", "MutantSync", { ["zeds"] = syncList })
-        -- 처음 몇 번 + 이후 1분마다만 기록
-        if _syncLogCount < 3 or now - _lastSyncLog > 60000 then
-            _syncLogCount = _syncLogCount + 1
-            _lastSyncLog = now
-            print("[PongDu][MutantTrack] sync sent mutants=" .. #syncList)
-        end
-    end
-end
-addServerTick(staleSweep)
+-- ── 특좀 표식 유지 ────────────────────────────────────────────────────────────
+-- 예전엔 modData 표식을 서버가 추적해(_live/_lost, 옷 ID + 거리) 청크를 나갔다 온 특좀에 되살리고
+-- MutantSync 로 클라에 재통지했다. 옷 ID 의 변형 번호(1~500)가 같은 옷의 일반 좀비와 겹쳐 호드 좀비를
+-- 특좀으로 둔갑시켰으므로 걷어냈다. 지금은 전용 아웃핏 자체가 표식이라 가상화·재시작을 그대로 버틴다
+-- (shared/PongDuMutantId.lua). 예전 세이브 키는 PongDuMutantId.removeLegacyKeys 가 지운다.
 
 -- ② 시체 로드 시 부활 예약 무효화. 플레이어 시체(감염 사망 -> 좀비화)는
 --    바닐라의 정상 부활 경로이므로 건드리지 않는다. 좀비 시체는 바닐라에서

@@ -21,8 +21,12 @@ end
 --  뮤턴트 (mutant_spawn): 스크리머 / 브루트 / 로치 중 1마리 랜덤 소환.
 --
 --  CDDA Zombies 모드에서 스크리머·브루트의 동작 로직만 떼어 자체 이식했다
---  (밴딧 -> 히트맨 이식과 동일 방식). CDDA 모드 의존성 없음 — 타입 배정도
---  CDDA의 CZList/RequestZombieType 대신 modData["PuppetMutant"] 하나로 처리.
+--  (밴딧 -> 히트맨 이식과 동일 방식). CDDA 모드 의존성 없음.
+--  종류·후원자 = 좀비가 입은 전용 아웃핏 PongDuMutant_<슬롯> + 옷 ID 변형 번호
+--  (shared/PongDuMutantId.lua). 아웃핏은 청크 가상화·서버 재시작·시체·강령술 부활·MP 패킷을
+--  모두 통과하므로, 서버 표식 패킷이나 레지스트리 없이 각 클라가 직접 알아본다.
+--  modData["PuppetMutant"/"PuppetMutantSender"/"PuppetMutantZid"] 는 적용기가 매 틱 아웃핏에서
+--  다시 채우는 클라 로컬 캐시일 뿐이다 (isTracer·이름표가 읽는다).
 --
 --    스크리머 : HP 1, 일반 걸음. 타깃이 생기면 주기적으로 비명
 --               (mutant_scream1/2 재생 + 반경 50 월드사운드로 주변 좀비 유인).
@@ -41,7 +45,7 @@ end
 --               단계 결정은 서버(server/PongDuSlammerServer.lua), 연출·이동은 features/slammer.lua.
 --               여기서는 종류 등록·체력·이름표만 한다.
 --
---  권한 구조: 좀비는 클라이언트 권한이므로 서버는 스폰 + modData 마킹만 하고
+--  권한 구조: 좀비는 클라이언트 권한이므로 서버는 전용 아웃핏 소환 + 후원자 번호만 하고
 --  (server.lua MutantSpawn 핸들러), 실제 스탯/행동은 각 클라이언트의
 --  OnZombieUpdate 적용기가 처리한다. 좀비 스트리밍/재사용으로 애님 변수가
 --  풀리면 PuppetMutantInit 가드가 리셋되므로 다음 틱에 자동 재적용된다.
@@ -51,8 +55,8 @@ local KINDS = { "screamer", "brute", "roach", "tracer", "slammer" }
 
 -- 샌드박스 타입 필터: PongDu.Mutant_<종류> 체크된 것만 등장 풀에 포함.
 -- 5종 전부 해제면 스프린터 1마리로 폴백
--- (서버 spawnSpecialZombie는 kind="sprinter"를 그대로 처리 -- modData 마킹 +
---  MutantMark 브로드캐스트, 클라 initMutant가 walkType 적용).
+-- (서버 spawnSpecialZombie는 kind="sprinter"도 전용 아웃핏(슬롯 06)으로 소환,
+--  클라 initMutant가 walkType 적용).
 local KIND_OPTION = {
     screamer = "Mutant_Screamer",
     brute    = "Mutant_Brute",
@@ -100,7 +104,6 @@ local ENDMENT_KEYS = {
 -- 주기였는데, 인게임 분 카운터 동기화 기계장치 대신 실시간 쿨다운으로 단순화.
 local SCREAM_COOLDOWN_MS = 15000
 local _nextScream = {}   -- [onlineID] = 다음 비명 허용 시각(ms). 클라 로컬.
-local _unknownKindLogged = {}   -- [zkey] = true : 모르는 종류 무시 로그를 이미 찍음
 
 -- 도네 발동 진입점 (rewardManager가 안전지대 대기까지 끝낸 뒤 호출).
 -- 종류를 클라에서 굴리고, 좌표와 함께 서버에 스폰 요청. [public name: .a]
@@ -147,6 +150,35 @@ local function mutantHealth(kind)
     return opt:getValue()
 end
 
+-- 트레이서 발라클라바·돈가방 고정 회색. 두 아이템은 무작위 착색(m_AllowRandomTint=true)이고
+-- 아웃핏 XML 에는 색 지정 항목이 없어(ClothingItemReference: 확률·GUID·하위아이템뿐) 클라가 칠한다.
+-- 좀비가 다시 만들어질 때마다 아웃핏 시드대로 색이 돌아오지만 initMutant 가 그때마다 다시 칠한다.
+-- ImmutableColor.new 는 int/float 오버로드가 겹쳐 decode(String) 로 만든다 (0x737373 = 0.45 회색).
+local TINT_GREY = nil
+local TRACER_GREY_ITEMS = { Hat_BalaclavaFull = true, Bag_MoneyBag = true }
+
+local function tintTracerGrey(zombie)
+    -- 착용 아이템 모드(강령술 fakeDead 부활 등)에서 getItemVisuals() 를 부르면 좀비 자신의
+    -- itemVisuals 를 wornItems 로 덮어써 옷이 지워진다(IsoZombie.java:4709~4725) -> 건너뛴다.
+    if zombie:isUsingWornItems() then
+        print("[PuppetMutant] tracer grey skipped (worn-items mode) zid=" .. tostring(zombie:getOnlineID()))
+        return
+    end
+    if not TINT_GREY then TINT_GREY = ImmutableColor.decode("0x737373") end
+    local iv = zombie:getItemVisuals()
+    if not iv then return end
+    local n = 0
+    for i = 0, iv:size() - 1 do
+        local v = iv:get(i)
+        if v and TRACER_GREY_ITEMS[v:getClothingItemName()] then
+            v:setTint(TINT_GREY)
+            n = n + 1
+        end
+    end
+    if n > 0 then zombie:resetModel() end
+    print("[PuppetMutant] tracer grey tinted=" .. tostring(n) .. " zid=" .. tostring(zombie:getOnlineID()))
+end
+
 -- ── 1회 초기화 (클라별) ───────────────────────────────────────────────────────
 -- 스탯류는 매 틱 재적용하면 안 되는 것들이라 PuppetMutantInit 애님 변수로
 -- 가드. 변수는 좀비가 스트림 아웃되면 리셋 -> 다시 로드될 때 자동 재초기화.
@@ -186,6 +218,7 @@ local function initMutant(zombie, kind)
     -- 반드시 그 뒤여야 한다.
     local hp = mutantHealth(kind)
     if hp then zombie:setHealth(hp) end
+    if kind == "tracer" then tintTracerGrey(zombie) end
     -- 옷 진단: 강령술 부활 특좀이 알몸으로 보이는 문제 추적용.
     --   wornItems 로 그리는 좀비(isUsingWornItems: 부활 플레이어 플래그·죽은척 출신)는 클라에
     --   wornItems 가 없으면 알몸이 된다(IsoZombie.java:4715, 4725).
@@ -886,218 +919,47 @@ local function updateRoach(zombie)
 end
 
 -- ── 적용기 본체 ───────────────────────────────────────────────────────────────
--- 서버발 zombie transmitModData는 클라이언트에 전달되지 않으므로, 서버가
--- sendServerCommand("PongDuMutant","MutantMark")로 쏜 zedId+kind를 받아두고
--- OnZombieUpdate에서 onlineID로 매칭한다 (폭격 NearbyExplosion과 같은 채널).
--- modData 경로는 SP/호스트 겸용 폴백으로 유지.
-local _pending = {}   -- [onlineID] = { k=종류, s=후원자, e=만료시각(ms) }
-local PENDING_MS = 120000   -- MutantMark 유효시간(2분). 이후엔 레지스트리(pid)로 재적용.
-
--- 만료 검사 겸용 리더. 만료된 항목은 즉시 제거 (ID 재활용 하이재킹 방지).
-local function pendingEntry(zid)
-    local p = _pending[zid]
-    if not p then return nil end
-    if type(p) == "table" and p["e"] and getTimestampMs() > p["e"] then
-        _pending[zid] = nil
-        return nil
+-- 종류는 아웃핏 이름으로 알아낸다. 아웃핏 이름은 좀비마다 modData 에 캐시한다(PuppetOutfit):
+-- 일반 좀비는 매 틱 문자열 비교 한 번으로 끝난다. 객체 재사용(resetForReuse)은 modData 를
+-- 지우므로 캐시도 같이 지워진다. 옷을 아직 안 입은 순간(nil)은 캐시하지 않고 다음 틱에 다시 본다.
+local function outfitKind(zombie, md)
+    local name = md["PuppetOutfit"]
+    if name == nil then
+        name = zombie:getOutfitName()
+        if name == nil then return nil end
+        md["PuppetOutfit"] = name
     end
-    return p
-end
-
--- 영속 레지스트리: 서버가 특수좀비 탄생 시 글로벌 ModData "PuppetMutants"에
--- 정규화ID -> kind 로 등록해둔다 (server.lua registerMutant 참고). 이 ID는
--- 사망->시체->부활 내내 유지되므로 부활 좀비도 조회에 걸려 자동 재적용된다.
--- 모자 비트 마스킹까지 등록/조회가 같은 함수(HitmanUtils.GetZombieID)를 쓴다.
-local _registry = {}  -- [정규화ID 문자열] = kind 또는 {k=종류, s=후원자}
-
--- 레지스트리/펜딩 항목 겸용 리더 (구버전 문자열 항목 호환)
-local function regEntry(v)
-    if type(v) == "table" then return v["k"], v["s"] end
-    return v, nil
-end
-
-local function mutantKey(zombie)
-    return PongDuZombieId.GetString(zombie)
-end
-
-Events.OnReceiveGlobalModData.Add(function(name, data)
-    if name == "PuppetMutants" and type(data) == "table" then
-        _registry = data
-        print("[PuppetMutant] registry received, entries follow")
-        for k, v in pairs(_registry) do
-            print("[PuppetMutant]   " .. tostring(k) .. " = " .. tostring(v))
-        end
-    end
-end)
-Events.OnGameStart.Add(function()
-    ModData.request("PuppetMutants")
-end)
-
--- 부활 마크: 서버 RiseUp이 특수좀비 시체를 판별하면 부활 위치+종류를
--- 브로드캐스트한다. 부활 좀비는 pid가 새로 발급돼 레지스트리 직조회가
--- 불가하므로, 클라가 마크 스퀘어(±1)의 미적용 좀비에게 능력을 재적용한다.
-local _reviveMarks = {}   -- { {x,y,z,kind,expire}, ... }
-local REVIVE_MARK_MS = 20000
-
--- 특좀 지정 [public name: .mark]
--- MutantMark 수신부와 동일한 등록. 좀비 레인처럼 자체 배치 채널(RainMark)로
--- zid+kind를 받는 기능이 특좀 개별 패킷 없이 같은 파이프라인에 태울 때 쓴다.
--- 만료시각 포함: OnZombieDead가 안 뜨고 죽은 좀비의 스테일 항목이
--- onlineID 재활용으로 새 좀비를 하이재킹하는 것을 차단.
--- 만료 뒤 스트림-인 재적용은 레지스트리(pid)가 담당한다.
--- ttlMs 를 주면 그 시간만 유효 (MutantSync 처럼 주기적으로 다시 오는 통지용).
-function _a.mark(zid, kind, sender, ttlMs)
-    if not zid or not kind then return end
-    _pending[zid] = { ["k"] = kind, ["s"] = sender,
-                      ["e"] = getTimestampMs() + (ttlMs or PENDING_MS) }
-end
-
--- 서버 MutantSync (server.lua staleSweep, MP 만): 서버에 로드된 특좀 전체 목록.
--- 클라 좀비 객체는 청크를 나갔다 오면 새로 만들어져 modData 가 비고, 스폰 때 받은
--- MutantMark 는 이미 소비/만료돼 있다. 주기 목록으로 다시 표시해 두면 보이는 순간
--- 적용기가 능력을 다시 붙인다. 만료는 주기보다 조금 길게만 잡아 onlineID 재활용
--- 하이재킹 창을 짧게 한다 (서버 목록이 매번 새로 덮어쓴다).
-local SYNC_TTL_MS = 8000
-local _syncLogged = 0
-
-Events.OnServerCommand.Add(function(module, command, args)
-    if module ~= "PongDuMutant" then return end
-    if command == "MutantMark" then
-        print("[PuppetMutant] mark received zid=" .. tostring(args and args["zedId"])
-            .. " kind=" .. tostring(args and args["kind"]))
-        _a.mark(args and tonumber(args["zedId"]), args and args["kind"], args and args["sender"])
-    elseif command == "MutantSync" then
-        local list = args and args["zeds"]
-        if type(list) ~= "table" then return end
-        local n = 0
-        for _, e in pairs(list) do
-            if type(e) == "table" then
-                local zid = tonumber(e["id"])
-                local p = zid and _pending[zid]
-                -- 스폰 직후의 긴 MutantMark 는 짧은 동기화 항목으로 덮지 않는다.
-                if zid and e["k"] and not (p and p["e"] and p["e"] - getTimestampMs() > SYNC_TTL_MS) then
-                    _a.mark(zid, e["k"], e["s"], SYNC_TTL_MS)
-                end
-                n = n + 1
-            end
-        end
-        -- 첫 몇 번만 기록 (3초마다 와서 매번 찍으면 로그가 덮인다)
-        if _syncLogged < 3 then
-            _syncLogged = _syncLogged + 1
-            print("[PuppetMutant] sync received mutants=" .. tostring(n))
-        end
-    elseif command == "MutantRevive" then
-        local x, y = tonumber(args and args["x"]), tonumber(args and args["y"])
-        local kind = args and args["kind"]
-        if x and y and kind then
-            _reviveMarks[#_reviveMarks + 1] = {
-                x = x, y = y, z = tonumber(args["z"]) or 0,
-                kind = kind, sender = args["sender"],
-                expire = getTimestampMs() + REVIVE_MARK_MS,
-            }
-            print("[PuppetMutant] revive mark " .. tostring(kind)
-                .. " @" .. tostring(x) .. "," .. tostring(y)
-                .. " key=" .. tostring(args["key"]))
-        end
-    elseif command == "MutantReviveDebug" then
-        print("[PuppetMutant] riseup total=" .. tostring(args and args["total"])
-            .. " pid-readable=" .. tostring(args and args["readable"])
-            .. " special=" .. tostring(args and args["marked"]))
-    end
-end)
-
--- 마크 매칭: 마크 스퀘어 ±1 안의 좀비면 소모하고 종류 반환.
--- 같은 스퀘어에 이종 시체가 동시 부활하면 클라별 배정이 어긋날 수 있는
--- 알려진 한계가 있으나(드묾), 재등록으로 이후 사이클부터는 pid로 고정된다.
-local function matchReviveMark(zombie)
-    if #_reviveMarks == 0 then return nil end
-    local zx = math.floor(zombie:getX())
-    local zy = math.floor(zombie:getY())
-    local zz = math.floor(zombie:getZ())
-    local now = getTimestampMs()
-    for i = #_reviveMarks, 1, -1 do
-        local m = _reviveMarks[i]
-        if now > m.expire then
-            table.remove(_reviveMarks, i)
-        elseif math.abs(m.x - zx) <= 1 and math.abs(m.y - zy) <= 1 and m.z == zz then
-            table.remove(_reviveMarks, i)
-            return m.kind, m.sender
-        end
-    end
-    return nil
+    return PongDuMutantId.kindOfOutfitName(name)
 end
 
 local function applyMutant(zombie)
     local md = zombie:getModData()
     local curZid = zombie:getOnlineID()
-    -- ★풀 재활용 방어 (호드매니저 둔갑 근본원인): B41은 죽은 좀비의 IsoZombie
-    -- 객체를 풀에 반환 후 새 좀비에 재사용하는데 modData가 안 지워진다. 죽은
-    -- 특좀 객체가 호드 좀비로 재활용되면 md["PuppetMutant"]가 그대로 딸려와
-    -- 새 좀비가 특좀으로 둔갑한다(서버 로그: 호드 시점 REG/MutantMark 전무인데
-    -- 클라는 resolution 경로 없이 바로 init). md에 소유 onlineID를 함께 박아,
-    -- 현재 좀비 zid와 다르면 스테일(재활용)로 간주하고 폐기한다.
-    if md["PuppetMutant"] and md["PuppetMutantZid"] ~= curZid then
-        print("[PuppetMutant] STALE md rejected kind=" .. tostring(md["PuppetMutant"])
-            .. " mdZid=" .. tostring(md["PuppetMutantZid"]) .. " curZid=" .. tostring(curZid))
-        md["PuppetMutant"] = nil
-        md["PuppetMutantSender"] = nil
-        md["PuppetMutantZid"] = nil
-        zombie:setVariable("PuppetMutantInit", false)
-    end
-    local kind, sender = md["PuppetMutant"], md["PuppetMutantSender"]
-    -- 서버 MutantMark(pending)가 권위값. 좀비 스트림-인이 MutantMark보다 먼저
-    -- 도착한 경우 스테일 pending으로 오배정된 kind가 md에 캐시될 수 있는데,
-    -- 진짜 마크가 도착하는 즉시 여기서 교정한다.
-    local p = pendingEntry(curZid)
-    if p then
-        local pk, ps = regEntry(p)
-        if pk and kind and pk ~= kind then
-            print("[PuppetMutant] corrected " .. tostring(kind) .. " -> " .. tostring(pk)
-                .. " zid=" .. tostring(curZid))
-            kind, sender = pk, ps
-            md["PuppetMutant"] = pk
-            md["PuppetMutantSender"] = ps
-            md["PuppetMutantZid"] = curZid
-            zombie:setVariable("PuppetMutantInit", false)   -- 올바른 kind로 재초기화
-        elseif not kind then
-            kind, sender = pk, ps
-        end
-        -- ★1회용 소비: MutantMark는 "방금 스폰한 그 좀비"를 지목하는 일회성
-        -- 신호다. 적용 즉시 항목을 지워야 onlineID 재활용으로 새 좀비가 죽은
-        -- 특좀의 스테일 항목에 걸려 같은 종류로 둔갑하는 것을 막는다.
-        _pending[curZid] = nil
-    end
-    -- pid(persistentOutfitID) 레지스트리 조회 경로 제거.
-    -- persistentOutfitID는 좀비 고유 ID가 아니라 '옷차림' 공유 ID라, 이전에
-    -- 등록된 특좀과 같은 옷을 입은 일반좀비(예: 호드매니저 소환분)가 같은
-    -- key로 조회에 걸려 그 특좀 종류로 둔갑하는 오탐이 났다. 부활 판별은
-    -- 서버가 시체 modData로 정확히 하고, 클라 능력적용은 아래 revive-mark로
-    -- 처리하므로 pid 경로는 순수 오탐원 -> 완전 삭제.
-    if not kind and zombie:isAlive()
-        and not zombie:getVariableBoolean("PuppetMutantInit") then
-        kind, sender = matchReviveMark(zombie)
-        if kind then
-            print("[PuppetMutant] resolved via REVIVE-MARK key="
-                .. tostring(mutantKey(zombie)) .. " kind=" .. tostring(kind)
-                .. " zid=" .. tostring(zombie:getOnlineID()))
-        end
-    end
-    if not kind then return end
-    -- 모르는 종류(이름을 바꾸기 전 세이브의 "wrecker" 등)는 적용하지 않는다. 그대로 두면
-    -- 능력 없는 일반 좀비에 이름표만 로치 이름·흰색 폴백으로 붙는다. 좀비당 한 번만 기록.
-    if not haloKey[kind] then
-        local uk = zkey(zombie)
-        if not _unknownKindLogged[uk] then
-            _unknownKindLogged[uk] = true
-            print("[PuppetMutant] ignore unknown kind=" .. tostring(kind)
-                .. " zid=" .. tostring(zombie:getOnlineID()))
+    local kind = outfitKind(zombie, md)
+    if not kind then
+        -- 특좀이 아니다. 예전 표식이 남아 있으면(이전 버전 세이브의 시체 modData 등) 지운다.
+        if md["PuppetMutant"] then
+            print("[PuppetMutant] cleared legacy mark kind=" .. tostring(md["PuppetMutant"])
+                .. " outfit=" .. tostring(md["PuppetOutfit"]) .. " zid=" .. tostring(curZid))
+            md["PuppetMutant"] = nil
+            md["PuppetMutantSender"] = nil
+            md["PuppetMutantZid"] = nil
+            zombie:setVariable("PuppetMutantInit", false)
         end
         return
     end
-    -- 클라 로컬 캐시: 이후 조회/네임태그 렌더가 modData만 보면 되게.
-    -- 소유 zid를 함께 박아 풀 재활용 스테일 판별의 기준으로 삼는다.
-    if not md["PuppetMutant"] then md["PuppetMutant"] = kind end
-    if sender and not md["PuppetMutantSender"] then md["PuppetMutantSender"] = sender end
+    local sender = PongDuMutantId.senderOf(zombie)
+    if md["PuppetMutant"] ~= kind then
+        if md["PuppetMutant"] then
+            print("[PuppetMutant] kind changed " .. tostring(md["PuppetMutant"]) .. " -> " .. kind
+                .. " zid=" .. tostring(curZid))
+        end
+        zombie:setVariable("PuppetMutantInit", false)   -- 올바른 종류로 (재)초기화
+    end
+    -- 클라 로컬 캐시: isTracer·이름표가 modData만 보면 되게 매 틱 아웃핏 값으로 맞춘다.
+    -- 후원자 표가 늦게 도착해도(MP 접속 직후) 다음 틱에 이름이 채워진다.
+    md["PuppetMutant"] = kind
+    md["PuppetMutantSender"] = sender
     md["PuppetMutantZid"] = curZid
     -- BLT 선제 차단: 패스 도중에 새로 스폰된 특좀은 PongDuCompat의 패스 시작
     -- 스캔을 놓치므로, 여기서 매 틱 도장을 갱신해 사각을 없앤다(modData 3필드
@@ -1136,14 +998,8 @@ local function applyMutant(zombie)
 end
 Events.OnZombieUpdate.Add(applyMutant)
 
--- 죽으면 로컬 마크/쿨다운 정리 + 서버에 사망 좌표 리포트.
--- 죽을 때 로컬 캐시만 정리한다.
--- (예전엔 좌표 death-mark를 서버로 보고했지만, 서버가 시체 modData를 직접
---  읽는 방식으로 바뀌어 death-mark 자체가 불필요해졌다. registry 폴백도
---  옷차림 pid 충돌로 일반좀비의 잘못된 death-mark를 유발하던 오탐원이라 제거.)
+-- 죽을 때 로컬 캐시만 정리한다. 시체·강령술 부활의 특좀 유지는 아웃핏이 담당한다.
 Events.OnZombieDead.Add(function(zombie)
-    local zid = zombie:getOnlineID()
-    _pending[zid] = nil              -- 서버 MutantMark 가 onlineID 로 오므로 그대로
     local k = zkey(zombie)
     _nextScream[k] = nil
     _hpSnap[k] = nil                 -- 이름표(_showTags)는 renderTags 가 사망 시 스스로 지운다

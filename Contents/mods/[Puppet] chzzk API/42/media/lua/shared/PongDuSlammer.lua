@@ -124,8 +124,10 @@ function S.log(msg)
     print("[PongDu][Slammer] " .. msg)
 end
 
+-- 슬래머 판별은 전용 아웃핏으로 한다 (shared/PongDuMutantId.lua). 서버도 같은 방법이라
+-- 청크를 나갔다 온 슬래머(modData 가 버려짐)도 그대로 알아본다.
 function S.isSlammer(zombie)
-    return zombie ~= nil and zombie:getModData()["PuppetMutant"] == S.KIND
+    return zombie ~= nil and PongDuMutantId.kindOf(zombie) == S.KIND
 end
 
 -- 애니메이션 상태 이름 정규화: 소문자, 경로 앞부분 제거, "-network" 꼬리 제거.

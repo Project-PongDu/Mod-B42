@@ -6,7 +6,6 @@ local labelKey = require("utils/labelKey")
 local timerText = require("utils/timerText")
 local fx = require("utils/fx")
 local deltaTime = require("utils/deltaTime")
-local mutantspawn = require("features/mutantspawn")
 local vxf = require("utils/vehtransform")
 local vpView = require("utils/viewpointView")
 
@@ -26,8 +25,8 @@ local vpView = require("utils/viewpointView")
 --     - 전 클라: 낙하 자세 고정 (아래 낙하 애니메이션 절)
 --     - 낙하산 연출이면 낙하산 부착 + 감속 (아래 Rain_Parachute 절)
 --     착지하면 대기열에서 뺀다. 체력은 건드리지 않는다 -- 서버 설정(좀비 강인함,
---     특좀 체력 옵션) 그대로다. 종류(k)가 있으면 특좀 적용기(mutantspawn.mark)에
---     넘긴다 -- 스프린터 포함 전 특좀이 도네 특좀과 같은 경로로 능력/이름표를 받는다.
+--     특좀 체력 옵션) 그대로다. 특좀은 서버가 전용 아웃핏으로 소환하므로 특좀 적용기
+--     (features/mutantspawn.lua)가 아웃핏으로 알아보고 도네 특좀과 같은 능력/이름표를 입힌다.
 --
 -- [B42 낙하 판정] 착지 데미지·넘어짐은 fallTime 이 아니라 착지 순간 속도로 정한다.
 -- IsoGameCharacter.updateFalling 이 매 틱 lastFallSpeed 에 중력(5.0 층/초^2)을 더하고
@@ -771,12 +770,7 @@ Events.OnServerCommand.Add(function(module, command, args)
                 para = para,     -- 낙하산 대상
                 chute = false,   -- 이 클라에서 낙하산을 씌웠는지
             }
-            -- 특좀: 도네 특좀(MutantMark)과 같은 대기열에 등록 -> OnZombieUpdate
-            -- 적용기가 onlineID로 매칭해 능력/체력/이름표를 입힌다 (전 클라 각자).
-            -- SP(obj 있음)는 건너뛴다: id 가 -1 이라 mark 하면 모든 좀비가 특좀이 되고,
-            -- 서버가 같은 객체에 심은 modData PuppetMutant/PuppetMutantZid(-1) 경로로
-            -- 적용기가 이미 정확히 매칭한다.
-            if kind and not obj then mutantspawn.mark(id, kind, sender) end
+            -- 특좀 능력/이름표는 적용기가 전용 아웃핏으로 알아보고 입힌다 (표식 전달 불필요).
         end
     end
 end)

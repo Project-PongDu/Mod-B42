@@ -31,9 +31,9 @@
 PongDuCompat = PongDuCompat or {}
 
 -- 퐁듀가 스탯 소유권을 주장하는 좀비 판별.
---   PuppetMutant  : 뮤턴트 4종(screamer/brute/roach/tracer) + 스프린터
---                   (mutant_spawn, zombie_rain, sprinter5 부활 경로 공통 마커)
---   isSprinter    : server.lua makeSprinter 경로
+--   전용 아웃핏  : 뮤턴트(screamer/brute/roach/tracer/slammer) + 스프린터
+--                   (PongDuMutant_<슬롯>, shared/PongDuMutantId.lua. 소환·좀비 레인·부활 공통)
+--   isSprinter    : 예전 makeSprinter 경로 마커 (남은 개체 호환)
 --   hitmanBrain   : 히트맨 NPC (좀비 객체를 NPC로 쓰므로 체력/크롤 개입 시 파손)
 --   Hitman 변수   : 브레인 부착 전/후 과도 구간 방어
 -- 영구 소유(개체 정체성 자체가 퐁듀 것). 블러드문처럼 "한시적으로 스탯만
@@ -43,9 +43,9 @@ PongDuCompat = PongDuCompat or {}
 -- 복구 불가).
 function PongDuCompat.isSpecialZombie(zombie)
     if not zombie then return false end
+    if PongDuMutantId and PongDuMutantId.kindOf(zombie) then return true end
     local md = zombie:getModData()
     if md then
-        if md["PuppetMutant"] then return true end
         if md["isSprinter"] then return true end
         if md["hitmanBrain"] then return true end
     end

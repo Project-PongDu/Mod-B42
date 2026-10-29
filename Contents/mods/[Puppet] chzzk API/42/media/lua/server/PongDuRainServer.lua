@@ -36,7 +36,7 @@ local RAIN_DUR_MIN_S     = 5
 local RAIN_DUR_MAX_S     = 120
 local RAIN_CNT_MAX       = 500                              -- 전 종류 합계 상한 (스퀘어 생성 부하)
 
--- 낙하 종류. "normal" 외에는 특좀 파이프라인(PuppetMutant kind)과 같은 이름이다
+-- 낙하 종류. "normal" 외에는 특좀 종류 이름(shared/PongDuMutantId.lua)과 같다
 -- (sprinter = server.lua spawnZombies 뛰좀, 나머지 = features/mutantspawn.lua KINDS).
 -- 순서는 로그 출력 순서일 뿐, 실제 낙하 순서는 셔플된다.
 local RAIN_KINDS = { "normal", "sprinter", "screamer", "brute", "roach", "tracer", "slammer" }
@@ -171,15 +171,26 @@ local function buildKindList(kinds)
     return list, requested
 end
 
--- 1마리 스폰: 지면(z=0)에 생성 후 바로 z=session.dropZ 로 올린다(파일 머리 주석). 랜덤 아웃핏(outfit=nil),
--- 체력 캡처 후 세션 배치에 적재. 특좀 종류는 서버 modData에 마킹만 하고
--- 스탯/행동 적용은 RainMark를 받은 클라가 특좀 적용기(mutantspawn)에 넘겨
--- 처리한다 (B41 MP 좀비는 클라 권한).
+-- 1마리 스폰: 지면(z=0)에 생성 후 바로 z=session.dropZ 로 올린다(파일 머리 주석). 일반 좀비는
+-- 랜덤 아웃핏(outfit=nil), 특좀은 종류별 전용 아웃핏(shared/PongDuMutantId.lua)으로 소환하고
+-- 후원자 번호를 옷 ID 변형 번호에 박는다. 스탯/행동 적용은 각 클라 특좀 적용기(mutantspawn)가
+-- 아웃핏으로 종류를 알아내 처리한다 (좀비는 클라 권한). 아웃핏은 시체·강령술 부활에도 유지된다.
 local function spawnRainZombie(session, col, kind)
+    local mutant = kind ~= nil and kind ~= "normal"
     -- addZombiesInOutfit 는 해당 z 스퀘어가 있어야 스폰한다(LuaManager). 지면은 isRainColumn 이 보장.
-    local zeds = addZombiesInOutfit(col.x, col.y, 0, 1, nil, nil)
+    local zeds
+    if mutant then
+        zeds = addZombiesInOutfit(col.x, col.y, 0, 1, PongDuMutantId.outfitOf(kind),
+            PongDuMutantId.femaleChance(kind))
+    else
+        zeds = addZombiesInOutfit(col.x, col.y, 0, 1, nil, nil)
+    end
     if not zeds or zeds:size() == 0 then return false end
     local zed = zeds:get(0)
+    if mutant then
+        -- 소환과 같은 호출 안에서 옷 ID 를 바꿔야 첫 패킷에 실린다 (setZ 보다 먼저)
+        PongDuMutantId.applyDonor(zed, session.sender)
+    end
     zed:setZ(session.dropZ)
     zed:setLastZ(session.dropZ)
     zed:DoZombieStats()
@@ -187,18 +198,6 @@ local function spawnRainZombie(session, col, kind)
     local p = session.player
     pcall(function() zed:setTarget(p) end)
     pcall(function() zed:setTurnAlertedValues(math.floor(p:getX()), math.floor(p:getY())) end)
-    -- 서버측 특좀 마킹: 이게 있어야 시체(IsoDeadBody)에 계승되어 강령술
-    -- (RiseUp)이 b:getModData()["PuppetMutant"]를 읽고 같은 종류로 부활시킨다.
-    -- PuppetMutantZid 스탬프 필수 -- 없으면 staleSweep이 풀 재활용으로 오인해 즉시 지운다.
-    local mutant = kind ~= nil and kind ~= "normal"
-    if mutant then
-        local md = zed:getModData()
-        md["PuppetMutant"]    = kind
-        md["PuppetMutantZid"] = zed:getOnlineID()
-        if session.sender and session.sender ~= "" then
-            md["PuppetMutantSender"] = session.sender
-        end
-    end
     session.batch[#session.batch + 1] = {
         ["id"] = zed:getOnlineID(),
         ["k"]  = mutant and kind or nil,
