@@ -100,6 +100,7 @@ local ENDMENT_KEYS = {
 -- 주기였는데, 인게임 분 카운터 동기화 기계장치 대신 실시간 쿨다운으로 단순화.
 local SCREAM_COOLDOWN_MS = 15000
 local _nextScream = {}   -- [onlineID] = 다음 비명 허용 시각(ms). 클라 로컬.
+local _unknownKindLogged = {}   -- [zkey] = true : 모르는 종류 무시 로그를 이미 찍음
 
 -- 도네 발동 진입점 (rewardManager가 안전지대 대기까지 끝낸 뒤 호출).
 -- 종류를 클라에서 굴리고, 좌표와 함께 서버에 스폰 요청. [public name: .a]
@@ -309,19 +310,18 @@ end
 -- (WorldSoundPacket.processServer) -> 한 번이면 전원의 좀비가 듣는다. 모든 클라가 내면
 -- 접속자 수만큼 중복 중계된다. 반경 50 이상이어야 가상 좀비(청크 밖 인구)도 끈다.
 --
--- 표적 전파: 스크리머가 플레이어를 표적으로 잡은 채 비명을 지르면, 비명을
--- 들은 좀비도 그 플레이어를 표적으로 인지한다. 월드사운드만으로는 좀비가
--- "소리 난 곳"으로 갈 뿐 플레이어를 모르므로 features/aggro.lua 인계 루프를 쓴다:
---   18타일 이내 = spotted(target,false) 비강제 스팟 → 엔진 자체 추격 루프 인계
---   그 밖     = pathToSound로 표적 플레이어 현재 좌표로 유인(2초마다 갱신)
+-- 표적 위치 전달: 스크리머가 플레이어를 표적으로 잡은 채 비명을 지르면, 비명을
+-- 들은 좀비에게 "그 순간의" 플레이어 위치를 한 번 알린다 (aggro.nudgeOnce):
+--   모두      = pathToSound 로 비명 시점의 플레이어 좌표로 유인
+--   18타일 이내 = 추가로 spotted(target,false) 비강제 스팟 → 성공하면 엔진 추격 인계
+-- 비명마다 1회뿐이다. 예전엔 어그로 창(16초)이 2초마다 플레이어 현재 좌표로 다시
+-- 유인해 좀비 무리가 2초 주기로 돌아보며 경로를 갈아탔다 (2026-10-29 실측 로그
+-- "pulse lured=100" 2초 간격).
 -- 좀비는 소유 클라 권한이라 각 클라가 자기 소유 좀비만 고른다. 원격 스크리머의
 -- 표적도 ZombiePacket.target 으로 동기화되므로 비소유 클라도 표적을 안다 →
--- 전파는 월드사운드와 달리 모든 클라에서 돈다(서버 패킷 추가 없음).
+-- 전달은 월드사운드와 달리 모든 클라에서 돈다(서버 패킷 추가 없음).
 local SCREAM_RADIUS = 50
 local SCREAM_VOLUME = 50
--- 표적 전파 창 유지시간: 다음 비명 직전까지 이어지게 쿨다운 + 여유 1초.
--- 스크리머가 표적을 계속 물고 있으면 비명마다 창이 연장돼 끊김 없이 이어진다.
-local SCREAM_AGGRO_MS = SCREAM_COOLDOWN_MS + 1000
 
 -- 비명 청각 판정: WorldSoundManager.getSoundAttract(B42.21 :347) 재현.
 -- 3D 거리(z 는 3배 가중) <= 반경 x 좀비별 청각 배율(착용 장비·날씨 포함),
@@ -374,8 +374,7 @@ local function collectScreamListeners(screamer)
     return list
 end
 
--- 표적 전파 본체. MP 는 onlineID 화이트리스트 창(aggro.addScreamIds)으로 넘기고,
--- 싱글은 onlineID 가 전부 -1 이라 창을 못 쓰므로 비명 시점에 1회 인계/유인한다.
+-- 표적 위치 전달 본체 (MP·SP 공통, 비명마다 1회).
 local function propagateScreamTarget(screamer, target)
     local szid = screamer:getOnlineID()
     if not instanceof(target, "IsoPlayer") or target:isDead() then
@@ -387,26 +386,14 @@ local function propagateScreamTarget(screamer, target)
         print("[PuppetMutant] scream listener scan error: " .. tostring(list))
         return
     end
-    local pid = target:getOnlineID()
-    if isClient() then
-        local ids = {}
-        for i = 1, #list do
-            local id = list[i]:getOnlineID()
-            if id >= 0 then ids[#ids + 1] = id end
-        end
-        local added = aggro.addScreamIds(pid, ids, SCREAM_AGGRO_MS)
-        print("[PuppetMutant] scream propagate zid=" .. tostring(szid)
-            .. " targetPid=" .. tostring(pid)
-            .. " heard=" .. tostring(#list) .. " added=" .. tostring(added))
-    else
-        local nH, nL = 0, 0
-        for i = 1, #list do
-            local r = aggro.nudgeOnce(list[i], target)
-            if r == "handoff" then nH = nH + 1 elseif r == "lure" then nL = nL + 1 end
-        end
-        print("[PuppetMutant] scream propagate(SP) heard=" .. tostring(#list)
-            .. " handoff=" .. tostring(nH) .. " lure=" .. tostring(nL))
+    local nS, nL = 0, 0
+    for i = 1, #list do
+        local r = aggro.nudgeOnce(list[i], target)
+        if r == "spotted" then nS = nS + 1 elseif r == "lure" then nL = nL + 1 end
     end
+    print("[PuppetMutant] scream propagate zid=" .. tostring(szid)
+        .. " targetPid=" .. tostring(target:getOnlineID())
+        .. " heard=" .. tostring(#list) .. " spotted=" .. tostring(nS) .. " lureOnly=" .. tostring(nL))
 end
 
 local function updateScreamer(zombie)
@@ -1096,6 +1083,17 @@ local function applyMutant(zombie)
         end
     end
     if not kind then return end
+    -- 모르는 종류(이름을 바꾸기 전 세이브의 "wrecker" 등)는 적용하지 않는다. 그대로 두면
+    -- 능력 없는 일반 좀비에 이름표만 로치 이름·흰색 폴백으로 붙는다. 좀비당 한 번만 기록.
+    if not haloKey[kind] then
+        local uk = zkey(zombie)
+        if not _unknownKindLogged[uk] then
+            _unknownKindLogged[uk] = true
+            print("[PuppetMutant] ignore unknown kind=" .. tostring(kind)
+                .. " zid=" .. tostring(zombie:getOnlineID()))
+        end
+        return
+    end
     -- 클라 로컬 캐시: 이후 조회/네임태그 렌더가 modData만 보면 되게.
     -- 소유 zid를 함께 박아 풀 재활용 스테일 판별의 기준으로 삼는다.
     if not md["PuppetMutant"] then md["PuppetMutant"] = kind end

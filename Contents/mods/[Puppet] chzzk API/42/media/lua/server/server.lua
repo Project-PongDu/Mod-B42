@@ -1744,26 +1744,52 @@ local function copyEntry(e, t)
     return { k = e.k, s = e.s, pid = e.pid, x = e.x, y = e.y, z = e.z, t = t or e.t }
 end
 
+-- 현재 존재하는 특좀 종류. 세이브에 남은 옛 종류(이름을 바꾸기 전 "wrecker" 등)는
+-- 클라에 처리기가 없어, 옷 ID·거리로 되살린 일반 좀비가 능력 없이 흰 "로치" 이름표만
+-- 달게 된다 (클라 이름표가 모르는 종류를 로치 이름·흰색으로 그림). 기동 시 걸러 버린다.
+local KNOWN_KINDS = {
+    screamer = true, brute = true, roach = true, tracer = true,
+    slammer = true, sprinter = true,
+}
+
 Events.OnInitGlobalModData.Add(function()
     if isClient() then return end
     local now = getTimestampMs()
     local lostT = ModData.getOrCreate(MD_LOST)
     local liveT = ModData.getOrCreate(MD_LIVE)
-    local nLost, nLive = 0, 0
+    local nLost, nLive, nDrop = 0, 0, 0
     for _, e in pairs(lostT) do
         if type(e) == "table" and e.pid then
-            _lost[#_lost + 1] = copyEntry(e)
-            nLost = nLost + 1
+            if KNOWN_KINDS[e.k] then
+                _lost[#_lost + 1] = copyEntry(e)
+                nLost = nLost + 1
+            else
+                nDrop = nDrop + 1
+            end
         end
     end
     for _, e in pairs(liveT) do
         if type(e) == "table" and e.pid then
-            _lost[#_lost + 1] = copyEntry(e, now)
-            nLive = nLive + 1
+            if KNOWN_KINDS[e.k] then
+                _lost[#_lost + 1] = copyEntry(e, now)
+                nLive = nLive + 1
+            else
+                nDrop = nDrop + 1
+            end
         end
     end
-    _lostDirty = true
-    print("[PongDu][MutantTrack] restored tracking from save: lost=" .. nLost .. " live=" .. nLive)
+    _lostDirty = true   -- 다음 persist 때 걸러진 목록으로 세이브가 덮인다
+    -- 영속 레지스트리(PuppetMutants)도 같은 기준으로 정리 (순회 중 삭제를 피해 키를 먼저 모은다)
+    local reg = ModData.getOrCreate("PuppetMutants")
+    local bad = {}
+    for k, v in pairs(reg) do
+        local kind = v
+        if type(v) == "table" then kind = v["k"] end
+        if not KNOWN_KINDS[kind] then bad[#bad + 1] = k end
+    end
+    for i = 1, #bad do reg[bad[i]] = nil end
+    print("[PongDu][MutantTrack] restored tracking from save: lost=" .. nLost .. " live=" .. nLive
+        .. " droppedUnknownKind=" .. nDrop .. " registryDropped=" .. #bad)
 end)
 
 local function persistTracking()
