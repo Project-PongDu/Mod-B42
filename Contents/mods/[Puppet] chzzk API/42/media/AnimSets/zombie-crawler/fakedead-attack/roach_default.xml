@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animNode>
+	<m_Name>roach_default</m_Name>
+	<m_AnimName>Zombie_PongDuRoach_DeadToCrawl</m_AnimName>
+	<m_Looped>false</m_Looped>
+	<m_BlendTime>0.20</m_BlendTime>
+	<m_SpeedScale>0.80</m_SpeedScale>
+	<m_Events x_name="07cc5be5-9544-5aab-8268-39f62a69e145">
+		<m_EventName>FallOnFront</m_EventName>
+		<m_TimePc>0.5</m_TimePc>
+		<m_ParameterValue>TRUE</m_ParameterValue>
+	</m_Events>
+	<m_Conditions x_name="1373da6d-070d-5a31-a19f-83a03f031526">
+		<m_Name>PuppetRoach</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+</animNode>

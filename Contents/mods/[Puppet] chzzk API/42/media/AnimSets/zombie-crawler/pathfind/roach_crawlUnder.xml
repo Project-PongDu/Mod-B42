@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animNode>
+	<m_Name>roach_crawlUnder</m_Name>
+	<m_AnimName>Zombie_PongDuRoach_CrawlUnder</m_AnimName>
+	<m_BlendTime>0.20</m_BlendTime>
+	<m_SyncTrackingEnabled>false</m_SyncTrackingEnabled>
+	<m_Conditions x_name="c2cac757-32f7-59de-a857-e1ad9a7a663b">
+		<m_Name>bMoving</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+	<m_Conditions x_name="0295cb7c-e984-5398-87eb-00122f6111ab">
+		<m_Name>bUnderVehicle</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+	<m_Conditions x_name="9aeed7dd-ca2f-5f22-abc8-55e6a70c8005">
+		<m_Name>PuppetRoach</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+</animNode>

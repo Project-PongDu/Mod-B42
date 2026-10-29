@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animNode>
+	<m_Name>roach_hitReact_onback</m_Name>
+	<m_AnimName>Zombie_PongDuRoach_HitReact_FloorOnBack</m_AnimName>
+	<m_Looped>false</m_Looped>
+	<m_BlendTime>0.25</m_BlendTime>
+	<m_SpeedScale>0.96</m_SpeedScale>
+	<m_SyncTrackingEnabled>false</m_SyncTrackingEnabled>
+	<m_Conditions x_name="b05c6510-b57b-5657-b065-07f06ddc7826">
+		<m_Name>FallOnFront</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>false</m_Value>
+	</m_Conditions>
+	<m_Events x_name="047802f1-d978-51e8-bf90-77e62f16701f">
+		<m_EventName>SetState</m_EventName>
+		<m_Time>Start</m_Time>
+		<m_ParameterValue />
+	</m_Events>
+	<m_Conditions x_name="5b04395e-306a-5cff-81c5-5648fe665cb7">
+		<m_Name>PuppetRoach</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+</animNode>

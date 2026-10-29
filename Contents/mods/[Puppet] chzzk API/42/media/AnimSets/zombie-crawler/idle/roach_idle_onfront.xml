@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animNode>
+	<m_Name>roach_idle_onfront</m_Name>
+	<m_AnimName>Zombie_PongDuRoach_CrawlIdle</m_AnimName>
+	<m_BlendTime>0.40</m_BlendTime>
+	<m_SpeedScale>0.40</m_SpeedScale>
+	<m_Conditions x_name="f5b05a22-3dee-5f1a-81f3-991cfaecf84c">
+		<m_Name>FallOnFront</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+	<m_Conditions x_name="f5d2ad23-2d31-5460-a0f8-ff5cbdffb481">
+		<m_Name>PuppetRoach</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+</animNode>

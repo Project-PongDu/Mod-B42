@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animNode>
+	<m_Name>roach_idleback</m_Name>
+	<m_AnimName>Zombie_PongDuRoach_Idle_FloorOnBack</m_AnimName>
+	<m_BlendTime>0.20</m_BlendTime>
+	<m_SyncTrackingEnabled>false</m_SyncTrackingEnabled>
+	<m_Conditions x_name="dfb65da1-b1fe-58bb-b1b1-d20d88a85a5e">
+		<m_Name>bBeingSteppedOn</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+	<m_Conditions x_name="17d3819a-89f8-5822-a397-6f4c9a2fb761">
+		<m_Name>ReanimateAnim</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>false</m_Value>
+	</m_Conditions>
+	<m_Conditions x_name="048e20b9-7240-5ee9-bc8e-702a900d5943">
+		<m_Name>PuppetRoach</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+</animNode>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animNode>
+	<m_Name>roach_hitReact_onfront</m_Name>
+	<m_AnimName>Zombie_PongDuRoach_CrawlHitReact_OnFront01</m_AnimName>
+	<m_Looped>false</m_Looped>
+	<m_BlendTime>0.30</m_BlendTime>
+	<m_BlendOutTime>0.40</m_BlendOutTime>
+	<m_SpeedScale>0.80</m_SpeedScale>
+	<m_Conditions x_name="02cee876-2928-5fc2-b040-0d6f68e14cb7">
+		<m_Name>FallOnFront</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+	<m_Events x_name="69a06a55-0c40-5048-998b-9d0a648a60a4">
+		<m_EventName>SetState</m_EventName>
+		<m_Time>Start</m_Time>
+		<m_ParameterValue />
+	</m_Events>
+	<m_Conditions x_name="fc1ff6d7-4878-58e8-a196-41dcf45a4849">
+		<m_Name>PuppetRoach</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+</animNode>

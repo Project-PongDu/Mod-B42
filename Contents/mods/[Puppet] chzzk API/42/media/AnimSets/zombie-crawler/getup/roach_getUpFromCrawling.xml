@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animNode>
+	<m_Name>roach_getUpFromCrawling</m_Name>
+	<m_AnimName>Zombie_PongDuRoach_CrawlUnder_Out</m_AnimName>
+	<m_Looped>false</m_Looped>
+	<m_BlendTime>0.20</m_BlendTime>
+	<m_EarlyTransitionOut>true</m_EarlyTransitionOut>
+	<m_SyncTrackingEnabled>false</m_SyncTrackingEnabled>
+	<m_Conditions x_name="c45c72a9-152f-55af-8f70-6155dd127f77">
+		<m_Name>bGetUpFromCrawl</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+	<m_Conditions x_name="cf81bb6f-1377-5f39-9028-aa0016cea223">
+		<m_Name>PuppetRoach</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+</animNode>

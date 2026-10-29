@@ -1,0 +1,30 @@
+module t3chzzkDonation
+{
+    imports
+    {
+        Base
+    }
+
+    /* 로치 전용 몸통 크롤러 외형. 아웃핏 PongDuMutant_03 에만 들어간다.
+       Gore Crawlers & Torn Zombies(DeadWorksZeds, Artmines)의 CrawlerTorso 모델/텍스처를
+       자체 네임스페이스로 복사해 쓴다. 원본 FPZ.CrawlerTorso_M/F 정의 그대로. */
+    item PongDuRoachTorso_M
+    {
+        DisplayCategory = ZedDmg,
+        ItemType = base:clothing,
+        BodyLocation = base:zeddmg,
+        ClothingItem = PongDu_RoachTorso_M,
+        WorldRender = false,
+        hidden = true,
+    }
+
+    item PongDuRoachTorso_F
+    {
+        DisplayCategory = ZedDmg,
+        ItemType = base:clothing,
+        BodyLocation = base:zeddmg,
+        ClothingItem = PongDu_RoachTorso_F,
+        WorldRender = false,
+        hidden = true,
+    }
+}

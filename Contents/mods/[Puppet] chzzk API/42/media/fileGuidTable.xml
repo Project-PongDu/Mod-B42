@@ -12,4 +12,12 @@
 		<path>media/clothing/clothingItems/PongDu_AirborneParachutePack.xml</path>
 		<guid>b4fdc0dd-1fd9-454f-b31d-b03b576669e9</guid>
 	</files>
+	<files>
+		<path>media/clothing/clothingItems/PongDu_RoachTorso_M.xml</path>
+		<guid>ce57c3a7-ac75-5762-9ef6-9e838fe9a671</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/PongDu_RoachTorso_F.xml</path>
+		<guid>f7419994-b8a5-5057-8dd7-5403e4b362f6</guid>
+	</files>
 </fileGuidTable>

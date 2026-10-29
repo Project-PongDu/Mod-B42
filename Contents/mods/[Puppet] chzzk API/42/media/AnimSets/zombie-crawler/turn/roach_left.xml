@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <animNode>
 	<m_Name>left</m_Name>
-	<m_AnimName>Zombie_Crawl02TurnL</m_AnimName>
+	<m_AnimName>Zombie_PongDuRoach_Crawl02TurnL</m_AnimName>
 	<m_ConditionPriority>1</m_ConditionPriority>
 	<m_deferredBoneAxis>Y</m_deferredBoneAxis>
 	<m_SpeedScale>6.0</m_SpeedScale>

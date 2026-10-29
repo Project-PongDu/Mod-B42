@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animNode>
+	<m_Name>roach_DoorClaw</m_Name>
+	<m_AnimName>Zombie_PongDuRoach_CrawlLunge</m_AnimName>
+	<m_BlendTime>0.20</m_BlendTime>
+	<m_SpeedScale>0.80</m_SpeedScale>
+	<m_SyncTrackingEnabled>false</m_SyncTrackingEnabled>
+	<m_Conditions x_name="1ca7c0d2-e6a6-53ba-a111-90deeaae502e">
+		<m_Name>ThumpType</m_Name>
+		<m_Type>STRING</m_Type>
+		<m_Value>DoorClaw</m_Value>
+	</m_Conditions>
+	<m_Events x_name="3355ac16-4e77-5ed9-923d-ed27aa24586a">
+		<m_EventName>ThumpFrame</m_EventName>
+		<m_TimePc>0.4</m_TimePc>
+		<m_ParameterValue />
+	</m_Events>
+	<m_Conditions x_name="530f238f-107e-5c9d-8c90-60f24596996f">
+		<m_Name>PuppetRoach</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>true</m_Value>
+	</m_Conditions>
+</animNode>

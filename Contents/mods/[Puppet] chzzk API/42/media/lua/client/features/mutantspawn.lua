@@ -39,6 +39,10 @@ end
 --               AnimSets/zombie-crawler/*/roach_*.xml 노드가 PuppetRoach
 --               애님 변수 조건으로 3배속 크롤을 재생 (조건 수가 많은 노드가
 --               우선 선택되는 PZ 애님 규칙, Hitman 애님 변형과 동일 기법).
+--               외형은 하반신이 없는 몸통 크롤러: 아웃핏 PongDuMutant_03 의
+--               PongDuRoachTorso_M/F 아이템(다리 마스크 + 내장 모델)과
+--               Zombie_PongDuRoach_* 클립. Gore Crawlers & Torn Zombies
+--               (DeadWorksZeds) 의 CrawlerTorso 에셋·애님 노드를 복사해 쓴다.
 --    슬래머     : 빠른 걸음(바닐라 fast shambler) 고정, 평소엔 일반 좀비처럼 문다(원본 레커와 같음). 대상이 5칸 안이면
 --               예고 후 직선 돌진, 닿은 플레이어는 넘어뜨리고 피해(돌진은 계속, 여러 명 관통),
 --               벽·문·울타리에 막히면 문·창문·바리케이드를 부수거나 울타리를 휘고 자기가 넘어진다.
@@ -896,7 +900,42 @@ local function updateTracer(zombie)
 end
 -- ── 로치: 크롤 상태 유지 ─────────────────────────────────────────────────────
 -- CDDA_UpdateZombie의 walktype 4 처리와 동일 패턴 — 상태가 풀려도 매 틱 복구.
+-- Gore Crawlers & Torn Zombies(DeadWorksZeds) 가 같이 켜져 있으면 그 모드의
+-- FPZ_TorsoCrawlers.lua 가 기어다니는 좀비마다 형태를 굴려 FPZ.Crawler* 외형과
+-- FPZTorso/FPZLegL/FPZLegR 애님 변수를 붙인다. 로치는 자기 몸통 외형이 따로 있으니
+-- 판정 완료 표시(FPZTorsoChecked)를 먼저 세워 굴림을 막고, 이미 붙었으면 떼어 낸다.
+-- FPZCrawlState 는 지우지 않는다: 서버 동기값과 같아야 그 모드가 다시 붙이지 않는다.
+local function blockFPZCrawl(zombie)
+    local md = zombie:getModData()
+    md["FPZTorsoChecked"] = true
+    local state = md["FPZCrawlState"]
+    if state == nil or md["PuppetFPZCleared"] == state then return end
+    md["PuppetFPZCleared"] = state
+    md["FPZTorso"] = nil
+    md["FPZLegVar"] = nil
+    zombie:setVariable("FPZTorso", false)
+    zombie:setVariable("FPZLegL", false)
+    zombie:setVariable("FPZLegR", false)
+    -- wornItems 모드에서 getItemVisuals() 를 부르면 외형이 덮어써지므로 건드리지 않는다.
+    local removed = 0
+    if not zombie:isUsingWornItems() then
+        local visuals = zombie:getItemVisuals()
+        for i = visuals:size() - 1, 0, -1 do
+            local iv = visuals:get(i)
+            local t = iv and iv:getItemType()
+            if t and string.find(tostring(t), "FPZ.Crawler", 1, true) == 1 then
+                visuals:remove(i)
+                removed = removed + 1
+            end
+        end
+    end
+    if removed > 0 then zombie:resetModelNextFrame() end
+    print("[PuppetMutant] roach blocked FPZ crawl state=" .. tostring(state)
+        .. " removed=" .. tostring(removed) .. " wornMode=" .. tostring(zombie:isUsingWornItems()))
+end
+
 local function updateRoach(zombie)
+    blockFPZCrawl(zombie)
     if not zombie:isCrawling() then
         zombie:toggleCrawling()
     end
