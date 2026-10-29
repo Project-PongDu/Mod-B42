@@ -74,7 +74,15 @@ local function send(z, st, phase, reason)
         .. " at " .. string.format("%.1f,%.1f", z:getX(), z:getY()))
 end
 
+-- 쓰러져 있는지: 서버는 소유 클라가 보낸 애니 상태(realState)로 판단한다.
+-- 서버의 원격 좀비 isOnFloor 는 네트워크로 갱신되지 않는다 (NetworkZombieVariables.setBooleanVariables 는
+-- isReanimatedPlayer 일 때만 setOnFloor). 강령술로 일어난 좀비는 서버 사본이 IsoDeadBody.reanimate 의
+-- setOnFloor(true) 로 생겨 일어난 뒤에도 서버에선 계속 누운 것으로 남아, 돌진을 한 번도 시작하지 못했다.
+local DOWN_STATES = { onground = true, falldown = true, getup = true, getdown = true,
+                      fakedead = true, falling = true }
 local function isDown(z)
+    local st = S.stateOf(z)
+    if st then return DOWN_STATES[st] == true end
     return z:isOnFloor() or z:isKnockedDown()
 end
 
@@ -446,7 +454,8 @@ local function scan(tnow)
             byZid[zidOf(z)] = z
             if not _st[z] then
                 _st[z] = { phase = PH.NONE, seq = 0, cooldownUntil = tnow + SPAWN_GRACE_MS, hit = {} }
-                print(LOG .. "tracking slammer zid=" .. tostring(zidOf(z)))
+                print(LOG .. "tracking slammer zid=" .. tostring(zidOf(z)) .. " state=" .. tostring(S.stateOf(z))
+                    .. " onFloor=" .. tostring(z:isOnFloor()) .. " crawling=" .. tostring(z:isCrawling()))
             end
         end
     end
