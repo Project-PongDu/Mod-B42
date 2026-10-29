@@ -20,6 +20,10 @@
 		<path>media/clothing/clothingItems/PongDu_RoachTorso_F.xml</path>
 		<guid>f7419994-b8a5-5057-8dd7-5403e4b362f6</guid>
 	</files>
+	<files>
+		<path>media/clothing/clothingItems/PongDu_MuscleUpper_M.xml</path>
+		<guid>27b65a91-181e-5faa-9166-c23789780fcb</guid>
+	</files>
 	<!-- Vanilla clothing items used by PongDuMutant_* outfits. B42 prefixes mod outfit item GUIDs with the mod ID
 	     (ClothingItemReference.setModID), so vanilla GUIDs must also be registered in this mod's table. -->
 	<files>

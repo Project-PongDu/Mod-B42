@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<clothingItem>
+	<m_GUID>27b65a91-181e-5faa-9166-c23789780fcb</m_GUID>
+	<m_MaleModel>skinned\clothes\PongDu_MuscleUpper_M</m_MaleModel>
+	<m_FemaleModel>skinned\clothes\PongDu_MuscleUpper_M</m_FemaleModel>
+	<m_AltMaleModel>null</m_AltMaleModel>
+	<m_AltFemaleModel>null</m_AltFemaleModel>
+	<m_Static>false</m_Static>
+	<m_AllowRandomHue>false</m_AllowRandomHue>
+	<m_AllowRandomTint>false</m_AllowRandomTint>
+	<m_AttachBone></m_AttachBone>
+	<m_Masks>1</m_Masks>
+	<m_Masks>3</m_Masks>
+	<m_Masks>4</m_Masks>
+	<m_Masks>5</m_Masks>
+	<m_Masks>6</m_Masks>
+	<textureChoices>PongDu\MuscleUpper_M</textureChoices>
+</clothingItem>
