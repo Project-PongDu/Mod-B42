@@ -325,9 +325,14 @@ local function breakObstacles(z, hx, hy, dirName)
     local done = {}
     local broken = 0
     local firstCands = nil
+    local names = nil
     for _ = 1, MAX_DESTROY_PASSES do
         local t, cands = topTarget(face, z)
-        if not firstCands then firstCands = cands end
+        if not firstCands then
+            firstCands = cands
+            names = {}
+            for _, c in ipairs(cands) do names[#names + 1] = spriteOf(c) end   -- 부수기 전 이름
+        end
         if not t then break end
         local spr = spriteOf(t)
         local ok, kind = pcall(destroyOne, t, z, dir)
@@ -345,8 +350,7 @@ local function breakObstacles(z, hx, hy, dirName)
         end
     end
 
-    local names = {}
-    for _, c in ipairs(firstCands or {}) do names[#names + 1] = spriteOf(c) end
+    names = names or {}
     print(LOG .. "break at " .. hx .. "," .. hy .. "," .. fz .. " dir=" .. dirName
         .. " candidates=" .. #names .. " [" .. table.concat(names, ",") .. "]"
         .. " broken=" .. broken .. " [" .. table.concat(done, ",") .. "]")
@@ -407,11 +411,7 @@ W.serverHandler = function(command, player, args, zombieObj)
             print(LOG .. "break skipped: impact square " .. tostring(hx) .. "," .. tostring(hy) .. "," .. tostring(hz)
                 .. " not on wrecker level " .. string.format("%.1f,%.1f,%d", z:getX(), z:getY(), math.floor(z:getZ())))
         end
-        -- 넘기에서 온 충돌인데 부순 게 없으면(바닐라도 못 부수는 울타리) 넘어뜨리지 않고 바닐라 넘기를 둔다
-        if climb and broken == 0 then
-            cancel(z, st, tnow, "climb over unbreakable")
-            return
-        end
+        -- 넘기에서 온 충돌도 부순 게 있든 없든 다른 충돌과 같이 crash (모든 충돌에 같은 넘어짐)
         toPhase(z, st, PH.CRASH, W.CRASH_MS, tnow, (climb and "climb-crash " or "crash ") .. who)
     elseif command == "Arrive" then
         if st.phase ~= PH.SPRINT then

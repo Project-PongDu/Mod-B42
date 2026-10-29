@@ -91,8 +91,8 @@ W.HOLD_STATE = "attackvehicle-network"
 --   "hold"     : 고정한다
 --   "suppress" : 돌진 중 부딪혀 bumped 에 들어가면 바로 끝내고 돌진을 잇는다
 --   "crash"    : 돌진 중 낮은 울타리에 닿아 바닐라가 넘기(climbfence)를 걸면 그 울타리 충돌로 본다.
---                소유 클라가 Crash(climb) 를 보내고 서버가 울타리를 부순다. 부술 수 없는 것이면 서버가
---                취소해 바닐라 넘기를 그대로 둔다. [원본과 다름: 원본은 climbfence 를 미정의로 두어 넘어간다]
+--                소유 클라가 Crash(climb) 를 보내고 서버가 울타리를 부순다. 부술 수 있든 없든 다른 충돌과
+--                똑같이 넘어진다(사용자 지시: 모든 충돌에 같은 넘어짐). [원본과 다름: 원본은 넘어간다]
 --                바닐라는 좀비 AI 가 Attack/StaggerBack/ClimbOverFence/ClimbThroughWindow 가 아니면
 --                벽 충돌 때 넘기를 건다(IsoMovingObject.checkHitHoppable). 고정 상태(GenericDefaultState)는
 --                여기 안 걸려 돌진 중에도 넘기가 시작된다.

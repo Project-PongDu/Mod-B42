@@ -43,6 +43,10 @@ local FALL_VAR_MIN_MS  = 500    -- 넘어짐 변수는 최소 이만큼 유지 (
 local FALL_VAR_MAX_MS  = 6000   -- 넘어짐 변수 최대 유지 시간
 
 local _fallVar = {}   -- [IsoPlayer] = 켠 시각 (넘어짐 변수 정리용)
+local _pendingKnock = {}  -- [IsoZombie] = { zid, t } 넘기(climbfence)를 끝낸 뒤 넘어뜨릴 슬래머
+local _pendingChase = {}  -- [IsoZombie] = t  공격 종료 처리 뒤 idle 로 떨어지면 다시 쫓게 할 슬래머
+local KNOCK_WAIT_MS = 1000
+local CHASE_WAIT_MS = 1500
 local _act   = {}   -- [키] = { z, zid, ph, seq, dx, dy, t0, held, hitLocal, crashSent, lastLog, lx, ly, policy }
 local _watch = {}   -- [키] = { z, zid, untilMs, lastLog }
 
@@ -125,9 +129,13 @@ local function resumeVanilla(z)
         z:changeState(WalkTowardState.instance())
         how = "walktoward(from idle)"
     elseif name == "attack" and t and not z:getVariableBoolean("bAttack") then
+        -- ZombieBiteDone 으로 애니가 attack->idle 로 넘어가면 AI 가 ZombieIdleState 로 강제 전환된다
+        -- (StateMachineComponent.actionStateChanged). ZombieIdleState 는 대상을 쫓지 않아 수 초간 멀뚱히 선다.
+        -- 그래서 idle 로 넘어간 뒤 OnTick 에서 한 번 더 경로 + WalkToward 를 건다(_pendingChase).
         z:setVariable("ZombieBiteDone", true)
         z:pathToCharacter(t)
         z:changeState(WalkTowardState.instance())
+        _pendingChase[z] = getTimestampMs()
         how = "walktoward(attack out of reach)"
     elseif resume then
         z:changeState(resume)
@@ -371,16 +379,30 @@ local function climbCrash(e)
     }, z)
 end
 
-local function crashFall(e)
-    local z = e.z
-    release(e, "crash")
+local function knockDownNow(z, zid)
     if not z:isOnFloor() and not z:isKnockedDown() then
-        -- 정면 충돌이므로 뒤로 넘어진다 (원본 PZM_onCrashRecoveryEnter)
         z:setIgnoreMovement(false)
         z:setFallOnFront(false)
         z:knockDown(false)
-        print(LOG .. "crash knockdown zid=" .. tostring(e.zid))
+        print(LOG .. "crash knockdown zid=" .. tostring(zid))
     end
+end
+
+local function crashFall(e)
+    local z = e.z
+    release(e, "crash")
+    -- 넘기(climbfence) 중이면 ClimbOverFenceState.execute 가 매 틱 setKnockedDown(false) 로 덮고,
+    -- climbfence 애니에는 넘어짐 전이가 없다(staggerback 으로만 가서 일어남). 그래서 넘기를 끝내
+    -- (ClimbFenceFinished -> climbfence/to_idle.xml) idle 로 돌린 뒤 다음 틱에 넘어뜨린다.
+    -- idle 에서는 높은 담장 충돌과 같은 falldown(idle/to_falldown.xml)이 나온다.
+    if W.normState(z:getCurrentActionContextStateName()) == "climbfence" then
+        z:setVariable("ClimbFenceFinished", true)
+        _pendingKnock[z] = { zid = e.zid, t = getTimestampMs() }
+        print(LOG .. "crash knockdown deferred (climbfence) zid=" .. tostring(e.zid))
+        return
+    end
+    -- 정면 충돌이므로 뒤로 넘어진다 (원본 PZM_onCrashRecoveryEnter)
+    knockDownNow(z, e.zid)
 end
 
 -- ── 단계 수신 ────────────────────────────────────────────────────────────────
@@ -507,8 +529,8 @@ Events.OnTick.Add(function()
                         faceDir(z, e.fx, e.fy)
                     end
                 elseif policy == "crash" then
-                    -- 넘기를 막지 않고(손을 떼고) 울타리 충돌로 보고한다. 서버가 부수면 crash 로 넘어지고,
-                    -- 못 부수면 취소돼 바닐라 넘기가 끝까지 간다.
+                    -- 넘기를 막지 않고(손을 떼고) 울타리 충돌로 보고한다. 서버가 crash 를 보내면 넘기를 끝내고
+                    -- 넘어진다(crashFall).
                     if e.ph == PH.SPRINT then climbCrash(e) end
                     release(e, "climb crash")
                 elseif policy == "suppress" then
@@ -546,6 +568,35 @@ Events.OnTick.Add(function()
                         .. " ai=" .. tostring(z:getCurrentStateName()))
                     e.lx, e.ly, e.lastLog = z:getX(), z:getY(), tnow
                 end
+            end
+        end
+    end
+
+    -- 넘기를 끝낸 슬래머 넘어뜨리기 (crashFall 참고)
+    for z, p in pairs(_pendingKnock) do
+        local st = z and not z:isDead() and W.normState(z:getCurrentActionContextStateName())
+        if not st then
+            _pendingKnock[z] = nil
+        elseif st ~= "climbfence" then
+            _pendingKnock[z] = nil
+            knockDownNow(z, p.zid)
+        elseif tnow - p.t > KNOCK_WAIT_MS then
+            _pendingKnock[z] = nil
+            print(LOG .. "crash knockdown failed: still climbfence zid=" .. tostring(p.zid))
+        end
+    end
+
+    -- 공격 종료 처리 뒤 idle 로 떨어진 슬래머 다시 쫓기 (resumeVanilla attack 참고)
+    for z, t0 in pairs(_pendingChase) do
+        if not z or z:isDead() or tnow - t0 > CHASE_WAIT_MS then
+            _pendingChase[z] = nil
+        elseif W.normState(z:getCurrentActionContextStateName()) == "idle" then
+            _pendingChase[z] = nil
+            local t = validTarget(z)
+            if t then
+                z:pathToCharacter(t)
+                z:changeState(WalkTowardState.instance())
+                print(LOG .. "chase resumed zid=" .. tostring(z:getOnlineID()) .. " after attack end")
             end
         end
     end
