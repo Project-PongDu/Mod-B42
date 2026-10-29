@@ -44,9 +44,9 @@ local FALL_VAR_MAX_MS  = 6000   -- 넘어짐 변수 최대 유지 시간
 
 local _fallVar = {}   -- [IsoPlayer] = 켠 시각 (넘어짐 변수 정리용)
 local _pendingKnock = {}  -- [IsoZombie] = { zid, t } 넘기(climbfence)를 끝낸 뒤 넘어뜨릴 슬래머
-local _pendingChase = {}  -- [IsoZombie] = t  공격 종료 처리 뒤 idle 로 떨어지면 다시 쫓게 할 슬래머
+local _pendingChase = {}  -- [IsoZombie] = { t = 등록 시각, from = "attack"|"face-target" }  해제 뒤 idle 로 떨어지면 다시 쫓게 할 슬래머
 local KNOCK_WAIT_MS = 1000
-local CHASE_WAIT_MS = 1500
+local CHASE_WAIT_MS = 3000   -- face-target 은 대상 쪽으로 다 돌아야 idle 로 넘어가므로 attack 보다 오래 걸릴 수 있다
 local _act   = {}   -- [키] = { z, zid, ph, seq, dx, dy, t0, held, hitLocal, crashSent, lastLog, lx, ly, policy }
 local _watch = {}   -- [키] = { z, zid, untilMs, lastLog }
 
@@ -107,6 +107,9 @@ end
 --                lunge/to_attack.xml) 돌진 클립이 바닐라 공격 클립을 덮어 ZombieBiteDone 이 안 서서
 --                attack 에 남는다. 원본처럼 AttackState 로 돌리면 멀리 있는 대상을 향해 헛공격 모션을 한다.
 --                대상이 공격 거리 안이면 원본대로 AttackState (물기).
+--   face-target: 원본대로 ZombieFaceTargetState 로 돌린 뒤, 대상을 보고 idle 로 넘어가면 바로 다시 쫓는다.
+--                [원본과 다름] 바닐라는 face-target -> idle(face-target/to_idle.xml, isFacingTarget) 때 AI 가
+--                ZombieIdleState 로 강제 전환돼(StateMachineComponent) 3~4초 멈춘다.
 --   그 외      : 애니메이션 상태 이름으로 등록된 AI 상태 (attack, lunge, climbfence 등)
 --   등록 없음  : 대상 있으면 WalkToward, 없으면 Idle
 local function resumeVanilla(z)
@@ -135,8 +138,12 @@ local function resumeVanilla(z)
         z:setVariable("ZombieBiteDone", true)
         z:pathToCharacter(t)
         z:changeState(WalkTowardState.instance())
-        _pendingChase[z] = getTimestampMs()
+        _pendingChase[z] = { t = getTimestampMs(), from = "attack" }
         how = "walktoward(attack out of reach)"
+    elseif name == "face-target" and t and resume then
+        z:changeState(resume)
+        _pendingChase[z] = { t = getTimestampMs(), from = "face-target" }
+        how = "face-target(chase on idle)"
     elseif resume then
         z:changeState(resume)
         how = tostring(raw)
@@ -586,9 +593,13 @@ Events.OnTick.Add(function()
         end
     end
 
-    -- 공격 종료 처리 뒤 idle 로 떨어진 슬래머 다시 쫓기 (resumeVanilla attack 참고)
-    for z, t0 in pairs(_pendingChase) do
-        if not z or z:isDead() or tnow - t0 > CHASE_WAIT_MS then
+    -- 해제(attack 종료 / face-target) 뒤 idle 로 떨어진 슬래머 다시 쫓기 (resumeVanilla 참고)
+    for z, pc in pairs(_pendingChase) do
+        if not z or z:isDead() or tnow - pc.t > CHASE_WAIT_MS then
+            if z and not z:isDead() then
+                print(LOG .. "chase wait expired zid=" .. tostring(z:getOnlineID()) .. " from=" .. tostring(pc.from)
+                    .. " anim=" .. tostring(z:getCurrentActionContextStateName()))
+            end
             _pendingChase[z] = nil
         elseif S.normState(z:getCurrentActionContextStateName()) == "idle" then
             _pendingChase[z] = nil
@@ -596,7 +607,7 @@ Events.OnTick.Add(function()
             if t then
                 z:pathToCharacter(t)
                 z:changeState(WalkTowardState.instance())
-                print(LOG .. "chase resumed zid=" .. tostring(z:getOnlineID()) .. " after attack end")
+                print(LOG .. "chase resumed zid=" .. tostring(z:getOnlineID()) .. " after " .. tostring(pc.from) .. " end")
             end
         end
     end

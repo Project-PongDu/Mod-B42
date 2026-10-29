@@ -17,7 +17,7 @@
 --   sound/PongDuSlammer_ChargeWarn.ogg), 시간·거리·방향·파괴·취소 규칙도 원본 값을 따른다.
 --   원본과 다른 점은 요청으로 바꾼 것뿐이다: 랜덤 외형(원본 남자 고정),
 --   피해(원본 차량충돌 공식 -> 전체 체력 20 + 부위 부상), 체력 샌드박스, 돌진 거리 10칸 상한,
---   돌진 속도 1.5배, 맞은 플레이어 넘어짐 클립, 돌진 후 헛공격 방지(client/features/slammer.lua resumeVanilla).
+--   돌진 속도 2배(m_SpeedScale 1.40 -> 2.80), 맞은 플레이어 넘어짐 클립, 돌진 후 헛공격 방지(client/features/slammer.lua resumeVanilla).
 --
 -- [바닐라 상태와의 공존] (원본 PZM_ActionStateAdapter 와 같은 방식)
 --   이동 고정은 AI 상태만 무동작 상태로 바꾸고 애니메이션 상태(ActionContext)는 그대로 둔다.
