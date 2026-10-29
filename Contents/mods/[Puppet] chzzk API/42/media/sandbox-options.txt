@@ -716,9 +716,9 @@ option PongDu.Mutant_Tracer = {
     page = PongDu_Debuff, translation = PongDu_Mutant_Tracer,
 }
 
-option PongDu.Mutant_Wrecker = {
+option PongDu.Mutant_Slammer = {
     type = boolean, default = true,
-    page = PongDu_Debuff, translation = PongDu_Mutant_Wrecker,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Slammer,
 }
 
 option PongDu.Mutant_Health_Screamer = {
@@ -741,9 +741,9 @@ option PongDu.Mutant_Health_Tracer = {
     page = PongDu_Debuff, translation = PongDu_Mutant_Health_Tracer,
 }
 
-option PongDu.Mutant_Health_Wrecker = {
+option PongDu.Mutant_Health_Slammer = {
     type = double, min = 0.50, max = 30, default = 5.00,
-    page = PongDu_Debuff, translation = PongDu_Mutant_Health_Wrecker,
+    page = PongDu_Debuff, translation = PongDu_Mutant_Health_Slammer,
 }
 
 option PongDu.Divider_RiseUp = {
@@ -862,9 +862,9 @@ option PongDu.Rain_Count_Tracer = {
     page = PongDu_Debuff, translation = PongDu_Rain_Count_Tracer,
 }
 
-option PongDu.Rain_Count_Wrecker = {
+option PongDu.Rain_Count_Slammer = {
     type = integer, min = 0, max = 500, default = 0,
-    page = PongDu_Debuff, translation = PongDu_Rain_Count_Wrecker,
+    page = PongDu_Debuff, translation = PongDu_Rain_Count_Slammer,
 }
 
 option PongDu.Rain_ShowRadius = {

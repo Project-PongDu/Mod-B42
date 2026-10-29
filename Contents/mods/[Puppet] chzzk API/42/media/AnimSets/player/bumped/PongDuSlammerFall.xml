@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 슬래머(돌진 특수좀비) 돌진에 맞은 플레이어의 넘어짐 (client/features/wrecker.lua).
+<!-- 슬래머(돌진 특수좀비) 돌진에 맞은 플레이어의 넘어짐 (client/features/slammer.lua).
      바닐라 밀려 넘어짐(bumpFall / walkBumpFallFront / walkBumpFallBehind) 대신
      바닐라 '전력질주 중 울타리 넘기 실패' 클립(climbfence/vaultOverSprintFail.xml 의 Bob_ValultOver_SprintFail)을 튼다.
      조건: BumpFall=true + PongDuSlammerFall=true. 우선순위 10 으로 바닐라 bumped 노드(우선순위 0)를 이긴다.

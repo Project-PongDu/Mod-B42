@@ -83,7 +83,7 @@ local function rainCfg()
         ["brute"]    = sv.Rain_Count_Brute,
         ["roach"]    = sv.Rain_Count_Roach,
         ["tracer"]   = sv.Rain_Count_Tracer,
-        ["wrecker"]  = sv.Rain_Count_Wrecker,
+        ["slammer"]  = sv.Rain_Count_Slammer,
     }
     return sv.Rain_Radius, sv.Rain_Duration, kinds
 end
@@ -1024,7 +1024,7 @@ function _a.b(player, sender)
         .. " normal=" .. tostring(kinds["normal"]) .. " sprinter=" .. tostring(kinds["sprinter"])
         .. " screamer=" .. tostring(kinds["screamer"]) .. " brute=" .. tostring(kinds["brute"])
         .. " roach=" .. tostring(kinds["roach"]) .. " tracer=" .. tostring(kinds["tracer"])
-        .. " wrecker=" .. tostring(kinds["wrecker"]))
+        .. " slammer=" .. tostring(kinds["slammer"]))
     -- 효과음/반경 표시: 본인은 즉시 로컬, 나머지 접속자는 서버 거리컷 브로드캐스트.
     -- 반경 표시는 Rain_ShowRadius 를 따르고(꺼져 있으면 markerRadius=0 -> 아무에게도
     -- 안 뜸), 마커는 낙하가 이어지는 지속시간 내내 유지된다.

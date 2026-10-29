@@ -33,10 +33,10 @@ end
 --               AnimSets/zombie-crawler/*/roach_*.xml 노드가 PuppetRoach
 --               애님 변수 조건으로 3배속 크롤을 재생 (조건 수가 많은 노드가
 --               우선 선택되는 PZ 애님 규칙, Hitman 애님 변형과 동일 기법).
---    레커     : 빠른 걸음(바닐라 fast shambler) 고정, 평소엔 일반 좀비처럼 문다(원본 레커와 같음). 대상이 5칸 안이면
+--    슬래머     : 빠른 걸음(바닐라 fast shambler) 고정, 평소엔 일반 좀비처럼 문다(원본 레커와 같음). 대상이 5칸 안이면
 --               예고 후 직선 돌진, 닿은 플레이어는 넘어뜨리고 피해(돌진은 계속, 여러 명 관통),
 --               벽·문·울타리에 막히면 문·창문·바리케이드를 부수거나 울타리를 휘고 자기가 넘어진다.
---               단계 결정은 서버(server/PongDuWreckerServer.lua), 연출·이동은 features/wrecker.lua.
+--               단계 결정은 서버(server/PongDuSlammerServer.lua), 연출·이동은 features/slammer.lua.
 --               여기서는 종류 등록·체력·이름표만 한다.
 --
 --  권한 구조: 좀비는 클라이언트 권한이므로 서버는 스폰 + modData 마킹만 하고
@@ -45,7 +45,7 @@ end
 --  풀리면 PuppetMutantInit 가드가 리셋되므로 다음 틱에 자동 재적용된다.
 -- ═══════════════════════════════════════════════════════════════════════════
 
-local KINDS = { "screamer", "brute", "roach", "tracer", "wrecker" }
+local KINDS = { "screamer", "brute", "roach", "tracer", "slammer" }
 
 -- 샌드박스 타입 필터: PongDu.Mutant_<종류> 체크된 것만 등장 풀에 포함.
 -- 5종 전부 해제면 스프린터 1마리로 폴백
@@ -56,7 +56,7 @@ local KIND_OPTION = {
     brute    = "Mutant_Brute",
     roach    = "Mutant_Roach",
     tracer   = "Mutant_Tracer",
-    wrecker  = "Mutant_Wrecker",
+    slammer  = "Mutant_Slammer",
 }
 
 local function pickKind()
@@ -76,7 +76,7 @@ local haloKey = {
     brute    = "IGUI_mutant_name_brute",
     roach    = "IGUI_mutant_name_roach",
     tracer   = "IGUI_mutant_name_tracer",
-    wrecker  = "IGUI_mutant_name_wrecker",
+    slammer  = "IGUI_mutant_name_slammer",
     sprinter = "IGUI_mutant_name_sprinter",
 }
 
@@ -133,7 +133,7 @@ local HEALTH_OPT = {
     screamer = "PongDu.Mutant_Health_Screamer",
     roach    = "PongDu.Mutant_Health_Roach",
     tracer   = "PongDu.Mutant_Health_Tracer",
-    wrecker  = "PongDu.Mutant_Health_Wrecker",
+    slammer  = "PongDu.Mutant_Health_Slammer",
 }
 
 local function mutantHealth(kind)
@@ -170,10 +170,10 @@ local function initMutant(zombie, kind)
         -- 이속에 아무 영향이 없다. 실제 이속 조절은 locomotion 애님 노드의
         -- m_SpeedScale 오버라이드로만 가능(TR locomotion 노드, 별도 작업).
         zombie:setWalkType("sprint" .. tostring(ZombRand(5) + 1))
-    elseif kind == "wrecker" then
-        -- 레커: 빠른 걸음 고정 (speedType 2, walkType "1"~"5", IsoZombie.doFastShambler).
+    elseif kind == "slammer" then
+        -- 슬래머: 빠른 걸음 고정 (speedType 2, walkType "1"~"5", IsoZombie.doFastShambler).
         -- speedType 을 2 로 박아 두므로 이후 DoZombieStats 도 같은 속도로 다시 만든다.
-        -- 돌진은 서버 단계 방송을 받아 features/wrecker.lua 가 처리한다.
+        -- 돌진은 서버 단계 방송을 받아 features/slammer.lua 가 처리한다.
         zombie:doFastShambler()
         -- 무는 능력은 건드리지 않는다 (원본 PZM_MutantProperties 의 Wrecker 에 noTeeth 없음).
         -- 돌진 중엔 AI 가 무동작 상태로 고정돼 AttackState 가 없으므로 물지 못한다.
@@ -233,7 +233,7 @@ end
 local _hpSnap = {}
 local SPRINT_KIND = { brute = true, tracer = true, sprinter = true }
 -- 빠른 걸음이어야 하는 종류: walkType 이 숫자만("1"~"5")이어야 한다 (sprint*/slow* 면 덮어써진 것)
-local FAST_KIND = { wrecker = true }
+local FAST_KIND = { slammer = true }
 
 local function guardStats(zombie, kind)
     if not zombie:getVariableBoolean("PuppetMutantInit") then return end
@@ -1064,7 +1064,7 @@ local NAME_KEY = {
     roach    = "IGUI_mutant_name_roach",
     sprinter = "IGUI_mutant_name_sprinter",
     tracer   = "IGUI_mutant_name_tracer",
-    wrecker  = "IGUI_mutant_name_wrecker",
+    slammer  = "IGUI_mutant_name_slammer",
 }
 
 local TAG_COLOR = {      -- 스크리머/브루트는 CDDA 원본 색, 로치는 바퀴 갈색
@@ -1073,7 +1073,7 @@ local TAG_COLOR = {      -- 스크리머/브루트는 CDDA 원본 색, 로치는
     roach    = {181, 101, 29},
     sprinter = {255, 165, 0},
     tracer   = {0, 200, 180},   -- 파쿠르 테마 청록
-    wrecker  = {230, 200, 0},   -- 중장비 노랑
+    slammer  = {230, 200, 0},   -- 중장비 노랑
 }
 
 local _showTags = {}     -- [onlineID] = { zombie=, ttl=, tdo=TextDrawObject }

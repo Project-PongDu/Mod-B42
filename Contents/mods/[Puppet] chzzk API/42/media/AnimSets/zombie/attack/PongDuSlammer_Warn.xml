@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 슬래머(돌진 특수좀비) 예고: 몸을 뒤로 젖힌다 (shared/PongDuSlammer.lua, client/features/slammer.lua).
+     클립은 사용자 지시로 원본 레커 ChargeWarn 대신 The Mutants 퓨커 Zombie_PongDuSlammer_Warn(3초)의 젖히기 구간
+     (0~40프레임)을 쓴다. 재생 위치는 PongDuSlammerProgress 가 0 -> 40/90 으로 보낸다(W.WARN_CLIP_END).
+     노드 설정은 원본 레커(PZTheMutants_Wrecker_ChargeWarn_Base)와 같고 퓨커 노드(PZTheMutants_Puker_Puke_Base)와도 같다.
+     조건만 원본 3개 변수 대신 퐁듀 단계 변수 PongDuSlammerPhase 하나를 쓴다.
+     각 클라가 좀비에 PongDuSlammerPhase 를 세우면 좀비가 지금 어느 상태에 있든 이 노드가 덮어쓴다.
+     애니메이션 변수는 네트워크로 안 가므로(ZombiePacket) 비소유 클라의 *-network 상태에도 같은 노드를 깐다.
+     원본과 같은 상태 폴더에 둔다: Warn/Sprint/Recovery 는 attack, attack-network, face-target, idle, lunge,
+     lunge-network, walktoward, walktoward-network / Sprint 는 bumped 도 / Sprint·Recovery 는 thump 도.
+     수정 시 같은 이름 파일을 전부 같이 바꿀 것. -->
+<animNode>
+	<m_Name>PongDuSlammer_Warn</m_Name>
+	<m_Priority>10</m_Priority>
+	<m_ConditionPriority>1000</m_ConditionPriority>
+	<m_AnimName>Zombie_PongDuSlammer_Warn</m_AnimName>
+	<m_useDeferredMovement>false</m_useDeferredMovement>
+	<m_Looped>false</m_Looped>
+	<m_BlendTime>0.10</m_BlendTime>
+	<m_BlendOutTime>0.10</m_BlendOutTime>
+	<m_StopAnimOnExit>true</m_StopAnimOnExit>
+	<m_SyncTrackingEnabled>false</m_SyncTrackingEnabled>
+	<m_TrackTimeToVariable>PongDuSlammerProgress</m_TrackTimeToVariable>
+	<m_Conditions>
+		<m_Name>PongDuSlammerPhase</m_Name>
+		<m_Type>STRING</m_Type>
+		<m_StringValue>warn</m_StringValue>
+	</m_Conditions>
+</animNode>

@@ -39,7 +39,7 @@ local RAIN_CNT_MAX       = 500                              -- 전 종류 합계
 -- 낙하 종류. "normal" 외에는 특좀 파이프라인(PuppetMutant kind)과 같은 이름이다
 -- (sprinter = server.lua spawnZombies 뛰좀, 나머지 = features/mutantspawn.lua KINDS).
 -- 순서는 로그 출력 순서일 뿐, 실제 낙하 순서는 셔플된다.
-local RAIN_KINDS = { "normal", "sprinter", "screamer", "brute", "roach", "tracer", "wrecker" }
+local RAIN_KINDS = { "normal", "sprinter", "screamer", "brute", "roach", "tracer", "slammer" }
 local RAIN_DROP_Z        = 7                                -- 좀비 레인 낙하 시작 높이 (층)
 -- 수송기 투하 낙하 시작 높이 (층). 수송기 고도(클라 zombierain.lua PLANE_FLOORS = 15층) 바로 아래라
 -- 화면에서 좀비가 기체 배 밑에서 떨어져 나온다. 스퀘어 상한은 31층(IsoChunkMap.TOP_LEVEL)이라 14층 생성 가능.
