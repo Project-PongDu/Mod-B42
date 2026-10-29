@@ -119,6 +119,67 @@ local function tryLure(z, tx, ty, tz)
     end)
 end
 
+-- 스크리머 비명 로컬 등록: mutantspawn.lua updateScreamer가 비명 시점에
+-- 청각 범위 안에서 고른 "자기 소유" 좀비 id를 넘긴다. 각 클라가 자기 소유
+-- 좀비만 고르므로 서버 브로드캐스트 없이 로컬 창으로 충분하다.
+-- 같은 pid의 scream 창이 있으면 병합 + 만료 연장 (비명 주기마다 창이 쌓이지
+-- 않게). 새로 들은 좀비는 인계/유인 기록을 지워 재시도 대상으로 되돌린다 —
+-- 예전에 인계됐다가 표적을 잃은 좀비가 _handoff에 막혀 무시되는 걸 방지.
+-- 반환: 창에 새로 추가된 개수.
+function _a.addScreamIds(pid, ids, durMs)
+    if not pid or type(ids) ~= "table" or #ids == 0 then return 0 end
+    local now = getTimestampMs()
+    local w
+    for i = 1, #_windows do
+        if _windows[i].src == "scream" and _windows[i].pid == pid then
+            w = _windows[i]
+            break
+        end
+    end
+    if not w then
+        w = {
+            ids = {}, nIds = 0,
+            expires = now + durMs, pid = pid, src = "scream",
+            lastLog = 0, handoff = 0,
+        }
+        _windows[#_windows + 1] = w
+        print("[PongDu][Aggro] window open src=scream dur=" .. tostring(durMs)
+            .. " pid=" .. tostring(pid))
+    elseif now + durMs > w.expires then
+        w.expires = now + durMs
+    end
+    for i = 1, #ids do
+        local zid = tonumber(ids[i])
+        if zid then
+            _handoff[zid]  = nil
+            _lastLure[zid] = nil
+        end
+    end
+    return mergeIds(w, ids)
+end
+
+-- 1회성 인계/유인 (창 없이). 싱글은 onlineID 가 전부 -1 이라 id 화이트리스트
+-- 창을 쓸 수 없으므로(창이 -1 하나로 모든 좀비를 잡아버림) 비명 시점에 한 번만
+-- 건다. 반환: "handoff" | "lure" | nil(누움·실패).
+function _a.nudgeOnce(z, target)
+    local st
+    pcall(function() st = z:getCurrentState() end)
+    if st == ZombieOnGroundState.instance() or st == ZombieGetUpState.instance() then
+        return nil
+    end
+    local ddx = z:getX() - target:getX()
+    local ddy = z:getY() - target:getY()
+    if ddx * ddx + ddy * ddy <= SIGHT_RANGE2 then
+        if tryHandoff(z, target) then return "handoff" end
+        return nil
+    end
+    if tryLure(z, math.floor(target:getX()), math.floor(target:getY()),
+            math.floor(target:getZ())) then
+        return "lure"
+    end
+    return nil
+end
+
 local function aggroScan()
     local cell = getCell()
     if not cell then return end

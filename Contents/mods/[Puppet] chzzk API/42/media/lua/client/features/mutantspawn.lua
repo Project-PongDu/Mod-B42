@@ -2,6 +2,7 @@ local _a = {}
 
 local zone   = require("utils/zone")
 local global = require("global")
+local aggro  = require("features/aggro")
 
 -- 좀비별 로컬 상태(체력 스냅샷·비명 쿨다운·이름표·벽등반 큐)의 테이블 키.
 -- MP 는 onlineID 가 좀비마다 다르지만 싱글은 전부 -1 이다(서버에서만 발급:
@@ -25,6 +26,7 @@ end
 --
 --    스크리머 : HP 1, 일반 걸음. 타깃이 생기면 주기적으로 비명
 --               (mutant_scream1/2 재생 + 반경 50 월드사운드로 주변 좀비 유인).
+--               플레이어를 표적으로 잡은 채 비명을 지르면 들은 좀비도 그 플레이어를 인지.
 --               CDDA_ZombieFunction.Scream 이식.
 --    브루트   : HP 3, 스프린터, 괴력(Strength=1), 넉다운 면역(keepstand),
 --               공격 중 플레이어를 밀쳐냄(attackFromWindowsLunge).
@@ -306,8 +308,106 @@ end
 -- (GameClient.sendWorldSound) 서버가 가상 좀비에 적용한 뒤 범위 안 다른 클라에 중계한다
 -- (WorldSoundPacket.processServer) -> 한 번이면 전원의 좀비가 듣는다. 모든 클라가 내면
 -- 접속자 수만큼 중복 중계된다. 반경 50 이상이어야 가상 좀비(청크 밖 인구)도 끈다.
+--
+-- 표적 전파: 스크리머가 플레이어를 표적으로 잡은 채 비명을 지르면, 비명을
+-- 들은 좀비도 그 플레이어를 표적으로 인지한다. 월드사운드만으로는 좀비가
+-- "소리 난 곳"으로 갈 뿐 플레이어를 모르므로 features/aggro.lua 인계 루프를 쓴다:
+--   18타일 이내 = spotted(target,false) 비강제 스팟 → 엔진 자체 추격 루프 인계
+--   그 밖     = pathToSound로 표적 플레이어 현재 좌표로 유인(2초마다 갱신)
+-- 좀비는 소유 클라 권한이라 각 클라가 자기 소유 좀비만 고른다. 원격 스크리머의
+-- 표적도 ZombiePacket.target 으로 동기화되므로 비소유 클라도 표적을 안다 →
+-- 전파는 월드사운드와 달리 모든 클라에서 돈다(서버 패킷 추가 없음).
 local SCREAM_RADIUS = 50
 local SCREAM_VOLUME = 50
+-- 표적 전파 창 유지시간: 다음 비명 직전까지 이어지게 쿨다운 + 여유 1초.
+-- 스크리머가 표적을 계속 물고 있으면 비명마다 창이 연장돼 끊김 없이 이어진다.
+local SCREAM_AGGRO_MS = SCREAM_COOLDOWN_MS + 1000
+
+-- 비명 청각 판정: WorldSoundManager.getSoundAttract(B42.21 :347) 재현.
+-- 3D 거리(z 는 3배 가중) <= 반경 x 좀비별 청각 배율(착용 장비·날씨 포함),
+-- 방이 다르면 x1.2, 한쪽이 실외면 추가 x1.4 감쇠 후 1 미만이면 들은 것.
+local function heardScream(z, sx, sy, sz, sq0, wsm)
+    local mult = 1.0
+    pcall(function() mult = wsm:getHearingMultiplier(z) end)
+    local r = SCREAM_RADIUS * mult
+    local dx = z:getX() - sx
+    local dy = z:getY() - sy
+    local dz = (z:getZ() - sz) * 3.0
+    local f = (dx * dx + dy * dy + dz * dz) / (r * r)
+    if f > 1 then return false end
+    local sq1 = z:getCurrentSquare()
+    if sq0 and sq1 then
+        local r0 = sq0:getRoom()
+        local r1 = sq1:getRoom()
+        if r0 ~= r1 then
+            f = f * 1.2
+            if r0 == nil or r1 == nil then f = f * 1.4 end
+        end
+    end
+    return f < 1
+end
+
+-- 비명을 들은 자기 소유 좀비 목록.
+-- 제외: 스크리머 본인, 이미 표적이 있는 좀비(다른 대상을 쫓는 중), 원격 좀비,
+-- 죽은척(fakeDead)/무력화(useless) 좀비.
+local function collectScreamListeners(screamer)
+    local list = {}
+    local cell = getCell()
+    local zlist = cell and cell:getZombieList()
+    if not zlist then return list end
+    local wsm = getWorldSoundManager()
+    local sx = math.floor(screamer:getX())
+    local sy = math.floor(screamer:getY())
+    local sz = math.floor(screamer:getZ())
+    local sq0 = screamer:getCurrentSquare()
+    for i = 0, zlist:size() - 1 do
+        local z = zlist:get(i)
+        if z and z ~= screamer and not z:isDead() and z:getTarget() == nil
+            and not z:isFakeDead() and not z:isUseless() then
+            local remote = false
+            pcall(function() remote = PongDuZombieId.IsRemote(z) end)
+            if not remote and heardScream(z, sx, sy, sz, sq0, wsm) then
+                list[#list + 1] = z
+            end
+        end
+    end
+    return list
+end
+
+-- 표적 전파 본체. MP 는 onlineID 화이트리스트 창(aggro.addScreamIds)으로 넘기고,
+-- 싱글은 onlineID 가 전부 -1 이라 창을 못 쓰므로 비명 시점에 1회 인계/유인한다.
+local function propagateScreamTarget(screamer, target)
+    local szid = screamer:getOnlineID()
+    if not instanceof(target, "IsoPlayer") or target:isDead() then
+        print("[PuppetMutant] scream zid=" .. tostring(szid) .. " target=non-player, no propagation")
+        return
+    end
+    local ok, list = pcall(collectScreamListeners, screamer)
+    if not ok then
+        print("[PuppetMutant] scream listener scan error: " .. tostring(list))
+        return
+    end
+    local pid = target:getOnlineID()
+    if isClient() then
+        local ids = {}
+        for i = 1, #list do
+            local id = list[i]:getOnlineID()
+            if id >= 0 then ids[#ids + 1] = id end
+        end
+        local added = aggro.addScreamIds(pid, ids, SCREAM_AGGRO_MS)
+        print("[PuppetMutant] scream propagate zid=" .. tostring(szid)
+            .. " targetPid=" .. tostring(pid)
+            .. " heard=" .. tostring(#list) .. " added=" .. tostring(added))
+    else
+        local nH, nL = 0, 0
+        for i = 1, #list do
+            local r = aggro.nudgeOnce(list[i], target)
+            if r == "handoff" then nH = nH + 1 elseif r == "lure" then nL = nL + 1 end
+        end
+        print("[PuppetMutant] scream propagate(SP) heard=" .. tostring(#list)
+            .. " handoff=" .. tostring(nH) .. " lure=" .. tostring(nL))
+    end
+end
 
 local function updateScreamer(zombie)
     local target = zombie:getTarget()
@@ -320,6 +420,7 @@ local function updateScreamer(zombie)
     if player and not player:hasTrait(CharacterTrait.DEAF) then
         zombie:playSound("mutant_scream" .. tostring(ZombRand(2) + 1))
     end
+    propagateScreamTarget(zombie, target)
     if isClient() and zombie:isRemoteZombie() then return end
     addSound(nil, zombie:getX(), zombie:getY(), zombie:getZ(), SCREAM_RADIUS, SCREAM_VOLUME)
     print("[PuppetMutant] scream zid=" .. tostring(zombie:getOnlineID())
