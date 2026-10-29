@@ -31,7 +31,7 @@ module Base
         }
     }
 
-    /* Wrecker charge warn: same file and settings as The Mutants PZTheMutants_Wrecker_ChargeWarn */
+    /* Slammer charge warn: PongDu-made gender-neutral roar (replaces The Mutants file). Loudness is baked into the ogg (mono, mean about -24 dB); keep volume at 1.0 */
     sound PongDuWrecker_ChargeWarn
     {
         category = Zombie,
@@ -41,7 +41,7 @@ module Base
         clip
         {
             file = media/sound/PongDuWrecker_ChargeWarn.ogg,
-            volume = 0.7,
+            volume = 1.0,
             distanceMin = 2,
             distanceMax = 100,
         }

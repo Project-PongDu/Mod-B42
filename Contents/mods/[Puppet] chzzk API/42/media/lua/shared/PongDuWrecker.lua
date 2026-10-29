@@ -12,7 +12,7 @@
 --   서버만 재면 실측 18~26칸을 가서야 멈췄다). 소유 클라가 Arrive 를 보내고 바로 회복으로 넘어간다.
 --
 -- [원본 레커(The Mutants, PZM_Wrecker_*)와의 관계]
---   클립·예고음은 원본 것을 그대로 쓰고(anims_X/Zombie/Zombie_PZM_Wrecker_*.glb. 버전 폴더(42/)의
+--   클립은 원본 것을 그대로 쓰고(예고음은 퐁듀 자체 제작으로 교체, 아래 W.WARN_SOUND. anims_X/Zombie/Zombie_PZM_Wrecker_*.glb. 버전 폴더(42/)의
 --   anims_X 는 common/media/anims_X 가 없으면 Zombie·Bob·Kate 같은 메시 폴더만 읽힌다(ModelManager.java:1838~1865),
 --   sound/PongDuWrecker_ChargeWarn.ogg), 시간·거리·방향·파괴·취소 규칙도 원본 값을 따른다.
 --   원본과 다른 점은 요청으로 바꾼 것뿐이다: 랜덤 외형(원본 남자 고정),
@@ -79,7 +79,9 @@ W.CHARGE_DISTANCE = 10    -- 한 번 돌진의 최대 거리 (칸). 원본은 �
 W.HIT_DAMAGE      = 20    -- 전체 체력(100) 기준으로 깎는 양
 W.FRACTURE_CHANCE = 30    -- 부상 부위마다 골절 확률 (%), 나머지는 깊은 상처
 
--- 예고음 (원본 PZTheMutants_Wrecker_ChargeWarn 과 같은 파일·설정, scripts/t3_mutant_sounds.txt).
+-- 예고음: 퐁듀 자체 제작 중성적 울음(sound/PongDuWrecker_ChargeWarn.ogg, 모노 1.5초, 음량은 파일에 반영 -
+-- 평균 약 -24 dB, 스크립트 volume 1.0). 원본 파일은 거의 최대 음량이라 다른 소리보다 약 25 dB 컸다.
+-- 거리·범주 설정은 원본과 같다(scripts/t3_mutant_sounds.txt).
 -- 재생도 원본과 같이 좀비 목소리 채널(getEmitter():playVocals)로 내고, 예고 동안 바닐라 좀비 울음은 끈다.
 W.WARN_SOUND = "PongDuWrecker_ChargeWarn"
 
