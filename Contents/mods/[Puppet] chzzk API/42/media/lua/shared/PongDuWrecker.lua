@@ -50,6 +50,11 @@ W.KIND = "wrecker"
 W.VAR_PHASE = "PongDuWreckerPhase"
 -- 예고 클립 재생 위치 (0~1). 예고 노드가 m_TrackTimeToVariable 로 읽는다 (원본 ActionProgress)
 W.VAR_PROGRESS = "PongDuWreckerProgress"
+-- 예고 클립: The Mutants 퓨커(Puker)의 구토 직전 몸을 뒤로 젖히는 구간 (사용자 지시, 원본 레커 ChargeWarn 대체).
+-- 클립 Zombie_PZM_Puker_Puke 는 3초(30fps 90프레임) 한 덩어리이고 그중 0~40프레임이 젖히기(windup)
+-- (원본 PZM_Puker_Actions: WINDUP 80틱 = 프레임 0~40, RELEASE 40~70, RECOVERY 70~90).
+-- 예고 1.5초 동안 재생 위치를 0 -> 40/90 으로 보낸다(원본 1.333초 구간을 1.5초로 약간 느리게).
+W.WARN_CLIP_END = 40 / 90
 -- 맞은 플레이어 변수. 켜져 있으면 넘어짐 노드(AnimSets/player/bumped/PongDuSlammerFall.xml)가
 -- 바닐라 밀려 넘어짐 대신 '전력질주 울타리 넘기 실패' 클립(Bob_ValultOver_SprintFail)을 튼다.
 W.VAR_PLAYER_FALL = "PongDuSlammerFall"

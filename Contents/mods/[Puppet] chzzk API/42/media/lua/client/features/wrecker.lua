@@ -549,7 +549,7 @@ Events.OnTick.Add(function()
             if e.ph == PH.WARN then
                 local pr = (tnow - e.t0) / W.WARN_MS
                 if pr > 1 then pr = 1 elseif pr < 0 then pr = 0 end
-                z:setVariable(W.VAR_PROGRESS, pr)
+                z:setVariable(W.VAR_PROGRESS, pr * W.WARN_CLIP_END)   -- 퓨커 클립의 젖히기 구간만
             end
             -- 단계 변수는 다른 코드나 좀비 재로드로 지워질 수 있어 계속 세운다
             if z:getVariableString(W.VAR_PHASE) ~= e.ph then
