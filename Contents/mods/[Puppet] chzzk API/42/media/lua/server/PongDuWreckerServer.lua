@@ -202,6 +202,11 @@ end
 --   안 휜 것은 휘고(bendFence), 휜 것은 무너뜨린다(smashFence). 한 번 충돌에 한 단계만.
 --   그 밖에는 getThumpableFor 가 고른 것(바리케이드가 있으면 바리케이드 먼저)을 부수고 다음 것을 다시 고른다.
 --   문은 setHealth(0) + Thump, 나머지는 Thump(30000).
+--   부서지는 울타리(BrokenFences, 바닐라 server/Items/BrokenFences.lua: 낮은 검은 철제·흰 나무·철망·
+--   나무 울타리, 높은 콘크리트·철망·철제·나무 담장 등) 중 위 두 경로에 안 걸리는 맵 기본 오브젝트는
+--   destroyFence 로 부순다. [원본과 다름] 바닐라에선 걷는 좀비의 getThumpableFor 가 이걸 nil 로 줘서
+--   (기어가는 좀비만 대상, IsoObject.java:6057) 원본 레커는 못 부쉈다. 차량 충돌·기는 좀비와 같은 함수라
+--   부서진 스프라이트·잔해·옆 칸 손상·소리·전송까지 바닐라가 처리한다(BrokenFences.java:169).
 -- BentFences 의 휘기·무너뜨리기는 자체적으로 transmitUpdatedSprite/transmitRemoveItemFromSquare 한다.
 local DIRS = {
     N = { dx = 0,  dy = -1, north = true,  iso = IsoDirections.N, edge = GridSquareEdgeFacingDirection.NORTH_SOUTH },
@@ -271,6 +276,7 @@ local function topTarget(face, z)
             end
             local t = c:getThumpableFor(z)
             if t then return t, cands end
+            if BrokenFences.getInstance():isBreakableObject(c) then return c, cands end
         end
     end
     return nil, cands
@@ -290,6 +296,10 @@ local function destroyOne(t, z, dir)
         t:setHealth(0)
         t:Thump(z, 1)
         return "door"
+    end
+    if not instanceof(t, "IsoThumpable") and BrokenFences.getInstance():isBreakableObject(t) then
+        BrokenFences.getInstance():destroyFence(t, dir.iso)
+        return "break-fence"
     end
     t:Thump(z, THUMP_BIG)
     return "thump"
@@ -327,7 +337,7 @@ local function breakObstacles(z, hx, hy, dirName)
         end
         broken = broken + 1
         done[#done + 1] = tostring(kind) .. ":" .. tostring(spr)
-        if kind == "bend-fence" or kind == "smash-fence" then break end   -- 울타리는 충돌 1번에 1단계
+        if kind == "bend-fence" or kind == "smash-fence" or kind == "break-fence" then break end   -- 울타리는 충돌 1번에 1단계
         local nt = topTarget(face, z)
         if nt == t then
             print(LOG .. "break no progress obj=" .. tostring(spr) .. " kind=" .. tostring(kind))
@@ -389,13 +399,20 @@ W.serverHandler = function(command, player, args, zombieObj)
         end
         local hx, hy = tonumber(args["hx"]), tonumber(args["hy"])
         local hz = tonumber(args["hz"]) or math.floor(z:getZ())
+        local climb = args["climb"] == "1"
+        local broken = 0
         if hx and hy and hz == math.floor(z:getZ()) then
-            breakObstacles(z, hx, hy, args["dir"])
+            broken = breakObstacles(z, hx, hy, args["dir"])
         else
             print(LOG .. "break skipped: impact square " .. tostring(hx) .. "," .. tostring(hy) .. "," .. tostring(hz)
                 .. " not on wrecker level " .. string.format("%.1f,%.1f,%d", z:getX(), z:getY(), math.floor(z:getZ())))
         end
-        toPhase(z, st, PH.CRASH, W.CRASH_MS, tnow, "crash " .. who)
+        -- 넘기에서 온 충돌인데 부순 게 없으면(바닐라도 못 부수는 울타리) 넘어뜨리지 않고 바닐라 넘기를 둔다
+        if climb and broken == 0 then
+            cancel(z, st, tnow, "climb over unbreakable")
+            return
+        end
+        toPhase(z, st, PH.CRASH, W.CRASH_MS, tnow, (climb and "climb-crash " or "crash ") .. who)
     elseif command == "Arrive" then
         if st.phase ~= PH.SPRINT then
             print(LOG .. "Arrive ignored: phase=" .. tostring(st.phase) .. " from=" .. who)

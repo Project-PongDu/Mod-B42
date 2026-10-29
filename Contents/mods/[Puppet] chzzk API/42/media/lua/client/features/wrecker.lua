@@ -338,6 +338,39 @@ local function checkArrive(e, tnow)
     W.sendClaim(reporter, "Arrive", { ["zid"] = e.zid, ["seq"] = e.seq, ["d"] = string.format("%.1f", d) }, z)
 end
 
+-- 돌진 중 바닐라가 넘기(climbfence)를 걸었다 (소유 클라): 넘으려는 울타리 면을 충돌로 보고한다.
+-- 면 방향: 돌진 방향과 가까운 순서로 4방향을 보며 그 쪽에 넘을 수 있는 오브젝트(getHoppableTo)가 있는 것.
+local function climbCrash(e)
+    if e.crashSent then return end
+    e.crashSent = true
+    local z = e.z
+    local sq = z:getCurrentSquare()
+    local fx, fy = e.fx or e.dx or 0, e.fy or e.dy or 0
+    local order = {
+        { "N", -fy, IsoDirections.N }, { "S", fy, IsoDirections.S },
+        { "E", fx, IsoDirections.E },  { "W", -fx, IsoDirections.W },
+    }
+    table.sort(order, function(a, b) return a[2] > b[2] end)
+    local dir = nil
+    if sq then
+        for _, o in ipairs(order) do
+            local adj = sq:getAdjacentSquare(o[3])
+            if adj and sq:getHoppableTo(adj) then dir = o[1]; break end
+        end
+    end
+    if not dir then dir = impactDir(z, e) or order[1][1] end
+    print(LOG .. "climb crash zid=" .. tostring(e.zid) .. " seq=" .. tostring(e.seq) .. " dir=" .. tostring(dir)
+        .. " at " .. string.format("%.2f,%.2f", z:getX(), z:getY()))
+    local reporter = getSpecificPlayer(0) or getPlayer()
+    W.sendClaim(reporter, "Crash", {
+        ["zid"] = e.zid, ["seq"] = e.seq,
+        ["hx"] = sq and sq:getX() or math.floor(z:getX()),
+        ["hy"] = sq and sq:getY() or math.floor(z:getY()),
+        ["hz"] = sq and sq:getZ() or math.floor(z:getZ()),
+        ["dir"] = dir, ["climb"] = "1",
+    }, z)
+end
+
 local function crashFall(e)
     local z = e.z
     release(e, "crash")
@@ -473,6 +506,11 @@ Events.OnTick.Add(function()
                     elseif e.ph == PH.RECOVERY then
                         faceDir(z, e.fx, e.fy)
                     end
+                elseif policy == "crash" then
+                    -- 넘기를 막지 않고(손을 떼고) 울타리 충돌로 보고한다. 서버가 부수면 crash 로 넘어지고,
+                    -- 못 부수면 취소돼 바닐라 넘기가 끝까지 간다.
+                    if e.ph == PH.SPRINT then climbCrash(e) end
+                    release(e, "climb crash")
                 elseif policy == "suppress" then
                     -- 돌진 중 몸 충돌로 bumped 에 들어감: 바닐라 상태로 돌려 놓고 bumped 를 바로 끝낸다
                     release(e, "bumped")

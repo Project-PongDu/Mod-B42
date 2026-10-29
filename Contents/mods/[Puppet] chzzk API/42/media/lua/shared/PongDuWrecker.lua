@@ -90,12 +90,18 @@ W.HOLD_STATE = "attackvehicle-network"
 -- 단계별로 이동 고정을 허용하는 애니메이션 상태 (이름은 normState 로 정규화한 것).
 --   "hold"     : 고정한다
 --   "suppress" : 돌진 중 부딪혀 bumped 에 들어가면 바로 끝내고 돌진을 잇는다
+--   "crash"    : 돌진 중 낮은 울타리에 닿아 바닐라가 넘기(climbfence)를 걸면 그 울타리 충돌로 본다.
+--                소유 클라가 Crash(climb) 를 보내고 서버가 울타리를 부순다. 부술 수 없는 것이면 서버가
+--                취소해 바닐라 넘기를 그대로 둔다. [원본과 다름: 원본은 climbfence 를 미정의로 두어 넘어간다]
+--                바닐라는 좀비 AI 가 Attack/StaggerBack/ClimbOverFence/ClimbThroughWindow 가 아니면
+--                벽 충돌 때 넘기를 건다(IsoMovingObject.checkHitHoppable). 고정 상태(GenericDefaultState)는
+--                여기 안 걸려 돌진 중에도 넘기가 시작된다.
 --   (없음)     : 손을 뗀다. 바닐라 상태가 끝날 때까지 기다린다. 충돌 판정도 하지 않는다.
 local HOLD_COMMON = { walktoward = "hold", lunge = "hold", idle = "hold", ["face-target"] = "hold", attack = "hold" }
 W.HOLD_STATES = {
     warn     = HOLD_COMMON,
     sprint   = { walktoward = "hold", lunge = "hold", idle = "hold", ["face-target"] = "hold", attack = "hold",
-                 thump = "hold", bumped = "suppress" },
+                 thump = "hold", bumped = "suppress", climbfence = "crash" },
     recovery = { walktoward = "hold", lunge = "hold", idle = "hold", ["face-target"] = "hold", attack = "hold",
                  thump = "hold" },
 }
