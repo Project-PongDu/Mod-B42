@@ -2443,46 +2443,7 @@
 		<m_AllowTopTint>false</m_AllowTopTint>
 		<m_AllowTShirtDecal>false</m_AllowTShirtDecal>
 		<m_items>
-			<itemGUID>dc364fca-aaa2-420a-8662-c51472f29605</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>cf0b766a-c273-49b0-bee4-5a0bb6496491</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>6fed6e2b-3a72-4bac-aac5-09585984493d</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>b7875779-8b43-4260-bb48-65b498c9627d</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>657a2898-adff-4b6c-8531-9059f2db13bf</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>99a89d79-d35f-4967-8eb2-435db1089e48</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>bf98caba-b7d5-474b-8c2d-7a599c886cbf</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>624f8899-e06c-4164-91b7-c848982c6bca</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>a4ae0cb9-c5b7-4fc6-994a-3bf497f28708</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>a5928297-fa7d-4c02-bc40-dddbaae615b3</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>1a8aee87-7718-40dd-bc6b-10b3aae0d88f</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>426bee5b-6a19-47d3-9b94-be9d40b72182</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>3efdf40c-dee5-4de9-bb62-d1a237591505</itemGUID>
-		</m_items>
-		<m_items>
-			<itemGUID>2c8270f5-a962-4ba5-83a3-1df3099950ae</itemGUID>
+			<itemGUID>229b23f6-8e8f-4f16-837b-4fe950c48bfc</itemGUID>
 		</m_items>
 	</m_MaleOutfits>
 	<m_MaleOutfits>

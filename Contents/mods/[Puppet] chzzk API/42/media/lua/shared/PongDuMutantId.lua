@@ -41,7 +41,7 @@ for slot, kind in pairs(M.SLOT_KIND) do M.KIND_SLOT[kind] = slot end
 -- 성별 고정 (addZombiesInOutfit femaleChance, 0~100). 없으면 50.
 M.FEMALE_CHANCE = {
     screamer = 100,   -- 비명 지르는 신부
-    slammer  = 0,     -- 축구 보호장비
+    slammer  = 0,     -- 근육 상체 + 청바지 (남성 몸 전용 외형)
 }
 
 M.DONOR_KEY  = "PongDuMutantDonors"
