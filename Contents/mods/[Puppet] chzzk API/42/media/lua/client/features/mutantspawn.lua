@@ -161,16 +161,25 @@ end
 local TINT_GREY = nil
 local TRACER_GREY_ITEMS = { Hat_BalaclavaFull = true, Bag_MoneyBag = true }
 
-local function tintTracerGrey(zombie)
+-- 클라는 좀비 옷을 모델이 처음 붙을 때 입힌다(ModelManager.dressInRandomOutfit:555~561,
+-- isPersistentOutfitInit=false 일 때 dressInPersistentOutfitID). 스폰 직후 첫 틱엔 itemVisuals 가
+-- 비어 있어(2026-10-30 로그: init 시 visuals=0, tracer grey tinted=0) 옷을 입은 뒤에 칠해야 한다.
+-- 그래서 initMutant 가 아니라 매 틱 부르고, 입은 뒤 한 번 칠하면 modData 표시로 멈춘다.
+-- 객체 재사용(resetForReuse)은 modData 와 옷을 같이 지우므로 다시 입으면 다시 칠한다.
+local function tintTracerGrey(zombie, md)
+    if md["PuppetTracerTinted"] then return end
     -- 착용 아이템 모드(강령술 fakeDead 부활 등)에서 getItemVisuals() 를 부르면 좀비 자신의
     -- itemVisuals 를 wornItems 로 덮어써 옷이 지워진다(IsoZombie.java:4709~4725) -> 건너뛴다.
     if zombie:isUsingWornItems() then
+        md["PuppetTracerTinted"] = true
         print("[PuppetMutant] tracer grey skipped (worn-items mode) zid=" .. tostring(zombie:getOnlineID()))
         return
     end
+    if not zombie:isPersistentOutfitInit() then return end   -- 아직 옷을 안 입었다
     if not TINT_GREY then TINT_GREY = ImmutableColor.decode("0x737373") end
     local iv = zombie:getItemVisuals()
     if not iv then return end
+    md["PuppetTracerTinted"] = true
     local n = 0
     for i = 0, iv:size() - 1 do
         local v = iv:get(i)
@@ -180,7 +189,32 @@ local function tintTracerGrey(zombie)
         end
     end
     if n > 0 then zombie:resetModel() end
-    print("[PuppetMutant] tracer grey tinted=" .. tostring(n) .. " zid=" .. tostring(zombie:getOnlineID()))
+    print("[PuppetMutant] tracer grey tinted=" .. tostring(n) .. " of " .. tostring(iv:size())
+        .. " zid=" .. tostring(zombie:getOnlineID()))
+end
+
+-- 옷 진단: 특좀이 실제로 입은 아이템을 옷을 입은 직후 한 번 남긴다 (아웃핏 XML 검증용).
+-- 위와 같은 이유로 init 시점이 아니라 isPersistentOutfitInit 이 선 뒤에 찍는다.
+local function logDressOnce(zombie, kind, md)
+    if md["PuppetDressLogged"] then return end
+    if zombie:isUsingWornItems() then
+        md["PuppetDressLogged"] = true
+        print("[PuppetMutant] dressed kind=" .. tostring(kind) .. " zid=" .. tostring(zombie:getOnlineID())
+            .. " skipped (worn-items mode)")
+        return
+    end
+    if not zombie:isPersistentOutfitInit() then return end
+    md["PuppetDressLogged"] = true
+    local iv = zombie:getItemVisuals()
+    local names = {}
+    local n = iv and iv:size() or 0
+    for i = 0, n - 1 do
+        local v = iv:get(i)
+        names[#names + 1] = v and tostring(v:getClothingItemName()) or "nil"
+    end
+    print("[PuppetMutant] dressed kind=" .. tostring(kind) .. " zid=" .. tostring(zombie:getOnlineID())
+        .. " female=" .. tostring(zombie:isFemale()) .. " n=" .. tostring(n)
+        .. " items=" .. table.concat(names, ","))
 end
 
 -- ── 1회 초기화 (클라별) ───────────────────────────────────────────────────────
@@ -222,7 +256,6 @@ local function initMutant(zombie, kind)
     -- 반드시 그 뒤여야 한다.
     local hp = mutantHealth(kind)
     if hp then zombie:setHealth(hp) end
-    if kind == "tracer" then tintTracerGrey(zombie) end
     -- 옷 진단: 강령술 부활 특좀이 알몸으로 보이는 문제 추적용.
     --   wornItems 로 그리는 좀비(isUsingWornItems: 부활 플레이어 플래그·죽은척 출신)는 클라에
     --   wornItems 가 없으면 알몸이 된다(IsoZombie.java:4715, 4725).
@@ -240,6 +273,7 @@ local function initMutant(zombie, kind)
         .. " outfit=" .. tostring(zombie:getOutfitName())
         .. " pid=" .. tostring(zombie:getPersistentOutfitID())
         .. " visuals=" .. tostring(nVis)
+        .. " dressed=" .. tostring(zombie:isPersistentOutfitInit())
         .. " wornMode=" .. tostring(wornMode)
         .. " rp=" .. tostring(zombie:isReanimatedPlayer())
         .. " noTeeth=" .. tostring(zombie:isNoTeeth()))
@@ -1025,6 +1059,8 @@ local function applyMutant(zombie)
             _a.pokeTag(zombie)
         end
     end
+    logDressOnce(zombie, kind, md)
+    if kind == "tracer" then tintTracerGrey(zombie, md) end
     if kind == "screamer" then
         updateScreamer(zombie)
     elseif kind == "brute" then
