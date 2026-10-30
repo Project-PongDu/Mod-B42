@@ -33,8 +33,8 @@
 		<guid>c213402a-d110-5c1a-8640-ef8f17179fc9</guid>
 	</files>
 	<files>
-		<path>media/clothing/clothingItems/PongDu_SlammerJeans.xml</path>
-		<guid>36be8f51-6d11-516d-9bea-f1678e2e1e89</guid>
+		<path>media/clothing/clothingItems/Trousers_Denim.xml</path>
+		<guid>229b23f6-8e8f-4f16-837b-4fe950c48bfc</guid>
 	</files>
 	<!-- Vanilla clothing items used by PongDuMutant_* outfits. B42 prefixes mod outfit item GUIDs with the mod ID
 	     (ClothingItemReference.setModID), so vanilla GUIDs must also be registered in this mod's table. -->

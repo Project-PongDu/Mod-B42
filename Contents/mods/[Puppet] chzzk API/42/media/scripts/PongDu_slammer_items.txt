@@ -18,9 +18,10 @@ module t3chzzkDonation
         hidden = true,
     }
 
-    /* 슬래머 방독면. 바닐라 Hat_GasMask 와 같은 모델·텍스처지만 ChanceToFall 이 없어 맞아도 안 떨어진다
-       (IsoZombie.helmetFallFromVisuals 는 ChanceToFall > 0 인 옷만 떨어뜨린다).
-       근육 상체와 같은 숨김 장식 형식(zeddmg, hidden)이다. */
+    /* 슬래머 방독면. 바닐라 Hat_GasMask 모델을 머리 뼈 스키닝 메시로 바꾼 것(상체 셰이더로 같이 커지게)과 같은 텍스처.
+       ChanceToFall 이 없어 맞아도 안 떨어진다 (IsoZombie.helmetFallFromVisuals 는 ChanceToFall > 0 인 옷만 떨어뜨린다).
+       숨김 장식이라 루팅창에 안 보이고, 죽을 때 서버가 바닐라 방독면을 따로 넣는다.
+       그 바닐라 방독면을 시체에서 꺼내면 이 장식도 같이 빠져 벗겨지는 연출이 된다 (PongDuSlammerServer.lua). */
     item PongDuSlammerGasMask
     {
         DisplayCategory = ZedDmg,
@@ -31,25 +32,15 @@ module t3chzzkDonation
         hidden = true,
     }
 
-    /* 슬래머 1.2배 외형 (셰이더 pongdu_slammerscale 이 옷에만 걸리므로 몸 전체를 옷으로 입힌다).
-       바닐라 몸의 머리·발 부분(회색 피부)과 바닐라 청바지 복사본. 둘 다 숨김 장식이라 시체에서 안 보이고,
-       루팅용 바닐라 청바지·방독면은 슬래머가 죽을 때 서버가 따로 넣는다 (PongDuSlammerServer.lua). */
+    /* 슬래머 상체 1.2배 외형. 셰이더 pongdu_slammerscale 은 상체 뼈(Spine1 이하)에 붙은 정점만 키우므로
+       근육 상체·방독면과 함께 머리도 옷으로 입힌다 (바닐라 몸의 머리·발 부분, 회색 피부. 발은 셰이더에서 1.0배).
+       하체는 바닐라 몸과 바닐라 청바지(Base.Trousers_Denim) 그대로라 시체에서 청바지를 벗기면 바닐라처럼 벗겨진다. */
     item PongDuSlammerBody_M
     {
         DisplayCategory = ZedDmg,
         ItemType = base:clothing,
         BodyLocation = base:zeddmg,
         ClothingItem = PongDu_SlammerBody_M,
-        WorldRender = false,
-        hidden = true,
-    }
-
-    item PongDuSlammerJeans
-    {
-        DisplayCategory = ZedDmg,
-        ItemType = base:clothing,
-        BodyLocation = base:zeddmg,
-        ClothingItem = PongDu_SlammerJeans,
         WorldRender = false,
         hidden = true,
     }

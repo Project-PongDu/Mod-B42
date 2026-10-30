@@ -550,15 +550,14 @@ Events.OnTick.Add(function()
     end
 end)
 
--- ── 루팅용 바닐라 아이템 ─────────────────────────────────────────────────────
--- 슬래머가 입은 청바지·방독면은 1.2배 셰이더용 숨김 복사본(PongDuSlammerJeans, PongDuSlammerGasMask)이라
--- 시체에서 보이지 않는다. 죽을 때 같은 바닐라 아이템(Base.Trousers_Denim, Base.Hat_GasMask)을 인벤토리에 넣어
--- 플레이어가 루팅하면 원래 크기 바닐라 옷이 되게 한다.
+-- ── 루팅용 바닐라 방독면 ────────────────────────────────────────────────────
+-- 슬래머 방독면은 상체 1.2배 셰이더용 숨김 장식(PongDuSlammerGasMask)이라 루팅창에 안 보인다.
+-- 죽을 때 바닐라 Base.Hat_GasMask 를 인벤토리에 넣고 표식(modData)을 단다. 청바지는 바닐라를 그대로 입으므로 손대지 않는다.
 -- IsoZombie.onKilled (서버/SP): DoZombieInventory(입은 옷 -> 인벤토리) -> OnZombieDead -> DoDeath(시체로 이동).
 -- MP 에선 서버 시체 인벤토리가 DeadZombiePacket 으로 클라에 간다.
-local LOOT_JEANS = "Base.Trousers_Denim"
-local LOOT_MASK  = "Base.Hat_GasMask"
-local COSMETIC_JEANS = "t3chzzkDonation.PongDuSlammerJeans"
+local LOOT_MASK = "Base.Hat_GasMask"
+local COSMETIC_MASK = "t3chzzkDonation.PongDuSlammerGasMask"
+local LOOT_TAG = "PongDuSlammerLoot"
 
 Events.OnZombieDead.Add(function(z)
     if not z or not S.isSlammer(z) then return end
@@ -567,21 +566,47 @@ Events.OnZombieDead.Add(function(z)
         print(LOG .. "loot skipped (no inventory) zid=" .. tostring(zidOf(z)))
         return
     end
-    -- 입고 있던 청바지 색(데님/검정/연청)을 그대로 넘긴다. 복사본의 textureChoices 순서는 바닐라와 같다.
-    local choice = -1
-    local items = inv:getItems()
-    for i = 0, items:size() - 1 do
+    local mask = inv:AddItem(LOOT_MASK)
+    if mask then mask:getModData()[LOOT_TAG] = "mask" end
+    print(LOG .. "loot added zid=" .. tostring(zidOf(z)) .. " mask=" .. tostring(mask ~= nil))
+end)
+
+-- ── 시체에서 방독면을 벗기는 연출 ─────────────────────────────────────────────
+-- 바닐라는 시체 인벤토리에서 착용 아이템이 빠지면 ItemContainer.DoRemoveItem -> IsoDeadBody.checkClothing 으로
+-- 착용 슬롯에서도 빼 다시 그린다. 루팅되는 건 바닐라 방독면이고 시체가 입은 건 장식이라,
+-- 표식 달린 바닐라 방독면이 시체에서 나가면 같은 시체의 장식도 같이 뺀다.
+-- ISTransferAction.transferItem 은 SP 에선 로컬, MP 에선 서버에서만 돈다 (ISInventoryTransferAction:perform).
+-- MP 제거는 바닐라 루팅과 같은 DoRemoveItem + sendRemoveItemFromContainer 경로라 클라 시체도 같이 벗겨진다.
+local function removeCosmeticMask(container)
+    local items = container:getItems()
+    for i = items:size() - 1, 0, -1 do
         local it = items:get(i)
-        if it and it:getFullType() == COSMETIC_JEANS and it:getVisual() then
-            choice = it:getVisual():getTextureChoice()
+        if it and it:getFullType() == COSMETIC_MASK then
+            container:DoRemoveItem(it)
+            if isServer() then sendRemoveItemFromContainer(container, it) end
+            return true
         end
     end
-    local jeans = inv:AddItem(LOOT_JEANS)
-    if jeans and choice >= 0 and jeans:getVisual() then
-        jeans:getVisual():setTextureChoice(choice)
-        jeans:synchWithVisual()
+    return false
+end
+
+if ISTransferAction and ISTransferAction.transferItem then
+    local origTransferItem = ISTransferAction.transferItem
+    ISTransferAction.transferItem = function(self, character, item, srcContainer, destContainer, dropSquare)
+        local result = origTransferItem(self, character, item, srcContainer, destContainer, dropSquare)
+        local body = srcContainer and srcContainer:getParent()
+        if item and body and instanceof(body, "IsoDeadBody") then
+            local md = item:getModData()
+            if md[LOOT_TAG] == "mask" then
+                md[LOOT_TAG] = nil
+                local removed = removeCosmeticMask(srcContainer)
+                print(LOG .. "corpse mask looted cosmeticRemoved=" .. tostring(removed)
+                    .. " by=" .. tostring(character and character:getUsername()))
+            end
+        end
+        return result
     end
-    local mask = inv:AddItem(LOOT_MASK)
-    print(LOG .. "loot added zid=" .. tostring(zidOf(z)) .. " jeans=" .. tostring(jeans ~= nil)
-        .. " jeansChoice=" .. tostring(choice) .. " mask=" .. tostring(mask ~= nil))
-end)
+    print(LOG .. "transfer hook installed")
+else
+    print(LOG .. "transfer hook skipped (ISTransferAction missing)")
+end

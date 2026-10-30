@@ -1,8 +1,27 @@
 #version 330
 
-// PongDu slammer: basicEffect copy with a uniform scale about the character origin (feet).
-// Applied after skinning so animation is unchanged. Used by m_Shader on slammer clothing items only.
+// PongDu slammer: basicEffect copy that scales only the upper body (Bip01_Spine1 and its children).
+// Pivot is the posed Spine1 joint, so it follows the animation (also for corpses lying down).
+// Per vertex the scale is blended by the weight on upper bones; the waist band stays at 1.0
+// so it matches vanilla jeans and legs. Used by m_Shader on slammer clothing items only.
+// Bone indices follow the Human skeleton (Skinned/MaleBody.x frame order): 4=Spine1 .. 19=BackPack.
 const float PONGDU_SCALE = 1.2;
+const int PONGDU_SPINE1 = 4;
+const int PONGDU_UPPER_FIRST = 4;
+const int PONGDU_UPPER_LAST = 19;
+const vec4 PONGDU_SPINE1_BIND = vec4(0.0, 0.663, 0.0174, 1.0); // bind position from MaleBody.x offset matrix
+const float PONGDU_BLEND_LO = 0.3;  // upper weight at the waist band (stays 1.0 below this)
+const float PONGDU_BLEND_HI = 0.9;  // upper weight where the full scale is reached
+
+float pongduUpperWeight(vec4 w, vec4 idx)
+{
+	float f = 0.0;
+	if (int(idx.x) >= PONGDU_UPPER_FIRST && int(idx.x) <= PONGDU_UPPER_LAST) f += w.x;
+	if (int(idx.y) >= PONGDU_UPPER_FIRST && int(idx.y) <= PONGDU_UPPER_LAST) f += w.y;
+	if (int(idx.z) >= PONGDU_UPPER_FIRST && int(idx.z) <= PONGDU_UPPER_LAST) f += w.z;
+	if (int(idx.w) >= PONGDU_UPPER_FIRST && int(idx.w) <= PONGDU_UPPER_LAST) f += w.w;
+	return smoothstep(PONGDU_BLEND_LO, PONGDU_BLEND_HI, f);
+}
 
 layout (location = 0) in vec4 vertex;
 layout (location = 1) in vec4 normal;
@@ -60,7 +79,10 @@ void main()
 #endif
 
 	vec4 positionScaled = boneEffect * position;
-	positionScaled.xyz *= FinalScale * PONGDU_SCALE;
+	vec3 pongduPivot = (MatrixPalette[PONGDU_SPINE1] * PONGDU_SPINE1_BIND).xyz;
+	float pongduK = 1.0 + (PONGDU_SCALE - 1.0) * pongduUpperWeight(boneWeights, boneIndices);
+	positionScaled.xyz = pongduPivot + (positionScaled.xyz - pongduPivot) * pongduK;
+	positionScaled.xyz *= FinalScale;
 	vec4 o = ModelViewProjection * positionScaled;
 
 	vec4 origin = ModelViewProjection * vec4(0, 0, 0, 1);
