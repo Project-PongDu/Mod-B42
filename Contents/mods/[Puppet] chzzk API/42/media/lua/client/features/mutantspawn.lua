@@ -258,6 +258,7 @@ local function matchSlammerSkin(zombie, md)
     if changed > 0 then zombie:resetModel() end
     print("[PuppetMutant] slammer skin=" .. tostring(skin) .. " choice=" .. tostring(idx)
         .. " found=" .. tostring(found) .. " changed=" .. tostring(changed)
+        .. " hair=" .. tostring(hv:getHairModel()) .. " beard=" .. tostring(hv:getBeardModel())
         .. " zid=" .. tostring(zombie:getOnlineID()))
 end
 

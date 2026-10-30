@@ -127,6 +127,39 @@ function M.outfitOf(kind)
     return M.OUTFIT_PREFIX .. slot
 end
 
+-- ── 고정 외형 (머리·수염) ─────────────────────────────────────────────────────
+-- 머리·수염은 옷 ID 변형 번호로 시드된 OutfitRNG 가 HairOutfitDefinitions 를 보고 고른다
+-- (PersistentOutfits.dressInOutfit -> Outfit.RandomData -> HairOutfitDefinitions
+--  .getRandomMaleHaircut / getRandomBeard). 변형 번호가 후원자 번호라 같은 후원자(또는 후원자 없음)의
+-- 특좀은 머리·수염이 똑같이 나오므로, 종류별로 외형을 아예 고정한다.
+-- "Bald" = 바닐라 hairStyles.xml 남성 스타일, 수염 "null" = 빈 이름 = BeardStyles 0번(수염 없음).
+-- 클라도 옷 ID 로 직접 입히므로 서버·클라가 같은 정의를 가져야 한다 -> shared 에서 등록.
+-- 정의 표는 Lua 파일을 읽을 때마다 다시 읽힌다(LuaManager: HairOutfitDefinitions.dirty = true).
+M.FIXED_HAIR = {
+    slammer = { maleHaircut = "Bald:100", beard = "null:100" },
+}
+
+local function registerFixedHair()
+    local defs = HairOutfitDefinitions and HairOutfitDefinitions.haircutOutfitDefinition
+    if type(defs) ~= "table" then
+        M.log("WARNING HairOutfitDefinitions.haircutOutfitDefinition missing, fixed hair not registered")
+        return
+    end
+    for kind, def in pairs(M.FIXED_HAIR) do
+        local outfit = M.outfitOf(kind)
+        local found = false
+        for i = 1, #defs do
+            if defs[i] and defs[i].outfit == outfit then found = true end
+        end
+        if outfit and not found then
+            table.insert(defs, { outfit = outfit, maleHaircut = def.maleHaircut, beard = def.beard })
+            M.log("fixed hair registered outfit=" .. outfit .. " maleHaircut=" .. tostring(def.maleHaircut)
+                .. " beard=" .. tostring(def.beard))
+        end
+    end
+end
+registerFixedHair()
+
 function M.femaleChance(kind)
     return M.FEMALE_CHANCE[kind] or 50
 end
