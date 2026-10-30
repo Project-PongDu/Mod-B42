@@ -28,15 +28,45 @@ local M = PongDuMutantId
 M.OUTFIT_PREFIX = "PongDuMutant_"
 M.SLOT_KIND = {
     ["01"] = "screamer",
-    ["02"] = "brute",
+    ["02"] = "brute",      -- 기본: [J&G] SWAT Uniform 진압복 (모드 필요)
     ["03"] = "roach",
     ["04"] = "tracer",
     ["05"] = "slammer",
     ["06"] = "sprinter",
-    -- "07", "08" : 예비 (아웃핏은 정의돼 있음, 종류 미배정)
+    ["07"] = "brute",      -- 폴백: 바닐라 진압경찰 복장 (SWAT 모드가 없을 때)
+    -- "08" : 예비 (아웃핏은 정의돼 있음, 종류 미배정)
 }
+
+-- 다른 모드 아이템을 입는 아웃핏의 폴백. items 중 하나라도 스크립트에 없으면 slot 아웃핏으로 소환한다.
+-- 판정은 아이템 스크립트 존재로 한다(모드 id 표기가 빌드마다 달라질 수 있어 id 는 로그로만 남긴다).
+-- [J&G] SWAT Uniform 은 KATTAJ1_ClothesCore 를 require 하므로 SWAT 아이템이 있으면 둘 다 켜진 것이다.
+-- 두 아웃핏 모두 SLOT_KIND 에 있어 이미 소환된 특좀은 어느 쪽이든 브루트로 판별된다.
+M.OUTFIT_FALLBACK = {
+    brute = {
+        slot  = "07",
+        mods  = { "[J&G] SWAT Uniform", "KATTAJ1_ClothesCore" },
+        items = {
+            "Base.SWAT_Helmet_Rook_FaceShield",
+            "Base.SWAT_Balaclava",
+            "Base.SWAT_Jacket",
+            "Base.SWAT_LightVest",
+            "Base.SWAT_ShoulderPads_Patriot",
+            "Base.SWAT_Elbow_Pads",
+            "Base.SWAT_Gloves",
+            "Base.SWAT_Pants_Tuck",
+            "Base.SWAT_Thigh_Pads",
+            "Base.SWAT_KneePads_Defender",
+            "Base.SWAT_Boots",
+        },
+    },
+}
+
+-- 종류 -> 기본 슬롯 (폴백 슬롯은 제외)
 M.KIND_SLOT = {}
-for slot, kind in pairs(M.SLOT_KIND) do M.KIND_SLOT[kind] = slot end
+for slot, kind in pairs(M.SLOT_KIND) do
+    local fb = M.OUTFIT_FALLBACK[kind]
+    if not (fb and fb.slot == slot) then M.KIND_SLOT[kind] = slot end
+end
 
 -- 성별 고정 (addZombiesInOutfit femaleChance, 0~100). 없으면 50.
 M.FEMALE_CHANCE = {
@@ -122,11 +152,93 @@ function M.kindOf(obj)
     return M.kindOfOutfitName(obj:getOutfitName())
 end
 
+local function modActive(id)
+    local ok, list = pcall(getActivatedMods)
+    if not ok or not list then return false end
+    return list:contains(id) or list:contains("\\" .. id)
+end
+
+--- 종류의 기본 아웃핏이 쓰는 모드 아이템이 전부 있는가. 폴백이 없는 종류는 항상 true.
+--- 스크립트는 기동 중에 바뀌지 않으므로 처음 판정한 값을 계속 쓴다.
+M._depsOk = {}
+function M.outfitDepsOk(kind)
+    local fb = M.OUTFIT_FALLBACK[kind]
+    if not fb then return true end
+    local cached = M._depsOk[kind]
+    if cached ~= nil then return cached end
+    local sm = getScriptManager()
+    if not sm then
+        M.log("outfit deps: script manager not ready kind=" .. tostring(kind) .. ", using fallback this time")
+        return false
+    end
+    local missing = {}
+    for i = 1, #fb.items do
+        if not sm:FindItem(fb.items[i]) then missing[#missing + 1] = fb.items[i] end
+    end
+    local mods = {}
+    for i = 1, #fb.mods do
+        mods[#mods + 1] = fb.mods[i] .. "=" .. tostring(modActive(fb.mods[i]))
+    end
+    local ok = #missing == 0
+    M._depsOk[kind] = ok
+    M.log("outfit deps kind=" .. tostring(kind) .. " ok=" .. tostring(ok)
+        .. " outfit=" .. M.OUTFIT_PREFIX .. (ok and M.KIND_SLOT[kind] or fb.slot)
+        .. " items=" .. (#fb.items - #missing) .. "/" .. #fb.items
+        .. " mods[" .. table.concat(mods, ", ") .. "]"
+        .. (ok and "" or (" missing[" .. table.concat(missing, ", ") .. "]")))
+    return ok
+end
+
+--- 종류 -> 소환할 아웃핏 이름. 모드 아이템이 없으면 폴백 아웃핏.
 function M.outfitOf(kind)
     local slot = M.KIND_SLOT[kind]
     if not slot then return nil end
+    local fb = M.OUTFIT_FALLBACK[kind]
+    if fb and not M.outfitDepsOk(kind) then slot = fb.slot end
     return M.OUTFIT_PREFIX .. slot
 end
+
+-- ── 아웃핏 고정 부착 무기 ─────────────────────────────────────────────────────
+-- 좀비는 옷 ID 로 입을 때마다(소환·후원자 번호 재착용·가상화 복귀·클라 렌더) PersistentOutfits.applyOutfit 이
+-- AttachedWeaponDefinitions.addRandomAttachedWeapon 을 부른다. attachedWeaponCustomOutfit[아웃핏 이름] 이 있으면
+-- 그 목록에서 고르고, 고르는 난수(OutfitRNG)는 옷 ID 로 시드돼 서버·클라가 같은 결과를 낸다.
+-- 부착 아이템은 죽을 때 IsoZombie.DoZombieInventory 가 인벤토리에 넣어 시체에서 루팅된다.
+-- 형식은 바닐라 AttachedWeaponDefinitions.nightstick 과 같다 (Nightstick Left + 허리띠 Belt2 보장).
+-- 바닐라 파일이 attachedWeaponCustomOutfit = {} 로 표를 새로 만들므로 바닐라 다음에 넣어야 한다.
+require "Definitions/AttachedWeaponDefinitions"
+
+M.ATTACHED_WEAPONS = {
+    brute = {
+        id = "pongduBruteNightstick",
+        chance = 100,
+        weaponLocation = { "Nightstick Left" },
+        bloodLocations = nil,
+        addHoles = false,
+        daySurvived = 0,
+        ensureItem = "Base.Belt2",
+        weapons = { "Base.Nightstick" },
+    },
+}
+
+local function registerAttachedWeapons()
+    local awd = AttachedWeaponDefinitions
+    if type(awd) ~= "table" or type(awd.attachedWeaponCustomOutfit) ~= "table" then
+        M.log("WARNING AttachedWeaponDefinitions.attachedWeaponCustomOutfit missing, attached weapons not registered")
+        return
+    end
+    for kind, def in pairs(M.ATTACHED_WEAPONS) do
+        for slot, k in pairs(M.SLOT_KIND) do
+            if k == kind then
+                local outfit = M.OUTFIT_PREFIX .. slot
+                awd.attachedWeaponCustomOutfit[outfit] = { chance = 100, maxitem = 1, weapons = { def } }
+                M.log("attached weapon registered outfit=" .. outfit .. " kind=" .. kind
+                    .. " item=" .. tostring(def.weapons[1]) .. " location=" .. tostring(def.weaponLocation[1])
+                    .. " ensure=" .. tostring(def.ensureItem))
+            end
+        end
+    end
+end
+registerAttachedWeapons()
 
 -- ── 고정 외형 (머리·수염) ─────────────────────────────────────────────────────
 -- 머리·수염은 옷 ID 변형 번호로 시드된 OutfitRNG 가 HairOutfitDefinitions 를 보고 고른다

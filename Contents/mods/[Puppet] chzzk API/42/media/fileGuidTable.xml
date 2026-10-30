@@ -135,60 +135,12 @@
 		<guid>cecf13a1-1f18-481d-9458-b37009a2bb82</guid>
 	</files>
 	<files>
-		<path>media/clothing/clothingItems/AthleticCup.xml</path>
-		<guid>dc364fca-aaa2-420a-8662-c51472f29605</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/Gloves_FingerlessGloves.xml</path>
-		<guid>cf0b766a-c273-49b0-bee4-5a0bb6496491</guid>
-	</files>
-	<files>
 		<path>media/clothing/clothingItems/Shoes_TrainerTINT.xml</path>
 		<guid>6fed6e2b-3a72-4bac-aac5-09585984493d</guid>
 	</files>
 	<files>
 		<path>media/clothing/clothingItems/ShinKneeGuard_L_Protective.xml</path>
 		<guid>b7875779-8b43-4260-bb48-65b498c9627d</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/ShinKneeGuard_R_Protective.xml</path>
-		<guid>657a2898-adff-4b6c-8531-9059f2db13bf</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/Shorts_FootballPants_Black.xml</path>
-		<guid>99a89d79-d35f-4967-8eb2-435db1089e48</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/Shoulderpad_Football_L.xml</path>
-		<guid>bf98caba-b7d5-474b-8c2d-7a599c886cbf</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/Shoulderpad_Football_R.xml</path>
-		<guid>624f8899-e06c-4164-91b7-c848982c6bca</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/Shirt_Football_Black.xml</path>
-		<guid>a4ae0cb9-c5b7-4fc6-994a-3bf497f28708</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/Hat_FootballHelmet_Red.xml</path>
-		<guid>a5928297-fa7d-4c02-bc40-dddbaae615b3</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/ElbowPad_Left_Workman.xml</path>
-		<guid>1a8aee87-7718-40dd-bc6b-10b3aae0d88f</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/ElbowPad_Right_Workman.xml</path>
-		<guid>426bee5b-6a19-47d3-9b94-be9d40b72182</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/ThighProtective_L.xml</path>
-		<guid>3efdf40c-dee5-4de9-bb62-d1a237591505</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/ThighProtective_R.xml</path>
-		<guid>2c8270f5-a962-4ba5-83a3-1df3099950ae</guid>
 	</files>
 	<files>
 		<path>media/clothing/clothingItems/Trousers_Shellsuit_Teal.xml</path>
@@ -441,5 +393,91 @@
 	<files>
 		<path>media/clothing/clothingItems/Glasses_Normal_HornRimmed.xml</path>
 		<guid>62ef5f1f-8eca-4ef2-8ade-fd4fa604762f</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/IceHockeyNeckGuard.xml</path>
+		<guid>9842be85-d579-4be4-bab3-6a31c233c2d4</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Socks_Heavy.xml</path>
+		<guid>6d9f4838-ed93-449a-9603-4b43e630b5b8</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Shirt_PoliceBlue.xml</path>
+		<guid>c87c06e9-15c3-4667-807f-7bec508f1405</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Trousers_Police.xml</path>
+		<guid>01cfabba-f1eb-4d18-8259-2dca4d0af8e5</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Vest_BulletPolice.xml</path>
+		<guid>d234e3b1-4e68-41b9-a48c-5669a8a52629</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Hat_RiotHelmet.xml</path>
+		<guid>6f664a5b-9789-41e8-ad68-143ebe03399a</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Gloves_LeatherGloves.xml</path>
+		<guid>2b0756ac-57f3-415e-bfed-24b28d1ca4d6</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Holster_Black.xml</path>
+		<guid>f25bba7d-5935-44a6-8e1f-e8a7befca172</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/ElbowPad_Left_Tactical.xml</path>
+		<guid>087cf3d7-ed2f-495d-a646-74a54e537614</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Shoes_BlackBoots.xml</path>
+		<guid>2717dfdb-49ef-401a-9715-c4487ce6abea</guid>
+	</files>
+	<!-- [J&G] SWAT Uniform items (brute PongDuMutant_02). The files live in that mod, not here. Same GUIDs as its own table;
+	     only resolved when PongDuMutant_02 is worn, and PongDuMutantId picks the fallback outfit PongDuMutant_07 when the mod is absent. -->
+	<files>
+		<path>media/clothing/clothingItems/SWAT_Helmet_Rook_FaceShield.xml</path>
+		<guid>ffc10548-5b8d-4792-92d5-2647dabb279d</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/SWAT_Balaclava.xml</path>
+		<guid>8b42f5ee-fe7d-4429-bd31-e711c092cb6b</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/SWAT_Jacket.xml</path>
+		<guid>7709bcf4-9b00-439c-94e7-b662ebe871c2</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/SWAT_LightVest.xml</path>
+		<guid>1e3c11da-63ae-4891-968a-6a2ca7d1ea0d</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/SWAT_ShoulderPads_Patriot.xml</path>
+		<guid>36fc1ad2-9bfa-4ce9-b9b8-33cc7a31e277</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/SWAT_Elbow_Pads.xml</path>
+		<guid>490f55ff-01c9-4482-8d6e-9f151e636f75</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/SWAT_Gloves.xml</path>
+		<guid>6a6c6a46-3360-40cf-80f4-c35088352563</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/SWAT_Pants_Tuck.xml</path>
+		<guid>41e01148-c05b-4cfe-b0b7-da9606e7d097</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/SWAT_Thigh_Pads.xml</path>
+		<guid>131ed10d-91a3-4308-a22a-08bfab7649f0</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/SWAT_KneePads_Defender.xml</path>
+		<guid>e8bbdc83-4cee-47fa-9615-b8a24427a04e</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/SWAT_Boots.xml</path>
+		<guid>8e8274c7-61b3-4f1c-a1ce-50f1fb79f1a7</guid>
 	</files>
 </fileGuidTable>
