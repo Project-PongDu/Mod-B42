@@ -217,6 +217,50 @@ local function logDressOnce(zombie, kind, md)
         .. " items=" .. table.concat(names, ","))
 end
 
+-- 슬래머 근육 상체 피부색 맞추기. 근육 옷 텍스처는 textureChoices 12장(바닐라 좀비 피부
+-- M_ZedBody0{1~4}_level{1~3} 순서)에서 무작위로 골라져 얼굴 피부와 무관하다
+-- (ModelInstanceTextureCreator.addClothingItem -> ItemVisual.getTextureChoice).
+-- 옷을 입은 뒤 한 번, 좀비 피부 텍스처 이름에 맞는 번호로 바꾸고 다시 그린다.
+-- 번호 = (톤-1)*3 + (부패단계-1). 객체 재사용 시 modData 가 지워지므로 다시 입으면 다시 맞춘다.
+local MUSCLE_ITEM = "PongDu_MuscleUpper_M"
+local function matchSlammerSkin(zombie, md)
+    if md["PuppetSkinMatched"] then return end
+    if zombie:isUsingWornItems() then                   -- tintTracerGrey 와 같은 이유로 건드리지 않는다
+        md["PuppetSkinMatched"] = true
+        print("[PuppetMutant] slammer skin match skipped (worn-items mode) zid=" .. tostring(zombie:getOnlineID()))
+        return
+    end
+    if not zombie:isPersistentOutfitInit() then return end   -- 아직 옷을 안 입었다
+    md["PuppetSkinMatched"] = true
+    local hv = zombie:getHumanVisual()
+    local skin = hv and hv:getSkinTexture() or nil
+    local tone, level = string.match(tostring(skin), "ZedBody0(%d)_level(%d)")
+    tone = tonumber(tone)
+    level = tonumber(level)
+    if not tone or not level or tone < 1 or tone > 4 or level < 1 or level > 3 then
+        print("[PuppetMutant] slammer skin match failed skin=" .. tostring(skin)
+            .. " zid=" .. tostring(zombie:getOnlineID()))
+        return
+    end
+    local idx = (tone - 1) * 3 + (level - 1)
+    local iv = zombie:getItemVisuals()
+    local found, changed = 0, 0
+    for i = 0, (iv and iv:size() or 0) - 1 do
+        local v = iv:get(i)
+        if v and v:getClothingItemName() == MUSCLE_ITEM then
+            found = found + 1
+            if v:getTextureChoice() ~= idx then
+                v:setTextureChoice(idx)
+                changed = changed + 1
+            end
+        end
+    end
+    if changed > 0 then zombie:resetModel() end
+    print("[PuppetMutant] slammer skin=" .. tostring(skin) .. " choice=" .. tostring(idx)
+        .. " found=" .. tostring(found) .. " changed=" .. tostring(changed)
+        .. " zid=" .. tostring(zombie:getOnlineID()))
+end
+
 -- ── 1회 초기화 (클라별) ───────────────────────────────────────────────────────
 -- 스탯류는 매 틱 재적용하면 안 되는 것들이라 PuppetMutantInit 애님 변수로
 -- 가드. 변수는 좀비가 스트림 아웃되면 리셋 -> 다시 로드될 때 자동 재초기화.
@@ -1056,6 +1100,7 @@ local function applyMutant(zombie)
     end
     logDressOnce(zombie, kind, md)
     if kind == "tracer" then tintTracerGrey(zombie, md) end
+    if kind == "slammer" then matchSlammerSkin(zombie, md) end
     if kind == "screamer" then
         updateScreamer(zombie)
     elseif kind == "brute" then

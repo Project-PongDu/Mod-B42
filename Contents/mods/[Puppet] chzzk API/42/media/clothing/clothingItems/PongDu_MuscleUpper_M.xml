@@ -14,5 +14,16 @@
 	<m_Masks>4</m_Masks>
 	<m_Masks>5</m_Masks>
 	<m_Masks>6</m_Masks>
-	<textureChoices>PongDu\MuscleUpper_M</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_01_1</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_01_2</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_01_3</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_02_1</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_02_2</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_02_3</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_03_1</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_03_2</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_03_3</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_04_1</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_04_2</textureChoices>
+	<textureChoices>PongDu\MuscleUpper_M_04_3</textureChoices>
 </clothingItem>
