@@ -575,8 +575,7 @@ end)
 -- 바닐라는 시체 인벤토리에서 착용 아이템이 빠지면 ItemContainer.DoRemoveItem -> IsoDeadBody.checkClothing 으로
 -- 착용 슬롯에서도 빼 다시 그린다. 루팅되는 건 바닐라 방독면이고 시체가 입은 건 장식이라,
 -- 표식 달린 바닐라 방독면이 시체에서 나가면 같은 시체의 장식도 같이 뺀다.
--- ISTransferAction.transferItem 은 SP 에선 로컬, MP 에선 서버에서만 돈다 (ISInventoryTransferAction:perform).
--- MP 제거는 바닐라 루팅과 같은 DoRemoveItem + sendRemoveItemFromContainer 경로라 클라 시체도 같이 벗겨진다.
+-- ISTransferAction.transferItem 은 SP 에서만 돈다. MP 는 서버 자바 트랜잭션이 이동을 처리하므로 아래 MaskLooted 명령으로 처리한다.
 local function removeCosmeticMask(container)
     local items = container:getItems()
     for i = items:size() - 1, 0, -1 do
@@ -613,7 +612,7 @@ end
 
 -- ── MP: 클라가 알려 준 시체 방독면 루팅 ───────────────────────────────────────
 -- MP 의 아이템 이동은 서버 자바(Transaction.updateItem)가 처리해 위 ISTransferAction 훅을 거치지 않는다.
--- 클라가 시체에서 바닐라 방독면을 옮긴 뒤 칸 좌표를 보내면(PongDuSlammerLootClient.lua),
+-- 클라가 시체에서 바닐라 방독면을 옮긴 뒤 칸 좌표를 보내면(PongDuMutantLootClient.lua),
 -- 그 칸의 시체 중 장식 방독면은 있는데 표식 달린 바닐라 방독면이 더는 없는 시체의 장식을 뺀다.
 local LOOT_NET = "PongDuSlammerLoot"
 
