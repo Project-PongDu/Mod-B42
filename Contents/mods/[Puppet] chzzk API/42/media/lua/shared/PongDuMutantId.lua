@@ -253,6 +253,7 @@ M.FIXED_HAIR = {
     slammer  = { maleHaircut = "Bald:100", beard = "null:100" },
     screamer = { femaleHaircut = "Bald:100" },
     roach    = { maleHaircut = "CrewCut:100", beard = "null:100" },   -- 안전모(ChanceToFall 없음)에 거의 가려진다
+    brute    = { maleHaircut = "Bald:100", femaleHaircut = "Bald:100" },   -- 성별 50%라 남녀 모두 대머리. 수염은 그대로
 }
 
 local function registerFixedHair()
@@ -261,18 +262,25 @@ local function registerFixedHair()
         M.log("WARNING HairOutfitDefinitions.haircutOutfitDefinition missing, fixed hair not registered")
         return
     end
+    -- 종류의 모든 슬롯에 등록한다(브루트는 기본 02 + 폴백 07). outfitOf 는 모드 판정 결과를 캐시하므로
+    -- 아이템 스크립트가 다 읽히기 전인 여기서는 부르지 않는다.
     for kind, def in pairs(M.FIXED_HAIR) do
-        local outfit = M.outfitOf(kind)
-        local found = false
-        for i = 1, #defs do
-            if defs[i] and defs[i].outfit == outfit then found = true end
-        end
-        if outfit and not found then
-            table.insert(defs, { outfit = outfit, femaleHaircut = def.femaleHaircut,
-                maleHaircut = def.maleHaircut, beard = def.beard })
-            M.log("fixed hair registered outfit=" .. outfit .. " femaleHaircut=" .. tostring(def.femaleHaircut)
-                .. " maleHaircut=" .. tostring(def.maleHaircut)
-                .. " beard=" .. tostring(def.beard))
+        for slot, k in pairs(M.SLOT_KIND) do
+            if k == kind then
+                local outfit = M.OUTFIT_PREFIX .. slot
+                local found = false
+                for i = 1, #defs do
+                    if defs[i] and defs[i].outfit == outfit then found = true end
+                end
+                if not found then
+                    table.insert(defs, { outfit = outfit, femaleHaircut = def.femaleHaircut,
+                        maleHaircut = def.maleHaircut, beard = def.beard })
+                    M.log("fixed hair registered outfit=" .. outfit .. " kind=" .. kind
+                        .. " femaleHaircut=" .. tostring(def.femaleHaircut)
+                        .. " maleHaircut=" .. tostring(def.maleHaircut)
+                        .. " beard=" .. tostring(def.beard))
+                end
+            end
         end
     end
 end
