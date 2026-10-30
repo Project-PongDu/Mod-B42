@@ -158,7 +158,8 @@ end
 -- 아웃핏 XML 에는 색 지정 항목이 없어(ClothingItemReference: 확률·GUID·하위아이템뿐) 클라가 칠한다.
 -- 좀비가 다시 만들어질 때마다 아웃핏 시드대로 색이 돌아오지만 그때마다 다시 칠한다.
 -- 운동화·더플백은 무작위 색 그대로 둔다. 시체 쪽 색은 서버가 맞춘다(PongDuTracerServer.lua).
--- ImmutableColor.new 는 int/float 오버로드가 겹쳐 decode(String) 로 만든다 (0xb3206f = 마젠타).
+-- ImmutableColor.new 는 int/float 오버로드가 겹쳐 decode(String) 로 만든다.
+-- decode 는 0xBBGGRR 순서다(ImmutableColor(int): 상위 바이트가 파랑) -> 마젠타 #b3206f 는 "0x6f20b3".
 local TINT_TRACER = nil
 local TRACER_TINT_ITEMS = { HoodieUP_WhiteTINT = true }
 
@@ -177,7 +178,7 @@ local function tintTracer(zombie, md)
         return
     end
     if not zombie:isPersistentOutfitInit() then return end   -- 아직 옷을 안 입었다
-    if not TINT_TRACER then TINT_TRACER = ImmutableColor.decode("0xb3206f") end
+    if not TINT_TRACER then TINT_TRACER = ImmutableColor.decode("0x6f20b3") end
     local iv = zombie:getItemVisuals()
     if not iv then return end
     md["PuppetTracerTinted"] = true

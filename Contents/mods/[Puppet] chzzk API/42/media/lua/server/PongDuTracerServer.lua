@@ -11,7 +11,7 @@ if isClient() then return end
 
 local LOG = "[PongDu][TracerServer] "
 local HOODIE = "HoodieUP_WhiteTINT"
-local HOODIE_HEX = "0xb3206f"   -- mutantspawn.lua 와 같은 값
+local HOODIE_HEX = "0x6f20b3"   -- 마젠타 #b3206f. decode 는 0xBBGGRR 순서. mutantspawn.lua 와 같은 값
 local _hoodieColor = nil
 
 Events.OnZombieDead.Add(function(z)
