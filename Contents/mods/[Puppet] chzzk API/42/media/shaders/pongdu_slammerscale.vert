@@ -5,7 +5,7 @@
 // Per vertex the scale is blended by the weight on upper bones; the waist band stays at 1.0
 // so it matches vanilla jeans and legs. Used by m_Shader on slammer clothing items only.
 // Bone indices follow the Human skeleton (Skinned/MaleBody.x frame order): 4=Spine1 .. 19=BackPack.
-const float PONGDU_SCALE = 1.2;
+const float PONGDU_SCALE = 1.1;
 const int PONGDU_SPINE1 = 4;
 const int PONGDU_UPPER_FIRST = 4;
 const int PONGDU_UPPER_LAST = 19;

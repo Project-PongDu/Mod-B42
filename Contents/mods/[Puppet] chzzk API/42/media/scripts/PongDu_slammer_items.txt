@@ -32,7 +32,7 @@ module t3chzzkDonation
         hidden = true,
     }
 
-    /* 슬래머 상체 1.2배 외형. 셰이더 pongdu_slammerscale 은 상체 뼈(Spine1 이하)에 붙은 정점만 키우므로
+    /* 슬래머 상체 1.1배 외형. 셰이더 pongdu_slammerscale 은 상체 뼈(Spine1 이하)에 붙은 정점만 키우므로
        근육 상체·방독면과 함께 머리도 옷으로 입힌다 (바닐라 몸의 머리·발 부분, 회색 피부. 발은 셰이더에서 1.0배).
        하체는 바닐라 몸과 바닐라 청바지(Base.Trousers_Denim) 그대로라 시체에서 청바지를 벗기면 바닐라처럼 벗겨진다. */
     item PongDuSlammerBody_M

@@ -551,7 +551,7 @@ Events.OnTick.Add(function()
 end)
 
 -- ── 루팅용 바닐라 방독면 ────────────────────────────────────────────────────
--- 슬래머 방독면은 상체 1.2배 셰이더용 숨김 장식(PongDuSlammerGasMask)이라 루팅창에 안 보인다.
+-- 슬래머 방독면은 상체 1.1배 셰이더용 숨김 장식(PongDuSlammerGasMask)이라 루팅창에 안 보인다.
 -- 죽을 때 바닐라 Base.Hat_GasMask 를 인벤토리에 넣고 표식(modData)을 단다. 청바지는 바닐라를 그대로 입으므로 손대지 않는다.
 -- IsoZombie.onKilled (서버/SP): DoZombieInventory(입은 옷 -> 인벤토리) -> OnZombieDead -> DoDeath(시체로 이동).
 -- MP 에선 서버 시체 인벤토리가 DeadZombiePacket 으로 클라에 간다.
