@@ -27,4 +27,18 @@ module t3chzzkDonation
         WorldRender = false,
         hidden = true,
     }
+
+    /* 로치 반면형 마스크. 바닐라 Hat_BuildersRespirator 와 같은 모델·텍스처.
+       바닐라는 ChanceToFall = 10 이라 맞거나 밀치면 떨어지지만(IsoZombie.helmetFallFromVisuals 는
+       ChanceToFall > 0 인 옷만 떨어뜨린다) 이 장식엔 없어서 안 떨어진다.
+       숨김 장식이라 루팅창에 안 보이고, 죽을 때 서버가 바닐라 마스크를 따로 넣는다 (PongDuMutantLoot.lua). */
+    item PongDuRoachRespirator
+    {
+        DisplayCategory = ZedDmg,
+        ItemType = base:clothing,
+        BodyLocation = base:zeddmg,
+        ClothingItem = PongDu_RoachRespirator,
+        WorldRender = false,
+        hidden = true,
+    }
 }

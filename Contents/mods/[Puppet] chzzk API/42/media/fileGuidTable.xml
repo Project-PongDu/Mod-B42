@@ -21,6 +21,10 @@
 		<guid>f7419994-b8a5-5057-8dd7-5403e4b362f6</guid>
 	</files>
 	<files>
+		<path>media/clothing/clothingItems/PongDu_RoachRespirator.xml</path>
+		<guid>6b808302-2c38-5acb-9a2d-940601219e25</guid>
+	</files>
+	<files>
 		<path>media/clothing/clothingItems/PongDu_MuscleUpper_M.xml</path>
 		<guid>27b65a91-181e-5faa-9166-c23789780fcb</guid>
 	</files>
@@ -105,10 +109,6 @@
 	<files>
 		<path>media/clothing/clothingItems/Hat_HardHat.xml</path>
 		<guid>523b2893-137b-44bc-b3f6-ba2c9d42d488</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/Hat_BuildersRespirator.xml</path>
-		<guid>ab824ec6-ac00-47b3-a613-89d8456e2333</guid>
 	</files>
 	<files>
 		<path>media/clothing/clothingItems/Bag_Satchel.xml</path>
