@@ -42,6 +42,7 @@ for slot, kind in pairs(M.SLOT_KIND) do M.KIND_SLOT[kind] = slot end
 M.FEMALE_CHANCE = {
     screamer = 100,   -- 전신화상 환자 (환자복 + 전신 붕대)
     slammer  = 0,     -- 근육 상체 + 청바지 (남성 몸 전용 외형)
+    roach    = 0,     -- 공사장 인부 (피투성이 남성 피부 + 남성 몸통 크롤러 메시만 맞춤)
 }
 
 M.DONOR_KEY  = "PongDuMutantDonors"
@@ -139,6 +140,7 @@ end
 M.FIXED_HAIR = {
     slammer  = { maleHaircut = "Bald:100", beard = "null:100" },
     screamer = { femaleHaircut = "Bald:100" },
+    roach    = { maleHaircut = "CrewCut:100", beard = "null:100" },   -- 안전모(ChanceToFall 없음)에 거의 가려진다
 }
 
 local function registerFixedHair()
@@ -171,6 +173,7 @@ registerFixedHair()
 M.FIXED_SKIN = {
     slammer  = "PongDu_SlammerGrey_M",
     screamer = "PongDu_ScreamerBurn_F",   -- 전신 화상 붕대 + 양눈 가림 + 입술 없는 이빨 (여성 UV, 바닐라 F_ZedBody 알파 유지)
+    roach    = "PongDu_RoachBlood_M",     -- 피투성이: 손·전완(반팔 밖) 끌린 피, 목 흘러내린 피, 몸통은 허리 쪽으로 흠뻑 (M_ZedBody02_level2 기반, 알파 유지)
 }
 
 --- 고정 피부가 있는 종류면 넣는다. 반환: 바뀌었으면 true

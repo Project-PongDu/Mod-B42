@@ -1911,7 +1911,19 @@
 			<itemGUID>f7419994-b8a5-5057-8dd7-5403e4b362f6</itemGUID>
 		</m_items>
 		<m_items>
-			<itemGUID>903c06ea-78e7-4f42-a3da-768be61f216f</itemGUID>
+			<itemGUID>e4ec9087-006d-41dc-81f4-585b6d2e958c</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>8aff3b6a-08aa-425e-be41-e41ebe198a11</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>523b2893-137b-44bc-b3f6-ba2c9d42d488</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>ab824ec6-ac00-47b3-a613-89d8456e2333</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>f8988b1c-04bb-4b9a-8656-851d324d2fd0</itemGUID>
 		</m_items>
 	</m_FemaleOutfits>
 	<m_FemaleOutfits>
@@ -2488,7 +2500,19 @@
 			<itemGUID>ce57c3a7-ac75-5762-9ef6-9e838fe9a671</itemGUID>
 		</m_items>
 		<m_items>
-			<itemGUID>903c06ea-78e7-4f42-a3da-768be61f216f</itemGUID>
+			<itemGUID>e4ec9087-006d-41dc-81f4-585b6d2e958c</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>8aff3b6a-08aa-425e-be41-e41ebe198a11</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>523b2893-137b-44bc-b3f6-ba2c9d42d488</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>ab824ec6-ac00-47b3-a613-89d8456e2333</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>f8988b1c-04bb-4b9a-8656-851d324d2fd0</itemGUID>
 		</m_items>
 	</m_MaleOutfits>
 	<m_MaleOutfits>
@@ -2698,4 +2722,4 @@
 			<itemGUID>51851e1a-3c3d-473d-8894-8cde0770b645</itemGUID>
 		</m_items>
 	</m_MaleOutfits>
-</outfitManager>
+</outfitManager>
