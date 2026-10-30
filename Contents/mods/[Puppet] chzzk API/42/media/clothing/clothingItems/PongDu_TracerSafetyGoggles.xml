@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<clothingItem>
+	<m_MaleModel>static\clothes\m_glasses_safetygoggles</m_MaleModel>
+	<m_FemaleModel>static\clothes\f_glasses_safetygoggles</m_FemaleModel>
+	<m_GUID>6eeba79e-e2ce-5239-9fec-d280011e4f9d</m_GUID>
+	<m_Static>true</m_Static>
+	<m_AllowRandomHue>false</m_AllowRandomHue>
+	<m_AllowRandomTint>false</m_AllowRandomTint>
+	<m_AttachBone>Bip01_Head</m_AttachBone>
+	<m_MasksFolder>none</m_MasksFolder>
+	<textureChoices>skigoggles_safety</textureChoices>
+</clothingItem>

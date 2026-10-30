@@ -154,42 +154,43 @@ local function mutantHealth(kind)
     return opt:getValue()
 end
 
--- 트레이서 발라클라바·돈가방 고정 회색. 두 아이템은 무작위 착색(m_AllowRandomTint=true)이고
+-- 트레이서 후드티 고정 마젠타. 후드티(HoodieUP_WhiteTINT)는 무작위 착색(m_AllowRandomTint=true)이고
 -- 아웃핏 XML 에는 색 지정 항목이 없어(ClothingItemReference: 확률·GUID·하위아이템뿐) 클라가 칠한다.
--- 좀비가 다시 만들어질 때마다 아웃핏 시드대로 색이 돌아오지만 initMutant 가 그때마다 다시 칠한다.
--- ImmutableColor.new 는 int/float 오버로드가 겹쳐 decode(String) 로 만든다 (0x737373 = 0.45 회색).
-local TINT_GREY = nil
-local TRACER_GREY_ITEMS = { Hat_BalaclavaFull = true, Bag_MoneyBag = true }
+-- 좀비가 다시 만들어질 때마다 아웃핏 시드대로 색이 돌아오지만 그때마다 다시 칠한다.
+-- 운동화·더플백은 무작위 색 그대로 둔다. 시체 쪽 색은 서버가 맞춘다(PongDuTracerServer.lua).
+-- ImmutableColor.new 는 int/float 오버로드가 겹쳐 decode(String) 로 만든다 (0xb3206f = 마젠타).
+local TINT_TRACER = nil
+local TRACER_TINT_ITEMS = { HoodieUP_WhiteTINT = true }
 
 -- 클라는 좀비 옷을 모델이 처음 붙을 때 입힌다(ModelManager.dressInRandomOutfit:555~561,
 -- isPersistentOutfitInit=false 일 때 dressInPersistentOutfitID). 스폰 직후 첫 틱엔 itemVisuals 가
 -- 비어 있어(2026-10-30 로그: init 시 visuals=0, tracer grey tinted=0) 옷을 입은 뒤에 칠해야 한다.
 -- 그래서 initMutant 가 아니라 매 틱 부르고, 입은 뒤 한 번 칠하면 modData 표시로 멈춘다.
 -- 객체 재사용(resetForReuse)은 modData 와 옷을 같이 지우므로 다시 입으면 다시 칠한다.
-local function tintTracerGrey(zombie, md)
+local function tintTracer(zombie, md)
     if md["PuppetTracerTinted"] then return end
     -- 착용 아이템 모드(강령술 fakeDead 부활 등)에서 getItemVisuals() 를 부르면 좀비 자신의
     -- itemVisuals 를 wornItems 로 덮어써 옷이 지워진다(IsoZombie.java:4709~4725) -> 건너뛴다.
     if zombie:isUsingWornItems() then
         md["PuppetTracerTinted"] = true
-        print("[PuppetMutant] tracer grey skipped (worn-items mode) zid=" .. tostring(zombie:getOnlineID()))
+        print("[PuppetMutant] tracer tint skipped (worn-items mode) zid=" .. tostring(zombie:getOnlineID()))
         return
     end
     if not zombie:isPersistentOutfitInit() then return end   -- 아직 옷을 안 입었다
-    if not TINT_GREY then TINT_GREY = ImmutableColor.decode("0x737373") end
+    if not TINT_TRACER then TINT_TRACER = ImmutableColor.decode("0xb3206f") end
     local iv = zombie:getItemVisuals()
     if not iv then return end
     md["PuppetTracerTinted"] = true
     local n = 0
     for i = 0, iv:size() - 1 do
         local v = iv:get(i)
-        if v and TRACER_GREY_ITEMS[v:getClothingItemName()] then
-            v:setTint(TINT_GREY)
+        if v and TRACER_TINT_ITEMS[v:getClothingItemName()] then
+            v:setTint(TINT_TRACER)
             n = n + 1
         end
     end
     if n > 0 then zombie:resetModel() end
-    print("[PuppetMutant] tracer grey tinted=" .. tostring(n) .. " of " .. tostring(iv:size())
+    print("[PuppetMutant] tracer tinted=" .. tostring(n) .. " of " .. tostring(iv:size())
         .. " zid=" .. tostring(zombie:getOnlineID()))
 end
 
@@ -1080,7 +1081,7 @@ local function applyMutant(zombie)
         end
     end
     logDressOnce(zombie, kind, md)
-    if kind == "tracer" then tintTracerGrey(zombie, md) end
+    if kind == "tracer" then tintTracer(zombie, md) end
     applyFixedSkin(zombie, kind, md)
     if kind == "screamer" then
         updateScreamer(zombie)

@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<clothingItem>
+	<m_GUID>9a0f517e-bdff-5634-8560-96682b8d7702</m_GUID>
+	<m_MaleModel>media\models_X\Static\Clothes\M_Glasses_Oakley.x</m_MaleModel>
+	<m_FemaleModel>media\models_X\Static\Clothes\F_Glasses_Oakley.x</m_FemaleModel>
+	<m_AltMaleModel></m_AltMaleModel>
+	<m_AltFemaleModel></m_AltFemaleModel>
+	<m_Static>true</m_Static>
+	<m_AllowRandomHue>false</m_AllowRandomHue>
+	<m_AllowRandomTint>false</m_AllowRandomTint>
+	<m_AttachBone>Bip01_Head</m_AttachBone>
+	<m_MasksFolder>none</m_MasksFolder>
+	<textureChoices>glasses_oakley_sun_blue</textureChoices>
+	<textureChoices>glasses_oakley_sun_purple</textureChoices>
+</clothingItem>

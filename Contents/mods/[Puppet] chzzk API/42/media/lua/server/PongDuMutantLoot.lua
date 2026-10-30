@@ -7,6 +7,7 @@
 -- 표식 달린 바닐라 아이템을 시체에서 꺼내면 같은 시체의 장식도 빼서 벗겨지는 연출을 맞춘다.
 --
 -- 새 특좀 장비를 이 방식으로 고정하려면 COSMETIC_LOOT 에 한 줄 추가 + 장식 의류(xml·스크립트·GUID)를 만든다.
+-- ifWorn = true 인 항목은 그 장식을 실제로 입었을 때만 지급한다 (아웃핏 subItems 로 여럿 중 하나를 고르는 장비용).
 -- 슬래머 방독면은 상체 확대 셰이더가 걸린 장식이라 PongDuSlammerServer.lua 가 같은 방식으로 따로 처리한다.
 --
 -- 호출 순서: IsoZombie.onKilled (서버/SP) -> DoZombieInventory(입은 옷 -> 인벤토리) -> OnZombieDead -> DoDeath.
@@ -22,6 +23,13 @@ local COSMETIC_LOOT = {
     roach = {
         { loot = "Base.Hat_BuildersRespirator", cosmetic = "t3chzzkDonation.PongDuRoachRespirator" },
     },
+    -- 트레이서: 방진 마스크 + 고글 3종 중 하나 (PongDu_tracer_items.txt)
+    tracer = {
+        { loot = "Base.Hat_BuildersRespirator", cosmetic = "t3chzzkDonation.PongDuTracerRespirator" },
+        { loot = "Base.Glasses_SafetyGoggles",  cosmetic = "t3chzzkDonation.PongDuTracerSafetyGoggles", ifWorn = true },
+        { loot = "Base.Glasses_SkiGoggles",     cosmetic = "t3chzzkDonation.PongDuTracerSkiGoggles",    ifWorn = true },
+        { loot = "Base.Glasses_Macho",          cosmetic = "t3chzzkDonation.PongDuTracerMacho",         ifWorn = true },
+    },
 }
 
 Events.OnZombieDead.Add(function(z)
@@ -36,10 +44,14 @@ Events.OnZombieDead.Add(function(z)
     end
     for i = 1, #list do
         local e = list[i]
-        local it = inv:AddItem(e.loot)
-        if it then it:getModData()[LOOT_TAG] = e.cosmetic end
-        print(LOG .. "loot added kind=" .. tostring(kind) .. " item=" .. e.loot
-            .. " ok=" .. tostring(it ~= nil) .. " zid=" .. tostring(z:getOnlineID()))
+        if e.ifWorn and not inv:containsType(e.cosmetic) then
+            -- 이 좀비는 다른 하위 항목을 골랐다
+        else
+            local it = inv:AddItem(e.loot)
+            if it then it:getModData()[LOOT_TAG] = e.cosmetic end
+            print(LOG .. "loot added kind=" .. tostring(kind) .. " item=" .. e.loot
+                .. " ok=" .. tostring(it ~= nil) .. " zid=" .. tostring(z:getOnlineID()))
+        end
     end
 end)
 

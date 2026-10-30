@@ -1929,22 +1929,58 @@
 		<m_AllowTopTint>false</m_AllowTopTint>
 		<m_AllowTShirtDecal>false</m_AllowTShirtDecal>
 		<m_items>
-			<itemGUID>22c8fd40-4c25-4e82-9353-f70aa582611a</itemGUID>
+			<itemGUID>dd89d7f8-3841-5b73-9512-bcbdcc453c88</itemGUID>
 		</m_items>
 		<m_items>
-			<itemGUID>9e094ca7-29b4-4c7d-ae70-597fa4c8a330</itemGUID>
+			<itemGUID>6eeba79e-e2ce-5239-9fec-d280011e4f9d</itemGUID>
+			<subItems>
+				<itemGUID>1e9d88d6-ba46-51cc-b8c2-a4c38cbb3325</itemGUID>
+			</subItems>
+			<subItems>
+				<itemGUID>9a0f517e-bdff-5634-8560-96682b8d7702</itemGUID>
+			</subItems>
 		</m_items>
 		<m_items>
-			<itemGUID>d3481027-59dc-42ac-9e66-8cc2ba1f66a4</itemGUID>
+			<itemGUID>623c97c5-49f2-4763-bafb-549a881d6495</itemGUID>
 		</m_items>
 		<m_items>
-			<itemGUID>096acc98-7ac1-4867-82dd-af77afb6a87b</itemGUID>
+			<itemGUID>cee1cfd4-8409-4ea0-8cd8-c826812a7161</itemGUID>
 		</m_items>
 		<m_items>
-			<itemGUID>593bea3d-c127-4574-ac1e-2197dc56e486</itemGUID>
+			<itemGUID>229b23f6-8e8f-4f16-837b-4fe950c48bfc</itemGUID>
+			<subItems>
+				<itemGUID>8973893f-f324-4cdb-a32b-43cd0378174f</itemGUID>
+			</subItems>
+			<subItems>
+				<itemGUID>e275bac3-e804-41cb-a80f-c6e54a9ce7f8</itemGUID>
+			</subItems>
 		</m_items>
 		<m_items>
-			<itemGUID>cecf13a1-1f18-481d-9458-b37009a2bb82</itemGUID>
+			<itemGUID>baec3522-a05d-4b62-ac11-24898d50f5f5</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>6fed6e2b-3a72-4bac-aac5-09585984493d</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>1bba5b1a-c6c6-4af7-ab69-43f583007159</itemGUID>
+			<subItems>
+				<itemGUID>86ba9c4a-55fb-409f-8e75-bd3559c6e8c7</itemGUID>
+			</subItems>
+			<subItems>
+				<itemGUID>d1859d8a-1857-4854-9f24-30affdbade34</itemGUID>
+			</subItems>
+		</m_items>
+		<m_items>
+			<itemGUID>469e7fc2-fc7d-4cc7-a634-67c632f26ba8</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>8aa898c9-bf9c-4cd8-aec7-f458863de30b</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>087cf3d7-ed2f-495d-a646-74a54e537614</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>98cc5725-0bba-493e-bb52-b01b9cd3f7a1</itemGUID>
 		</m_items>
 	</m_FemaleOutfits>
 	<m_FemaleOutfits>
@@ -2354,22 +2390,58 @@
 		<m_AllowTopTint>false</m_AllowTopTint>
 		<m_AllowTShirtDecal>false</m_AllowTShirtDecal>
 		<m_items>
-			<itemGUID>22c8fd40-4c25-4e82-9353-f70aa582611a</itemGUID>
+			<itemGUID>dd89d7f8-3841-5b73-9512-bcbdcc453c88</itemGUID>
 		</m_items>
 		<m_items>
-			<itemGUID>9e094ca7-29b4-4c7d-ae70-597fa4c8a330</itemGUID>
+			<itemGUID>6eeba79e-e2ce-5239-9fec-d280011e4f9d</itemGUID>
+			<subItems>
+				<itemGUID>1e9d88d6-ba46-51cc-b8c2-a4c38cbb3325</itemGUID>
+			</subItems>
+			<subItems>
+				<itemGUID>9a0f517e-bdff-5634-8560-96682b8d7702</itemGUID>
+			</subItems>
 		</m_items>
 		<m_items>
-			<itemGUID>d3481027-59dc-42ac-9e66-8cc2ba1f66a4</itemGUID>
+			<itemGUID>623c97c5-49f2-4763-bafb-549a881d6495</itemGUID>
 		</m_items>
 		<m_items>
-			<itemGUID>096acc98-7ac1-4867-82dd-af77afb6a87b</itemGUID>
+			<itemGUID>cee1cfd4-8409-4ea0-8cd8-c826812a7161</itemGUID>
 		</m_items>
 		<m_items>
-			<itemGUID>593bea3d-c127-4574-ac1e-2197dc56e486</itemGUID>
+			<itemGUID>229b23f6-8e8f-4f16-837b-4fe950c48bfc</itemGUID>
+			<subItems>
+				<itemGUID>8973893f-f324-4cdb-a32b-43cd0378174f</itemGUID>
+			</subItems>
+			<subItems>
+				<itemGUID>e275bac3-e804-41cb-a80f-c6e54a9ce7f8</itemGUID>
+			</subItems>
 		</m_items>
 		<m_items>
-			<itemGUID>cecf13a1-1f18-481d-9458-b37009a2bb82</itemGUID>
+			<itemGUID>baec3522-a05d-4b62-ac11-24898d50f5f5</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>6fed6e2b-3a72-4bac-aac5-09585984493d</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>1bba5b1a-c6c6-4af7-ab69-43f583007159</itemGUID>
+			<subItems>
+				<itemGUID>86ba9c4a-55fb-409f-8e75-bd3559c6e8c7</itemGUID>
+			</subItems>
+			<subItems>
+				<itemGUID>d1859d8a-1857-4854-9f24-30affdbade34</itemGUID>
+			</subItems>
+		</m_items>
+		<m_items>
+			<itemGUID>469e7fc2-fc7d-4cc7-a634-67c632f26ba8</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>8aa898c9-bf9c-4cd8-aec7-f458863de30b</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>087cf3d7-ed2f-495d-a646-74a54e537614</itemGUID>
+		</m_items>
+		<m_items>
+			<itemGUID>98cc5725-0bba-493e-bb52-b01b9cd3f7a1</itemGUID>
 		</m_items>
 	</m_MaleOutfits>
 	<m_MaleOutfits>

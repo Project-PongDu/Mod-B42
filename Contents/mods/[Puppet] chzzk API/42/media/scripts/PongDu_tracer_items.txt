@@ -1,0 +1,53 @@
+module t3chzzkDonation
+{
+    imports
+    {
+        Base
+    }
+
+    /* Tracer (PongDuMutant_04) face/eye gear that must not fall off when the zombie is hit.
+       Copies of the vanilla clothing items with new GUIDs. The vanilla items have ChanceToFall
+       (respirator 10, goggles 20) and IsoZombie.helmetFallFromVisuals drops any item with ChanceToFall > 0.
+       These hidden items have none. On death PongDuMutantLoot.lua puts the matching vanilla item
+       into the corpse inventory, and looting that item also removes the hidden copy from the corpse. */
+
+    item PongDuTracerRespirator
+    {
+        DisplayCategory = ZedDmg,
+        ItemType = base:clothing,
+        BodyLocation = base:zeddmg,
+        ClothingItem = PongDu_TracerRespirator,
+        WorldRender = false,
+        hidden = true,
+    }
+
+    item PongDuTracerSafetyGoggles
+    {
+        DisplayCategory = ZedDmg,
+        ItemType = base:clothing,
+        BodyLocation = base:zeddmg,
+        ClothingItem = PongDu_TracerSafetyGoggles,
+        WorldRender = false,
+        hidden = true,
+    }
+
+    item PongDuTracerSkiGoggles
+    {
+        DisplayCategory = ZedDmg,
+        ItemType = base:clothing,
+        BodyLocation = base:zeddmg,
+        ClothingItem = PongDu_TracerSkiGoggles,
+        WorldRender = false,
+        hidden = true,
+    }
+
+    item PongDuTracerMacho
+    {
+        DisplayCategory = ZedDmg,
+        ItemType = base:clothing,
+        BodyLocation = base:zeddmg,
+        ClothingItem = PongDu_TracerMacho,
+        WorldRender = false,
+        hidden = true,
+    }
+}
