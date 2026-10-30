@@ -394,4 +394,8 @@
 		<path>media/clothing/clothingItems/Trousers_Denim.xml</path>
 		<guid>229b23f6-8e8f-4f16-837b-4fe950c48bfc</guid>
 	</files>
+	<files>
+		<path>media/clothing/clothingItems/Hat_GasMask.xml</path>
+		<guid>92efbe27-baa3-4e7f-bc7c-cb4713d23c14</guid>
+	</files>
 </fileGuidTable>
