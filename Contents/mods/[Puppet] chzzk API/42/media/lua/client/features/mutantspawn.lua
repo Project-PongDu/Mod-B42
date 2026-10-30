@@ -217,47 +217,27 @@ local function logDressOnce(zombie, kind, md)
         .. " items=" .. table.concat(names, ","))
 end
 
--- 슬래머 근육 상체 피부색 맞추기. 근육 옷 텍스처는 textureChoices 12장(바닐라 좀비 피부
--- M_ZedBody0{1~4}_level{1~3} 순서)에서 무작위로 골라져 얼굴 피부와 무관하다
--- (ModelInstanceTextureCreator.addClothingItem -> ItemVisual.getTextureChoice).
--- 옷을 입은 뒤 한 번, 좀비 피부 텍스처 이름에 맞는 번호로 바꾸고 다시 그린다.
--- 번호 = (톤-1)*3 + (부패단계-1). 객체 재사용 시 modData 가 지워지므로 다시 입으면 다시 맞춘다.
-local MUSCLE_ITEM = "PongDu_MuscleUpper_M"
-local function matchSlammerSkin(zombie, md)
-    if md["PuppetSkinMatched"] then return end
-    if zombie:isUsingWornItems() then                   -- tintTracerGrey 와 같은 이유로 건드리지 않는다
-        md["PuppetSkinMatched"] = true
-        print("[PuppetMutant] slammer skin match skipped (worn-items mode) zid=" .. tostring(zombie:getOnlineID()))
-        return
-    end
+-- 고정 피부 (PongDuMutantId.FIXED_SKIN, 지금은 슬래머 회색). 옷을 입은 뒤 한 번 피부 텍스처 이름을 바꾸고
+-- 다시 그린다. 근육 상체 옷은 회색 텍스처 한 장뿐이라 따로 고를 것이 없다.
+-- 객체 재사용 시 modData 와 HumanVisual 이 같이 지워지므로 다시 입으면 다시 넣는다.
+local function applyFixedSkin(zombie, kind, md)
+    if md["PuppetSkinFixed"] then return end
+    if not PongDuMutantId.FIXED_SKIN[kind] then return end
     if not zombie:isPersistentOutfitInit() then return end   -- 아직 옷을 안 입었다
-    md["PuppetSkinMatched"] = true
+    md["PuppetSkinFixed"] = true
     local hv = zombie:getHumanVisual()
-    local skin = hv and hv:getSkinTexture() or nil
-    local tone, level = string.match(tostring(skin), "ZedBody0(%d)_level(%d)")
-    tone = tonumber(tone)
-    level = tonumber(level)
-    if not tone or not level or tone < 1 or tone > 4 or level < 1 or level > 3 then
-        print("[PuppetMutant] slammer skin match failed skin=" .. tostring(skin)
+    if not hv then
+        print("[PuppetMutant] fixed skin failed (no HumanVisual) kind=" .. tostring(kind)
             .. " zid=" .. tostring(zombie:getOnlineID()))
         return
     end
-    local idx = (tone - 1) * 3 + (level - 1)
-    local iv = zombie:getItemVisuals()
-    local found, changed = 0, 0
-    for i = 0, (iv and iv:size() or 0) - 1 do
-        local v = iv:get(i)
-        if v and v:getClothingItemName() == MUSCLE_ITEM then
-            found = found + 1
-            if v:getTextureChoice() ~= idx then
-                v:setTextureChoice(idx)
-                changed = changed + 1
-            end
-        end
-    end
-    if changed > 0 then zombie:resetModel() end
-    print("[PuppetMutant] slammer skin=" .. tostring(skin) .. " choice=" .. tostring(idx)
-        .. " found=" .. tostring(found) .. " changed=" .. tostring(changed)
+    local before = hv:getSkinTexture()
+    local changed = PongDuMutantId.applyFixedSkin(zombie, kind)
+    -- SP 에선 서버 스캔이 같은 객체에 이름을 먼저 넣을 수 있다(changed=false). 그때도 모델은 옛 피부로
+    -- 그려졌을 수 있으므로 처음 한 번은 항상 다시 그린다.
+    zombie:resetModel()
+    print("[PuppetMutant] fixed skin kind=" .. tostring(kind) .. " before=" .. tostring(before)
+        .. " now=" .. tostring(hv:getSkinTexture()) .. " changed=" .. tostring(changed)
         .. " hair=" .. tostring(hv:getHairModel()) .. " beard=" .. tostring(hv:getBeardModel())
         .. " zid=" .. tostring(zombie:getOnlineID()))
 end
@@ -1101,7 +1081,7 @@ local function applyMutant(zombie)
     end
     logDressOnce(zombie, kind, md)
     if kind == "tracer" then tintTracerGrey(zombie, md) end
-    if kind == "slammer" then matchSlammerSkin(zombie, md) end
+    applyFixedSkin(zombie, kind, md)
     if kind == "screamer" then
         updateScreamer(zombie)
     elseif kind == "brute" then

@@ -452,6 +452,11 @@ local function scan(tnow)
         if z and not z:isDead() and S.isSlammer(z) then
             seen[z] = true
             byZid[zidOf(z)] = z
+            -- 고정 피부(회색): 서버 HumanVisual 에도 넣어야 서버가 만든 시체·저장본이 같은 피부다.
+            -- 옷을 다시 입으면 이름이 지워지므로 스캔마다 확인한다 (같으면 아무것도 안 함).
+            if PongDuMutantId.applyFixedSkin(z, S.KIND) then
+                print(LOG .. "fixed skin set zid=" .. tostring(zidOf(z)) .. " skin=" .. tostring(z:getHumanVisual():getSkinTexture()))
+            end
             if not _st[z] then
                 _st[z] = { phase = PH.NONE, seq = 0, cooldownUntil = tnow + SPAWN_GRACE_MS, hit = {} }
                 print(LOG .. "tracking slammer zid=" .. tostring(zidOf(z)) .. " state=" .. tostring(S.stateOf(z))

@@ -160,6 +160,25 @@ local function registerFixedHair()
 end
 registerFixedHair()
 
+-- 종류별 고정 피부 텍스처 (media/textures/Body/<이름>.png). 무작위 좀비 피부(M_ZedBody0N_levelL,
+-- 옷 ID 변형 번호 시드) 대신 HumanVisual:setSkinTextureName 으로 덮어쓴다 (getSkinTexture 가 이 이름을 먼저 쓴다).
+-- 옷 ID 로 다시 입히면 HumanVisual.clear 가 이름을 지우므로, 클라(mutantspawn 렌더용)와 서버(시체·저장용)가
+-- 각자 다시 넣는다. 이름은 HumanVisual 직렬화·copyFrom 으로 시체에 따라간다.
+M.FIXED_SKIN = {
+    slammer = "PongDu_SlammerGrey_M",
+}
+
+--- 고정 피부가 있는 종류면 넣는다. 반환: 바뀌었으면 true
+function M.applyFixedSkin(zombie, kind)
+    local name = M.FIXED_SKIN[kind]
+    if not name or not zombie then return false end
+    local hv = zombie:getHumanVisual()
+    if not hv then return false end
+    if hv:getSkinTexture() == name then return false end
+    hv:setSkinTextureName(name)
+    return true
+end
+
 function M.femaleChance(kind)
     return M.FEMALE_CHANCE[kind] or 50
 end
