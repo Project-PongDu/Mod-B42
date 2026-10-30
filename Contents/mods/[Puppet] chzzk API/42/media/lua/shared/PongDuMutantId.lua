@@ -40,7 +40,7 @@ for slot, kind in pairs(M.SLOT_KIND) do M.KIND_SLOT[kind] = slot end
 
 -- 성별 고정 (addZombiesInOutfit femaleChance, 0~100). 없으면 50.
 M.FEMALE_CHANCE = {
-    screamer = 100,   -- 비명 지르는 신부
+    screamer = 100,   -- 전신화상 환자 (환자복 + 전신 붕대)
     slammer  = 0,     -- 근육 상체 + 청바지 (남성 몸 전용 외형)
 }
 
@@ -132,11 +132,13 @@ end
 -- (PersistentOutfits.dressInOutfit -> Outfit.RandomData -> HairOutfitDefinitions
 --  .getRandomMaleHaircut / getRandomBeard). 변형 번호가 후원자 번호라 같은 후원자(또는 후원자 없음)의
 -- 특좀은 머리·수염이 똑같이 나오므로, 종류별로 외형을 아예 고정한다.
--- "Bald" = 바닐라 hairStyles.xml 남성 스타일, 수염 "null" = 빈 이름 = BeardStyles 0번(수염 없음).
+-- "Bald" = 바닐라 hairStyles.xml 스타일(남녀 모두, 바닐라 femaleHaircut 에도 쓰임), 수염 "null" = 빈 이름 = BeardStyles 0번(수염 없음).
+-- 키는 바닐라 정의와 같다: femaleHaircut / maleHaircut / beard (없는 키는 Java initStringChance 가 null 로 둔다).
 -- 클라도 옷 ID 로 직접 입히므로 서버·클라가 같은 정의를 가져야 한다 -> shared 에서 등록.
 -- 정의 표는 Lua 파일을 읽을 때마다 다시 읽힌다(LuaManager: HairOutfitDefinitions.dirty = true).
 M.FIXED_HAIR = {
-    slammer = { maleHaircut = "Bald:100", beard = "null:100" },
+    slammer  = { maleHaircut = "Bald:100", beard = "null:100" },
+    screamer = { femaleHaircut = "Bald:100" },
 }
 
 local function registerFixedHair()
@@ -152,8 +154,10 @@ local function registerFixedHair()
             if defs[i] and defs[i].outfit == outfit then found = true end
         end
         if outfit and not found then
-            table.insert(defs, { outfit = outfit, maleHaircut = def.maleHaircut, beard = def.beard })
-            M.log("fixed hair registered outfit=" .. outfit .. " maleHaircut=" .. tostring(def.maleHaircut)
+            table.insert(defs, { outfit = outfit, femaleHaircut = def.femaleHaircut,
+                maleHaircut = def.maleHaircut, beard = def.beard })
+            M.log("fixed hair registered outfit=" .. outfit .. " femaleHaircut=" .. tostring(def.femaleHaircut)
+                .. " maleHaircut=" .. tostring(def.maleHaircut)
                 .. " beard=" .. tostring(def.beard))
         end
     end
