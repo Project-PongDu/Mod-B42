@@ -610,3 +610,52 @@ if ISTransferAction and ISTransferAction.transferItem then
 else
     print(LOG .. "transfer hook skipped (ISTransferAction missing)")
 end
+
+-- ── MP: 클라가 알려 준 시체 방독면 루팅 ───────────────────────────────────────
+-- MP 의 아이템 이동은 서버 자바(Transaction.updateItem)가 처리해 위 ISTransferAction 훅을 거치지 않는다.
+-- 클라가 시체에서 바닐라 방독면을 옮긴 뒤 칸 좌표를 보내면(PongDuSlammerLootClient.lua),
+-- 그 칸의 시체 중 장식 방독면은 있는데 표식 달린 바닐라 방독면이 더는 없는 시체의 장식을 뺀다.
+local LOOT_NET = "PongDuSlammerLoot"
+
+local function hasMarkedMask(container)
+    local items = container:getItems()
+    for i = 0, items:size() - 1 do
+        local it = items:get(i)
+        if it and it:getFullType() == LOOT_MASK and it:getModData()[LOOT_TAG] == "mask" then return true end
+    end
+    return false
+end
+
+Events.OnClientCommand.Add(function(module, command, player, args)
+    if module ~= LOOT_NET or command ~= "MaskLooted" then return end
+    local who = player and player:getUsername() or "?"
+    local x = tonumber(args and args["x"])
+    local y = tonumber(args and args["y"])
+    local zz = tonumber(args and args["z"])
+    if not x or not y or not zz then
+        print(LOG .. "MaskLooted ignored: bad args from=" .. who)
+        return
+    end
+    if player and (math.abs(player:getX() - x) > 4 or math.abs(player:getY() - y) > 4) then
+        print(LOG .. "MaskLooted ignored: reporter too far from=" .. who)
+        return
+    end
+    local cell = getCell()
+    local sq = cell and cell:getGridSquare(x, y, zz)
+    if not sq then
+        print(LOG .. "MaskLooted ignored: no square " .. x .. "," .. y .. "," .. zz .. " from=" .. who)
+        return
+    end
+    local bodies = sq:getDeadBodys()
+    local n, removed = 0, 0
+    for i = 0, bodies:size() - 1 do
+        local b = bodies:get(i)
+        local c = b and b:getContainer()
+        if c then
+            n = n + 1
+            if not hasMarkedMask(c) and removeCosmeticMask(c) then removed = removed + 1 end
+        end
+    end
+    print(LOG .. "MaskLooted at " .. x .. "," .. y .. "," .. zz .. " bodies=" .. n .. " cosmeticRemoved=" .. removed
+        .. " by=" .. who)
+end)
