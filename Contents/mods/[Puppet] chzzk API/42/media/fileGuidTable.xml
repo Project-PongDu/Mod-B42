@@ -24,6 +24,10 @@
 		<path>media/clothing/clothingItems/PongDu_MuscleUpper_M.xml</path>
 		<guid>27b65a91-181e-5faa-9166-c23789780fcb</guid>
 	</files>
+	<files>
+		<path>media/clothing/clothingItems/PongDu_SlammerGasMask.xml</path>
+		<guid>7bc6a1a3-ab64-53f0-aca2-7a7890bab925</guid>
+	</files>
 	<!-- Vanilla clothing items used by PongDuMutant_* outfits. B42 prefixes mod outfit item GUIDs with the mod ID
 	     (ClothingItemReference.setModID), so vanilla GUIDs must also be registered in this mod's table. -->
 	<files>
@@ -393,9 +397,5 @@
 	<files>
 		<path>media/clothing/clothingItems/Trousers_Denim.xml</path>
 		<guid>229b23f6-8e8f-4f16-837b-4fe950c48bfc</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/Hat_GasMask.xml</path>
-		<guid>92efbe27-baa3-4e7f-bc7c-cb4713d23c14</guid>
 	</files>
 </fileGuidTable>
