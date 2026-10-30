@@ -169,7 +169,8 @@ registerFixedHair()
 -- 옷 ID 로 다시 입히면 HumanVisual.clear 가 이름을 지우므로, 클라(mutantspawn 렌더용)와 서버(시체·저장용)가
 -- 각자 다시 넣는다. 이름은 HumanVisual 직렬화·copyFrom 으로 시체에 따라간다.
 M.FIXED_SKIN = {
-    slammer = "PongDu_SlammerGrey_M",
+    slammer  = "PongDu_SlammerGrey_M",
+    screamer = "PongDu_ScreamerBurn_F",   -- 전신 화상 붕대 + 양눈 가림 + 입술 없는 이빨 (여성 UV, 바닐라 F_ZedBody 알파 유지)
 }
 
 --- 고정 피부가 있는 종류면 넣는다. 반환: 바뀌었으면 true
@@ -417,6 +418,19 @@ end
 
 -- getAllOutfits 는 ModelManager.create() 를 부른다(이미 만들어졌으면 no-op, 전용 서버는 그래픽 생략).
 -- OnGameBoot(SP 메인 메뉴)에서는 부르지 않고 월드 초기화 때 한 번에 한다.
+-- 서버/SP: 고정 피부 특좀이 죽을 때 시체에도 피부가 따라가게 한다.
+-- IsoZombie.onKilled: DoZombieInventory(옷을 다시 입히면 피부 이름이 지워질 수 있음) -> OnZombieDead -> DoDeath(시체가 HumanVisual 복사).
+-- 슬래머는 PongDuSlammerServer 스캔도 넣지만, 같은 이름이면 applyFixedSkin 이 아무것도 안 한다.
+if not isClient() then
+    Events.OnZombieDead.Add(function(z)
+        local kind = z and M.kindOf(z)
+        if not kind or not M.FIXED_SKIN[kind] then return end
+        if M.applyFixedSkin(z, kind) then
+            M.log("fixed skin set on death kind=" .. kind .. " skin=" .. tostring(z:getHumanVisual():getSkinTexture()))
+        end
+    end)
+end
+
 if not isClient() then
     Events.OnInitGlobalModData.Add(function()
         M.sanitizeZoneDefs()
