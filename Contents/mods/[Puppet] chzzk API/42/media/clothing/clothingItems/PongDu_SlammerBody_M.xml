@@ -13,5 +13,6 @@
 	<m_Masks>0</m_Masks>
 	<m_Masks>8</m_Masks>
 	<m_Masks>10</m_Masks>
+	<m_MasksFolder>none</m_MasksFolder>
 	<textureChoices>Body\PongDu_SlammerGrey_M</textureChoices>
 </clothingItem>
