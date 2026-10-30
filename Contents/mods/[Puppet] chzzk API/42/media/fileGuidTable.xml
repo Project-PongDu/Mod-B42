@@ -39,36 +39,60 @@
 	<!-- Vanilla clothing items used by PongDuMutant_* outfits. B42 prefixes mod outfit item GUIDs with the mod ID
 	     (ClothingItemReference.setModID), so vanilla GUIDs must also be registered in this mod's table. -->
 	<files>
-		<path>media/clothing/clothingItems/WeddingDress.xml</path>
-		<guid>050b77d0-a609-4e90-ac1a-f0733fc77967</guid>
+		<path>media/clothing/clothingItems/Gown_Hospital.xml</path>
+		<guid>ae2071bc-0d47-4041-b0a5-28c8cfa46c05</guid>
 	</files>
 	<files>
-		<path>media/clothing/clothingItems/Hat_WeddingVeil.xml</path>
-		<guid>edf2b504-261e-4baf-9440-48884d80a8bb</guid>
+		<path>media/clothing/clothingItems/Bandage_Head_Blood.xml</path>
+		<guid>2e67a0c0-b92b-4718-a3ee-9af695316b3c</guid>
 	</files>
 	<files>
-		<path>media/clothing/clothingItems/Tshirt_DefaultTEXTURE.xml</path>
-		<guid>e4ec9087-006d-41dc-81f4-585b6d2e958c</guid>
+		<path>media/clothing/clothingItems/Bandage_Neck_Blood.xml</path>
+		<guid>1fef2139-9e59-482d-a1bc-099b760c6211</guid>
 	</files>
 	<files>
-		<path>media/clothing/clothingItems/Apron_Leather.xml</path>
-		<guid>52a9a076-b113-46c8-bb3d-bca1f22bf721</guid>
+		<path>media/clothing/clothingItems/Bandage_LeftUpperArm_Blood.xml</path>
+		<guid>4cb1d07d-b61e-4d9a-ae0a-f0cad4d09774</guid>
 	</files>
 	<files>
-		<path>media/clothing/clothingItems/Hat_WeldersMask.xml</path>
-		<guid>1bd52396-c99d-440a-8f2d-7808ce1cdd57</guid>
+		<path>media/clothing/clothingItems/Bandage_LeftLowerArm.xml</path>
+		<guid>55972242-09e3-4047-b30f-130de2183007</guid>
 	</files>
 	<files>
-		<path>media/clothing/clothingItems/Gloves_LeatherGlovesBrown.xml</path>
-		<guid>349a92a8-e06e-4da0-8c55-172a358e0173</guid>
+		<path>media/clothing/clothingItems/Bandage_LeftHand_Blood.xml</path>
+		<guid>37b4a727-fa87-4a3a-b576-b376be136cb2</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Bandage_RightUpperArm.xml</path>
+		<guid>a9aa0753-b796-46a1-af61-ea7840f4d98a</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Bandage_RightLowerArm_Blood.xml</path>
+		<guid>c2ee53b2-0f53-41fa-a6de-2352c5e04ae4</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Bandage_RightHand.xml</path>
+		<guid>e9816f1b-6ec8-4184-b525-accc1869830e</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Bandage_LeftLowerLeg_Blood.xml</path>
+		<guid>6c069f60-b72f-4ab0-8b02-9258ba5b997e</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Bandage_LeftFoot.xml</path>
+		<guid>ba424745-af45-4b3c-885b-0a835a7c65a7</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Bandage_RightLowerLeg.xml</path>
+		<guid>298c3c08-21f7-48e1-a8de-2601751410b6</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Bandage_RightFoot_Blood.xml</path>
+		<guid>a6936e42-b5cb-4e21-8f7c-7f53c3ad5385</guid>
 	</files>
 	<files>
 		<path>media/clothing/clothingItems/Trousers_Black.xml</path>
 		<guid>d3481027-59dc-42ac-9e66-8cc2ba1f66a4</guid>
-	</files>
-	<files>
-		<path>media/clothing/clothingItems/Shoes_BlackBoots.xml</path>
-		<guid>2717dfdb-49ef-401a-9715-c4487ce6abea</guid>
 	</files>
 	<files>
 		<path>media/clothing/clothingItems/Vest_DefaultTEXTURE.xml</path>
