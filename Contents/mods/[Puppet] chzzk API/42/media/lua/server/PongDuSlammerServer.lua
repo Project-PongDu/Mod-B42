@@ -549,3 +549,39 @@ Events.OnTick.Add(function()
         end
     end
 end)
+
+-- ── 루팅용 바닐라 아이템 ─────────────────────────────────────────────────────
+-- 슬래머가 입은 청바지·방독면은 1.2배 셰이더용 숨김 복사본(PongDuSlammerJeans, PongDuSlammerGasMask)이라
+-- 시체에서 보이지 않는다. 죽을 때 같은 바닐라 아이템(Base.Trousers_Denim, Base.Hat_GasMask)을 인벤토리에 넣어
+-- 플레이어가 루팅하면 원래 크기 바닐라 옷이 되게 한다.
+-- IsoZombie.onKilled (서버/SP): DoZombieInventory(입은 옷 -> 인벤토리) -> OnZombieDead -> DoDeath(시체로 이동).
+-- MP 에선 서버 시체 인벤토리가 DeadZombiePacket 으로 클라에 간다.
+local LOOT_JEANS = "Base.Trousers_Denim"
+local LOOT_MASK  = "Base.Hat_GasMask"
+local COSMETIC_JEANS = "t3chzzkDonation.PongDuSlammerJeans"
+
+Events.OnZombieDead.Add(function(z)
+    if not z or not S.isSlammer(z) then return end
+    local inv = z:getInventory()
+    if not inv then
+        print(LOG .. "loot skipped (no inventory) zid=" .. tostring(zidOf(z)))
+        return
+    end
+    -- 입고 있던 청바지 색(데님/검정/연청)을 그대로 넘긴다. 복사본의 textureChoices 순서는 바닐라와 같다.
+    local choice = -1
+    local items = inv:getItems()
+    for i = 0, items:size() - 1 do
+        local it = items:get(i)
+        if it and it:getFullType() == COSMETIC_JEANS and it:getVisual() then
+            choice = it:getVisual():getTextureChoice()
+        end
+    end
+    local jeans = inv:AddItem(LOOT_JEANS)
+    if jeans and choice >= 0 and jeans:getVisual() then
+        jeans:getVisual():setTextureChoice(choice)
+        jeans:synchWithVisual()
+    end
+    local mask = inv:AddItem(LOOT_MASK)
+    print(LOG .. "loot added zid=" .. tostring(zidOf(z)) .. " jeans=" .. tostring(jeans ~= nil)
+        .. " jeansChoice=" .. tostring(choice) .. " mask=" .. tostring(mask ~= nil))
+end)

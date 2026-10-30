@@ -6,6 +6,7 @@
 	<m_AltMaleModel></m_AltMaleModel>
 	<m_AltFemaleModel></m_AltFemaleModel>
 	<m_Static>true</m_Static>
+	<m_Shader>pongdu_slammerscale</m_Shader>
 	<m_AllowRandomHue>false</m_AllowRandomHue>
 	<m_AllowRandomTint>false</m_AllowRandomTint>
 	<m_AttachBone>Bip01_Head</m_AttachBone>

@@ -30,4 +30,27 @@ module t3chzzkDonation
         WorldRender = false,
         hidden = true,
     }
+
+    /* 슬래머 1.2배 외형 (셰이더 pongdu_slammerscale 이 옷에만 걸리므로 몸 전체를 옷으로 입힌다).
+       바닐라 몸의 머리·발 부분(회색 피부)과 바닐라 청바지 복사본. 둘 다 숨김 장식이라 시체에서 안 보이고,
+       루팅용 바닐라 청바지·방독면은 슬래머가 죽을 때 서버가 따로 넣는다 (PongDuSlammerServer.lua). */
+    item PongDuSlammerBody_M
+    {
+        DisplayCategory = ZedDmg,
+        ItemType = base:clothing,
+        BodyLocation = base:zeddmg,
+        ClothingItem = PongDu_SlammerBody_M,
+        WorldRender = false,
+        hidden = true,
+    }
+
+    item PongDuSlammerJeans
+    {
+        DisplayCategory = ZedDmg,
+        ItemType = base:clothing,
+        BodyLocation = base:zeddmg,
+        ClothingItem = PongDu_SlammerJeans,
+        WorldRender = false,
+        hidden = true,
+    }
 }
