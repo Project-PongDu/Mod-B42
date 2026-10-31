@@ -8,8 +8,6 @@
 --
 -- 새 특좀 장비를 이 방식으로 고정하려면 COSMETIC_LOOT 에 한 줄 추가 + 장식 의류(xml·스크립트·GUID)를 만든다.
 -- ifWorn = true 인 항목은 그 장식을 실제로 입었을 때만 지급한다 (아웃핏 subItems 로 여럿 중 하나를 고르는 장비용).
--- textureOffset = N 인 항목은 지급하는 바닐라 아이템 색(textureChoice)을 장식 색 + N 으로 맞춘다
--- (장식이 바닐라 textureChoices 의 일부만 쓸 때. 색은 옷 ID 시드로 정해져 ItemVisual 에 들어 있다).
 -- 슬래머 방독면은 상체 확대 셰이더가 걸린 장식이라 PongDuSlammerServer.lua 가 같은 방식으로 따로 처리한다.
 --
 -- 호출 순서: IsoZombie.onKilled (서버/SP) -> DoZombieInventory(입은 옷 -> 인벤토리) -> OnZombieDead -> DoDeath.
@@ -24,10 +22,8 @@ local LOOT_TAG = "PongDuMutantLoot"   -- 바닐라 아이템 modData: 같이 뺄
 local COSMETIC_LOOT = {
     roach = {
         { loot = "Base.Hat_BuildersRespirator", cosmetic = "t3chzzkDonation.PongDuRoachRespirator" },
-        -- 형광 조끼: 좀비는 라임 장식, 루팅은 바닐라 노랑 조끼
+        -- 형광 조끼: 좀비는 연두 형광 장식, 루팅은 바닐라 노랑 조끼
         { loot = "Base.Vest_HighViz",           cosmetic = "t3chzzkDonation.PongDuRoachVest" },
-        -- 공사장 헬멧: 장식은 파랑·빨강·흰색(0~2), 바닐라는 노랑·파랑·빨강·흰색(0~3) -> 같은 색으로 +1
-        { loot = "Base.Hat_HardHat",            cosmetic = "t3chzzkDonation.PongDuRoachHardHat", textureOffset = 1 },
     },
     -- 트레이서: 방진 마스크 + 고글 3종 중 하나 (PongDu_tracer_items.txt)
     tracer = {
@@ -37,15 +33,6 @@ local COSMETIC_LOOT = {
         { loot = "Base.Glasses_Macho",          cosmetic = "t3chzzkDonation.PongDuTracerMacho",         ifWorn = true },
     },
 }
-
-local function findType(container, fullType)
-    local items = container:getItems()
-    for i = 0, items:size() - 1 do
-        local it = items:get(i)
-        if it and it:getFullType() == fullType then return it end
-    end
-    return nil
-end
 
 Events.OnZombieDead.Add(function(z)
     if not z or not PongDuMutantId then return end
@@ -64,18 +51,6 @@ Events.OnZombieDead.Add(function(z)
         else
             local it = inv:AddItem(e.loot)
             if it then it:getModData()[LOOT_TAG] = e.cosmetic end
-            if it and e.textureOffset then
-                local cos = findType(inv, e.cosmetic)
-                local cv = cos and cos:getVisual()
-                local lv = it:getVisual()
-                local ci = cv and cv:getTextureChoice() or -1
-                if lv and ci >= 0 then
-                    lv:setTextureChoice(ci + e.textureOffset)
-                    it:synchWithVisual()
-                end
-                print(LOG .. "loot texture kind=" .. tostring(kind) .. " item=" .. e.loot
-                    .. " cosmeticChoice=" .. tostring(ci) .. " lootChoice=" .. tostring(lv and lv:getTextureChoice()))
-            end
             print(LOG .. "loot added kind=" .. tostring(kind) .. " item=" .. e.loot
                 .. " ok=" .. tostring(it ~= nil) .. " zid=" .. tostring(z:getOnlineID()))
         end

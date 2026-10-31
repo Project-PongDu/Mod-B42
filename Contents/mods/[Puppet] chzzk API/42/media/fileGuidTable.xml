@@ -29,10 +29,6 @@
 		<guid>555e40fa-e22d-5269-89f6-da7b93373d48</guid>
 	</files>
 	<files>
-		<path>media/clothing/clothingItems/PongDu_RoachHardHat.xml</path>
-		<guid>97170c12-1b57-52eb-b0d3-5fc728d03d4e</guid>
-	</files>
-	<files>
 		<path>media/clothing/clothingItems/PongDu_MuscleUpper_M.xml</path>
 		<guid>27b65a91-181e-5faa-9166-c23789780fcb</guid>
 	</files>
@@ -109,6 +105,10 @@
 	<files>
 		<path>media/clothing/clothingItems/Tshirt_DefaultTEXTURE.xml</path>
 		<guid>e4ec9087-006d-41dc-81f4-585b6d2e958c</guid>
+	</files>
+	<files>
+		<path>media/clothing/clothingItems/Hat_HardHat.xml</path>
+		<guid>523b2893-137b-44bc-b3f6-ba2c9d42d488</guid>
 	</files>
 	<files>
 		<path>media/clothing/clothingItems/Bag_Satchel.xml</path>

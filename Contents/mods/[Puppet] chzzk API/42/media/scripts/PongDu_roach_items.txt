@@ -42,7 +42,7 @@ module t3chzzkDonation
         hidden = true,
     }
 
-    /* 로치 형광 조끼. 바닐라 Vest_HighViz 모델·마스크 그대로, 텍스처만 라임 형광(PongDu\RoachHighVisVest).
+    /* 로치 형광 조끼. 바닐라 Vest_HighViz 모델·마스크 그대로, 텍스처만 연두 형광(색상각 약 90도, PongDu\RoachHighVisVest).
        바닐라 조끼는 노랑(색상각 약 51도)이라 형광으로 안 보여서 좀비가 입은 모습만 바꾼다.
        숨김 장식이라 루팅창에 안 보이고, 죽을 때 서버가 바닐라 노랑 조끼(Base.Vest_HighViz)를 넣는다.
        그 조끼를 시체에서 꺼내면 이 장식도 빠진다 (PongDuMutantLoot.lua). */
@@ -52,19 +52,6 @@ module t3chzzkDonation
         ItemType = base:clothing,
         BodyLocation = base:zeddmg,
         ClothingItem = PongDu_RoachVest,
-        WorldRender = false,
-        hidden = true,
-    }
-
-    /* 로치 공사장 헬멧. 바닐라 Hat_HardHat 모델·머리 처리(m_HatCategory Group01) 그대로, 색 후보에서 노랑만 뺐다
-       (파랑·빨강·흰색 3종, 후원자 번호 시드로 하나). 노랑 헬멧이 라임 조끼와 뭉쳐 보여서다.
-       숨김 장식이라 루팅창에 안 보이고, 죽을 때 서버가 같은 색의 바닐라 헬멧(Base.Hat_HardHat)을 넣는다 (PongDuMutantLoot.lua). */
-    item PongDuRoachHardHat
-    {
-        DisplayCategory = ZedDmg,
-        ItemType = base:clothing,
-        BodyLocation = base:zeddmg,
-        ClothingItem = PongDu_RoachHardHat,
         WorldRender = false,
         hidden = true,
     }
