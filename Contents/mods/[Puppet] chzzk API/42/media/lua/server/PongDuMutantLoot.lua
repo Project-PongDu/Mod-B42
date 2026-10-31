@@ -25,12 +25,9 @@ local COSMETIC_LOOT = {
         -- 형광 조끼: 좀비는 연두 형광 장식, 루팅은 바닐라 노랑 조끼
         { loot = "Base.Vest_HighViz",           cosmetic = "t3chzzkDonation.PongDuRoachVest" },
     },
-    -- 트레이서: 방진 마스크 + 고글 3종 중 하나 (PongDu_tracer_items.txt)
+    -- 트레이서(탈옥수): 허리에 묶은 죄수복은 입고 있을 때만 있는 장식, 루팅은 바닐라 죄수복 점프수트 (PongDu_tracer_items.txt)
     tracer = {
-        { loot = "Base.Hat_BuildersRespirator", cosmetic = "t3chzzkDonation.PongDuTracerRespirator" },
-        { loot = "Base.Glasses_SafetyGoggles",  cosmetic = "t3chzzkDonation.PongDuTracerSafetyGoggles", ifWorn = true },
-        { loot = "Base.Glasses_SkiGoggles",     cosmetic = "t3chzzkDonation.PongDuTracerSkiGoggles",    ifWorn = true },
-        { loot = "Base.Glasses_Macho",          cosmetic = "t3chzzkDonation.PongDuTracerMacho",         ifWorn = true },
+        { loot = "Base.Boilersuit_Prisoner",    cosmetic = "t3chzzkDonation.PongDuTracerTiedSuit" },
     },
 }
 

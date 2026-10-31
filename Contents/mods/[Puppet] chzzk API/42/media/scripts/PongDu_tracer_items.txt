@@ -5,48 +5,19 @@ module t3chzzkDonation
         Base
     }
 
-    /* Tracer (PongDuMutant_04) face/eye gear that must not fall off when the zombie is hit.
-       Copies of the vanilla clothing items with new GUIDs. The vanilla items have ChanceToFall
-       (respirator 10, goggles 20) and IsoZombie.helmetFallFromVisuals drops any item with ChanceToFall > 0.
-       These hidden items have none. On death PongDuMutantLoot.lua puts the matching vanilla item
-       into the corpse inventory, and looting that item also removes the hidden copy from the corpse. */
+    /* Tracer (PongDuMutant_04, escaped convict) prison jumpsuit with the top tied around the waist.
+       Mesh: Spongie's Open Jackets M/F_BoilerSuitTIED, used in PongDu with the author's permission
+       (models_X/Skinned/Clothes/PongDu_TracerTiedSuit_M/F.glb). Texture is the vanilla orange prisoner jumpsuit.
+       This tied form only exists while the tracer wears it: it is a hidden item, and on death
+       PongDuMutantLoot.lua puts the vanilla Base.Boilersuit_Prisoner into the corpse inventory instead.
+       Looting that jumpsuit also removes this hidden item from the corpse. */
 
-    item PongDuTracerRespirator
+    item PongDuTracerTiedSuit
     {
         DisplayCategory = ZedDmg,
         ItemType = base:clothing,
         BodyLocation = base:zeddmg,
-        ClothingItem = PongDu_TracerRespirator,
-        WorldRender = false,
-        hidden = true,
-    }
-
-    item PongDuTracerSafetyGoggles
-    {
-        DisplayCategory = ZedDmg,
-        ItemType = base:clothing,
-        BodyLocation = base:zeddmg,
-        ClothingItem = PongDu_TracerSafetyGoggles,
-        WorldRender = false,
-        hidden = true,
-    }
-
-    item PongDuTracerSkiGoggles
-    {
-        DisplayCategory = ZedDmg,
-        ItemType = base:clothing,
-        BodyLocation = base:zeddmg,
-        ClothingItem = PongDu_TracerSkiGoggles,
-        WorldRender = false,
-        hidden = true,
-    }
-
-    item PongDuTracerMacho
-    {
-        DisplayCategory = ZedDmg,
-        ItemType = base:clothing,
-        BodyLocation = base:zeddmg,
-        ClothingItem = PongDu_TracerMacho,
+        ClothingItem = PongDu_TracerTiedSuit,
         WorldRender = false,
         hidden = true,
     }

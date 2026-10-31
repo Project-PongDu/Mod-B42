@@ -73,6 +73,7 @@ M.FEMALE_CHANCE = {
     screamer = 100,   -- 전신화상 환자 (환자복 + 전신 붕대)
     slammer  = 0,     -- 근육 상체 + 청바지 (남성 몸 전용 외형)
     roach    = 0,     -- 공사장 인부 (피투성이 남성 피부 + 남성 몸통 크롤러 메시만 맞춤)
+    tracer   = 0,     -- 탈옥수 (남성 몸 UV 전신 문신 피부)
 }
 
 M.DONOR_KEY  = "PongDuMutantDonors"
@@ -254,6 +255,7 @@ M.FIXED_HAIR = {
     screamer = { femaleHaircut = "Bald:100" },
     roach    = { maleHaircut = "CrewCut:100", beard = "null:100" },   -- 안전모(ChanceToFall 없음)에 거의 가려진다
     brute    = { maleHaircut = "Bald:100", femaleHaircut = "Bald:100" },   -- 성별 50%라 남녀 모두 대머리. 수염은 그대로
+    tracer   = { maleHaircut = "Bald:100", beard = "null:100" },   -- 탈옥수: 빡빡이, 수염 없음(해골 얼굴 문신이 가려지지 않게)
 }
 
 local function registerFixedHair()
@@ -294,6 +296,7 @@ M.FIXED_SKIN = {
     slammer  = "PongDu_SlammerGrey_M",
     screamer = "PongDu_ScreamerBurn_F",   -- 전신 화상 붕대 + 양눈 가림 + 입술 없는 이빨 (여성 UV, 바닐라 F_ZedBody 알파 유지)
     roach    = "PongDu_RoachBlood_M",     -- 피투성이: 손·전완(반팔 밖) 끌린 피, 목 흘러내린 피, 몸통은 허리 쪽으로 흠뻑 (M_ZedBody02_level2 기반, 알파 유지)
+    tracer   = "PongDu_TracerInk_M",      -- 탈옥수 전신 문신(치카노 블랙앤그레이, 바닐라 흰 눈을 살린 해골 얼굴). 1024px, M_ZedBody01_level1 기반, 알파 유지
 }
 
 --- 고정 피부가 있는 종류면 넣는다. 반환: 바뀌었으면 true
