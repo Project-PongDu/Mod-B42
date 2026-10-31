@@ -22,6 +22,8 @@ local LOOT_TAG = "PongDuMutantLoot"   -- 바닐라 아이템 modData: 같이 뺄
 local COSMETIC_LOOT = {
     roach = {
         { loot = "Base.Hat_BuildersRespirator", cosmetic = "t3chzzkDonation.PongDuRoachRespirator" },
+        -- 형광 조끼: 좀비는 라임 장식, 루팅은 바닐라 노랑 조끼
+        { loot = "Base.Vest_HighViz",           cosmetic = "t3chzzkDonation.PongDuRoachVest" },
     },
     -- 트레이서: 방진 마스크 + 고글 3종 중 하나 (PongDu_tracer_items.txt)
     tracer = {
