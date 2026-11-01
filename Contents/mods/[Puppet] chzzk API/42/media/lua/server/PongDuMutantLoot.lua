@@ -7,7 +7,10 @@
 -- 표식 달린 바닐라 아이템을 시체에서 꺼내면 같은 시체의 장식도 빼서 벗겨지는 연출을 맞춘다.
 --
 -- 새 특좀 장비를 이 방식으로 고정하려면 COSMETIC_LOOT 에 한 줄 추가 + 장식 의류(xml·스크립트·GUID)를 만든다.
--- ifWorn = true 인 항목은 그 장식을 실제로 입었을 때만 지급한다 (아웃핏 subItems 로 여럿 중 하나를 고르는 장비용).
+-- 모든 항목은 그 장식을 실제로 입었을 때만 지급한다. 아웃핏 subItems 로 여럿 중 하나를 고르는 장비도,
+-- 강령술로 다시 일어난 특좀도 이 조건 하나로 처리된다: 부활 좀비는 wasFakeDead 라 DoZombieInventory 를
+-- 건너뛰고 시체 인벤토리를 그대로 물려받으므로(IsoDeadBody.reanimate), 이미 루팅해 장식이 빠진 시체에서
+-- 일어난 좀비는 다시 죽어도 루팅 아이템이 나오지 않는다 (루팅은 시체당 한 번).
 -- 슬래머 방독면은 상체 확대 셰이더가 걸린 장식이라 PongDuSlammerServer.lua 가 같은 방식으로 따로 처리한다.
 --
 -- 호출 순서: IsoZombie.onKilled (서버/SP) -> DoZombieInventory(입은 옷 -> 인벤토리) -> OnZombieDead -> DoDeath.
@@ -31,6 +34,13 @@ local COSMETIC_LOOT = {
     },
 }
 
+-- 로그용: 강령술(fakeDead 경로) 부활 좀비인지. 노출 여부와 무관하게 로그 때문에 죽지 않도록 pcall.
+local function wasFakeDead(z)
+    local ok, v = pcall(function() return z:wasFakeDead() end)
+    if ok then return v end
+    return "?"
+end
+
 Events.OnZombieDead.Add(function(z)
     if not z or not PongDuMutantId then return end
     local kind = PongDuMutantId.kindOf(z)
@@ -43,8 +53,11 @@ Events.OnZombieDead.Add(function(z)
     end
     for i = 1, #list do
         local e = list[i]
-        if e.ifWorn and not inv:containsType(e.cosmetic) then
-            -- 이 좀비는 다른 하위 항목을 골랐다
+        if not inv:containsType(e.cosmetic) then
+            -- 다른 하위 항목을 골랐거나, 이미 루팅된 시체에서 강령술로 일어난 좀비다
+            print(LOG .. "loot skipped (cosmetic not worn) kind=" .. tostring(kind) .. " item=" .. e.loot
+                .. " cosmetic=" .. e.cosmetic .. " fakeDead=" .. tostring(wasFakeDead(z))
+                .. " zid=" .. tostring(z:getOnlineID()))
         else
             local it = inv:AddItem(e.loot)
             if it then it:getModData()[LOOT_TAG] = e.cosmetic end

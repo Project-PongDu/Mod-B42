@@ -552,7 +552,7 @@ end)
 
 -- ── 루팅용 바닐라 방독면 ────────────────────────────────────────────────────
 -- 슬래머 방독면은 상체 1.1배 셰이더용 숨김 장식(PongDuSlammerGasMask)이라 루팅창에 안 보인다.
--- 죽을 때 바닐라 Base.Hat_GasMask 를 인벤토리에 넣고 표식(modData)을 단다. 청바지는 바닐라를 그대로 입으므로 손대지 않는다.
+-- 죽을 때 장식을 입고 있으면 바닐라 Base.Hat_GasMask 를 인벤토리에 넣고 표식(modData)을 단다. 청바지는 바닐라를 그대로 입으므로 손대지 않는다.
 -- IsoZombie.onKilled (서버/SP): DoZombieInventory(입은 옷 -> 인벤토리) -> OnZombieDead -> DoDeath(시체로 이동).
 -- MP 에선 서버 시체 인벤토리가 DeadZombiePacket 으로 클라에 간다.
 local LOOT_MASK = "Base.Hat_GasMask"
@@ -564,6 +564,12 @@ Events.OnZombieDead.Add(function(z)
     local inv = z:getInventory()
     if not inv then
         print(LOG .. "loot skipped (no inventory) zid=" .. tostring(zidOf(z)))
+        return
+    end
+    -- 장식을 실제로 입었을 때만 지급한다. 강령술 부활 좀비는 시체 인벤토리를 그대로 물려받으므로
+    -- (wasFakeDead -> DoZombieInventory 생략) 이미 방독면을 루팅한 시체에서 일어났으면 장식이 없다.
+    if not inv:containsType(COSMETIC_MASK) then
+        print(LOG .. "loot skipped (cosmetic not worn) zid=" .. tostring(zidOf(z)))
         return
     end
     local mask = inv:AddItem(LOOT_MASK)
