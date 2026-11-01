@@ -7,10 +7,15 @@
 -- 표식 달린 바닐라 아이템을 시체에서 꺼내면 같은 시체의 장식도 빼서 벗겨지는 연출을 맞춘다.
 --
 -- 새 특좀 장비를 이 방식으로 고정하려면 COSMETIC_LOOT 에 한 줄 추가 + 장식 의류(xml·스크립트·GUID)를 만든다.
--- 모든 항목은 그 장식을 실제로 입었을 때만 지급한다. 아웃핏 subItems 로 여럿 중 하나를 고르는 장비도,
--- 강령술로 다시 일어난 특좀도 이 조건 하나로 처리된다: 부활 좀비는 wasFakeDead 라 DoZombieInventory 를
--- 건너뛰고 시체 인벤토리를 그대로 물려받으므로(IsoDeadBody.reanimate), 이미 루팅해 장식이 빠진 시체에서
--- 일어난 좀비는 다시 죽어도 루팅 아이템이 나오지 않는다 (루팅은 시체당 한 번).
+-- 장식 루팅 아이템은 그 장식을 실제로 입었을 때만 지급한다 (아웃핏 subItems 로 여럿 중 하나를 고르는 장비용).
+-- REWARD_LOOT 는 장식과 무관한 처치 보상(트레이서 권총, 스크리머 의약품, 로치 공구)이다.
+--
+-- [루팅은 특좀 한 마리당 한 번]
+-- 강령술로 일어난 좀비(wasFakeDead)는 DoZombieInventory 를 건너뛰고 시체 인벤토리를 그대로 물려받는다
+-- (IsoDeadBody.reanimate). 첫 사망 때 준 루팅·보상 중 안 가져간 것은 이미 인벤토리에 있으므로
+-- 다시 죽어도 아무것도 새로 넣지 않는다. 장식 유무로 판정하면 디버그 삭제처럼 장식이 안 빠지는 경로나
+-- 루팅하지 않은 시체(장식 + 루팅 아이템이 둘 다 남음)에서 중복 지급되므로 부활 여부로 막는다.
+-- 한계: 부활 좀비가 가상화(청크 언로드·서버 재시작)되면 엔진이 새로 입혀 wasFakeDead 가 풀리므로 다시 지급된다.
 -- 슬래머 방독면은 상체 확대 셰이더가 걸린 장식이라 PongDuSlammerServer.lua 가 같은 방식으로 따로 처리한다.
 --
 -- 호출 순서: IsoZombie.onKilled (서버/SP) -> DoZombieInventory(입은 옷 -> 인벤토리) -> OnZombieDead -> DoDeath.
@@ -34,35 +39,134 @@ local COSMETIC_LOOT = {
     },
 }
 
--- 로그용: 강령술(fakeDead 경로) 부활 좀비인지. 노출 여부와 무관하게 로그 때문에 죽지 않도록 pcall.
+-- 강령술(fakeDead 경로) 부활 좀비인지. 확인 못 하면 nil (지급은 그대로 진행).
 local function wasFakeDead(z)
     local ok, v = pcall(function() return z:wasFakeDead() end)
-    if ok then return v end
-    return "?"
+    if ok then return v == true end
+    return nil
 end
+
+-- ── 처치 보상 ──────────────────────────────────────────────────────────────
+-- 아이템 이름은 B42 42.21 바닐라 generated/items 스크립트 기준.
+
+-- 트레이서(탈옥수): 바닐라 루팅 테이블에 나오는 실총 권총 6종 중 하나를 무조건 지급 (장난감 Revolver_CapGun 제외).
+-- 탄은 그 총 장탄수(getMaxAmmo)의 2배를 낱발로. 탄창식이면 빈 탄창을 끼운 상태(setContainsClip), 리볼버는 빈 실린더.
+local TRACER_PISTOLS = {
+    { gun = "Base.Pistol",          ammo = "Base.Bullets9mm" },   -- M9, 15발, 9mmClip
+    { gun = "Base.Pistol2",         ammo = "Base.Bullets45" },    -- M1911, 7발, 45Clip
+    { gun = "Base.Pistol3",         ammo = "Base.Bullets44" },    -- D-E, 8발, 44Clip
+    { gun = "Base.Revolver",        ammo = "Base.Bullets357" },   -- .357, 6발
+    { gun = "Base.Revolver_Long",   ammo = "Base.Bullets44" },    -- .44 매그넘, 6발
+    { gun = "Base.Revolver_Short",  ammo = "Base.Bullets38" },    -- .38 단신, 5발
+}
+
+local function giveTracerPistol(z, inv, kind, zid)
+    local e = TRACER_PISTOLS[ZombRand(#TRACER_PISTOLS) + 1]
+    local gun = inv:AddItem(e.gun)
+    if not gun or not instanceof(gun, "HandWeapon") then
+        print(LOG .. "reward failed kind=" .. kind .. " gun=" .. e.gun .. " item=" .. tostring(gun) .. " zid=" .. zid)
+        return
+    end
+    gun:setCurrentAmmoCount(0)
+    gun:setRoundChambered(false)
+    local mag = gun:getMagazineType()
+    local hasMag = mag ~= nil and mag ~= ""
+    gun:setContainsClip(hasMag)
+    local cap = gun:getMaxAmmo()
+    local want = cap * 2
+    local got = 0
+    for _ = 1, want do
+        if inv:AddItem(e.ammo) then got = got + 1 end
+    end
+    print(LOG .. "reward added kind=" .. kind .. " gun=" .. e.gun .. " cap=" .. tostring(cap)
+        .. " ammo=" .. e.ammo .. " x" .. got .. "/" .. want
+        .. " mag=" .. (hasMag and mag or "none") .. " clipIn=" .. tostring(gun:isContainsClip())
+        .. " zid=" .. zid)
+end
+
+-- 표 방식 보상. 한 줄 = { item 또는 oneOf, n (개수) 또는 nMin~nMax (무작위 개수), chance (0~100, 없으면 100) }
+local REWARD_ITEMS = {
+    -- 스크리머(전신화상 환자): 응급 처치 묶음
+    screamer = {
+        { item = "Base.AlcoholBandage", n = 4 },                          -- 소독된 붕대
+        { oneOf = { "Base.Pills", "Base.PillsBeta" }, n = 1 },            -- 진통제 / 베타 차단제(긴장완화제)
+        { item = "Base.SutureNeedle", n = 3 },                            -- 봉합용 바늘
+        { item = "Base.Disinfectant", n = 1, chance = 50 },               -- 소독약 (50%)
+    },
+    -- 로치(공사장 인부): 바리케이드 공구 묶음
+    roach = {
+        { item = "Base.Plank", nMin = 1, nMax = 2 },                      -- 판자 1~2
+        { item = "Base.Hammer", n = 1 },                                  -- 망치
+        { oneOf = { "Base.Saw", "Base.GardenSaw" }, n = 1 },              -- 톱 / 정원용 톱
+        { item = "Base.NailsBox", n = 1 },                                -- 못 상자
+        { item = "Base.Rope", n = 2 },                                    -- 밧줄 2
+    },
+}
+
+local function giveRewardItems(z, inv, kind, zid)
+    local list = REWARD_ITEMS[kind]
+    local parts = {}
+    for i = 1, #list do
+        local e = list[i]
+        local chance = e.chance or 100
+        if chance >= 100 or ZombRand(100) < chance then
+            local item = e.item
+            if e.oneOf then item = e.oneOf[ZombRand(#e.oneOf) + 1] end
+            local n = e.n
+            if not n then n = e.nMin + ZombRand(e.nMax - e.nMin + 1) end
+            local got = 0
+            for _ = 1, n do
+                if inv:AddItem(item) then got = got + 1 end
+            end
+            parts[#parts + 1] = item .. " x" .. got .. "/" .. n
+        else
+            parts[#parts + 1] = tostring(e.item) .. " (chance " .. chance .. " miss)"
+        end
+    end
+    print(LOG .. "reward added kind=" .. kind .. " " .. table.concat(parts, ", ") .. " zid=" .. zid)
+end
+
+local REWARD_LOOT = {
+    tracer   = giveTracerPistol,
+    screamer = giveRewardItems,
+    roach    = giveRewardItems,
+}
 
 Events.OnZombieDead.Add(function(z)
     if not z or not PongDuMutantId then return end
     local kind = PongDuMutantId.kindOf(z)
-    local list = kind and COSMETIC_LOOT[kind]
-    if not list then return end
+    if not kind then return end
+    local list = COSMETIC_LOOT[kind]
+    local reward = REWARD_LOOT[kind]
+    if not list and not reward then return end
+    local zid = tostring(z:getOnlineID())
     local inv = z:getInventory()
     if not inv then
-        print(LOG .. "loot skipped (no inventory) kind=" .. tostring(kind) .. " zid=" .. tostring(z:getOnlineID()))
+        print(LOG .. "loot skipped (no inventory) kind=" .. tostring(kind) .. " zid=" .. zid)
         return
     end
+    if wasFakeDead(z) then
+        print(LOG .. "loot skipped (risen by necromancy, loot once) kind=" .. tostring(kind) .. " zid=" .. zid)
+        return
+    end
+
+    if reward then
+        local ok, err = pcall(reward, z, inv, kind, zid)
+        if not ok then print(LOG .. "reward error kind=" .. tostring(kind) .. " err=" .. tostring(err)) end
+    end
+
+    if not list then return end
     for i = 1, #list do
         local e = list[i]
         if not inv:containsType(e.cosmetic) then
-            -- 다른 하위 항목을 골랐거나, 이미 루팅된 시체에서 강령술로 일어난 좀비다
+            -- 아웃핏 subItems 로 다른 하위 항목을 골랐다
             print(LOG .. "loot skipped (cosmetic not worn) kind=" .. tostring(kind) .. " item=" .. e.loot
-                .. " cosmetic=" .. e.cosmetic .. " fakeDead=" .. tostring(wasFakeDead(z))
-                .. " zid=" .. tostring(z:getOnlineID()))
+                .. " cosmetic=" .. e.cosmetic .. " zid=" .. zid)
         else
             local it = inv:AddItem(e.loot)
             if it then it:getModData()[LOOT_TAG] = e.cosmetic end
             print(LOG .. "loot added kind=" .. tostring(kind) .. " item=" .. e.loot
-                .. " ok=" .. tostring(it ~= nil) .. " zid=" .. tostring(z:getOnlineID()))
+                .. " ok=" .. tostring(it ~= nil) .. " zid=" .. zid)
         end
     end
 end)

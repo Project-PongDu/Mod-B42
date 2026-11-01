@@ -566,8 +566,13 @@ Events.OnZombieDead.Add(function(z)
         print(LOG .. "loot skipped (no inventory) zid=" .. tostring(zidOf(z)))
         return
     end
-    -- 장식을 실제로 입었을 때만 지급한다. 강령술 부활 좀비는 시체 인벤토리를 그대로 물려받으므로
-    -- (wasFakeDead -> DoZombieInventory 생략) 이미 방독면을 루팅한 시체에서 일어났으면 장식이 없다.
+    -- 루팅은 한 마리당 한 번: 강령술 부활 좀비는 시체 인벤토리를 그대로 물려받으므로
+    -- (wasFakeDead -> DoZombieInventory 생략) 안 가져간 방독면은 이미 들어 있고, 가져갔으면 다시 주지 않는다.
+    local okFd, fd = pcall(function() return z:wasFakeDead() end)
+    if okFd and fd == true then
+        print(LOG .. "loot skipped (risen by necromancy, loot once) zid=" .. tostring(zidOf(z)))
+        return
+    end
     if not inv:containsType(COSMETIC_MASK) then
         print(LOG .. "loot skipped (cosmetic not worn) zid=" .. tostring(zidOf(z)))
         return
