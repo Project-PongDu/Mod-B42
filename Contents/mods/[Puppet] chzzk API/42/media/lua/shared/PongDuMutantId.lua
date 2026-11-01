@@ -441,6 +441,7 @@ end
 ---   성별 미지정인데 한쪽 성별에만 있는 이름 -> 그 성별로 지정
 ---   지정 성별에 없거나 어느 쪽에도 없는 이름 -> 항목 제거
 --- Java 는 이 Lua 표를 첫 사용 때 읽는다(ZombiesZoneDefinition.dirty 초기 true).
+--- 서버·MP 클라 양쪽에서 똑같이 돌아야 한다 (파일 끝 OnInitGlobalModData 주석: 커스텀 아웃핏 번호).
 function M.sanitizeZoneDefs()
     if M._zoneSanitized then return true end
     local zzd = ZombiesZoneDefinition
@@ -554,6 +555,18 @@ if not isClient() then
         if M.applyFixedSkin(z, kind) then
             M.log("fixed skin set on death kind=" .. kind .. " skin=" .. tostring(z:getHumanVisual():getSkinTexture()))
         end
+    end)
+end
+
+-- MP 클라도 같은 구역 정의 정리를 해야 한다. 구역 정의의 항목마다 엔진이 "ZZD.<구역>.<아웃핏>" 커스텀 아웃핏을
+-- PersistentOutfits 에 등록하고(ZombiesZoneDefinition.registerCustomOutfits), 그 뒤에 "ReanimatedPlayer" 가 붙는다.
+-- 번호는 등록 순서라 서버만 항목을 지우면 서버 쪽 번호가 지운 만큼 당겨져 클라와 어긋난다.
+-- (11/01 실측: 서버 ReanimatedPlayer = 715. 시체를 끌면 엔진이 시체를 ReanimatedPlayer 로 되살리는데
+--  클라는 715 를 다른 ZZD 아웃핏으로 읽어 군복·털모자 차림으로 바뀌어 보였다. 구역 출현 좀비도 같은 이유로 엉뚱한 옷.)
+-- 순서: GlobalModData.init(OnInitGlobalModData) -> PersistentOutfits.init 이 서버·클라 양쪽에서 같다(IsoWorld.init).
+if isClient() then
+    Events.OnInitGlobalModData.Add(function()
+        M.sanitizeZoneDefs()
     end)
 end
 
