@@ -40,7 +40,20 @@ Events.OnServerCommand.Add(function(module, command, args)
         local worn, nWorn = toSet(args["worn"])
         local att, nAtt = toSet(args["att"])
         if not _cache[zid] then _n = _n + 1 end
-        _cache[zid] = { pid = tonumber(args["pid"]), worn = worn, att = att, nWorn = nWorn, nAtt = nAtt }
+        local vis = {}
+        if type(args["vis"]) == "table" then
+            for _, e in pairs(args["vis"]) do
+                if type(e) == "table" and type(e["n"]) == "string" then vis[#vis + 1] = e end
+            end
+        end
+        local attl = {}
+        if type(args["attl"]) == "table" then
+            for _, e in pairs(args["attl"]) do
+                if type(e) == "table" and type(e["t"]) == "string" and type(e["l"]) == "string" then attl[#attl + 1] = e end
+            end
+        end
+        _cache[zid] = { pid = tonumber(args["pid"]), worn = worn, att = att, vis = vis, attl = attl,
+            nWorn = nWorn, nAtt = nAtt }
         print(LOG .. "worn received zid=" .. tostring(zid) .. " worn=" .. nWorn .. " att=" .. nAtt)
     elseif command == "RisenClear" then
         local zid = tonumber(args["zid"])
@@ -81,10 +94,61 @@ local function apply(z, zid, rec)
             ai:remove(it)
         end
     end
-    if #removed > 0 then z:resetModel() end
+    -- 서버 좀비가 입고 있는데 클라가 옷 ID 로 못 입힌 옷(부활 아웃핏에 없는 바닐라 옷)을 서버 겉모습 그대로 덧입힌다.
+    local added = {}
+    if iv and rec.vis then
+        local have = {}
+        for i = 0, iv:size() - 1 do
+            local v = iv:get(i)
+            local name = v and v:getClothingItemName()
+            if name then have[name] = true end
+        end
+        for _, e in ipairs(rec.vis) do
+            if not have[e["n"]] then
+                local ok, err = pcall(function()
+                    local v = ItemVisual.new()
+                    v:setItemType(e["t"])
+                    v:setClothingItemName(e["n"])
+                    if type(e["c"]) == "string" then v:setTint(ImmutableColor.decode(e["c"])) end
+                    if tonumber(e["h"]) then v:setHue(tonumber(e["h"])) end
+                    if tonumber(e["bt"]) then v:setBaseTexture(tonumber(e["bt"])) end
+                    if tonumber(e["tc"]) then v:setTextureChoice(tonumber(e["tc"])) end
+                    iv:add(v)
+                end)
+                if ok then
+                    have[e["n"]] = true
+                    added[#added + 1] = tostring(e["n"])
+                else
+                    print(LOG .. "add visual failed zid=" .. tostring(zid) .. " item=" .. tostring(e["n"]) .. " err=" .. tostring(err))
+                end
+            end
+        end
+    end
+    -- 부착물(몸에 박힌 무기·허리 진압봉 등): 서버 좀비에 붙어 있는데 클라에 없는 것을 같은 위치에 붙인다.
+    if rec.attl then
+        for _, e in ipairs(rec.attl) do
+            local cur = z:getAttachedItem(e["l"])
+            if not (cur and cur:getFullType() == e["t"]) then
+                local ok, err = pcall(function()
+                    local it = instanceItem(e["t"])
+                    if not it then error("no item script") end
+                    z:setAttachedItem(e["l"], it)
+                end)
+                if ok then
+                    added[#added + 1] = e["l"] .. "=" .. e["t"]
+                else
+                    print(LOG .. "attach failed zid=" .. tostring(zid) .. " item=" .. tostring(e["t"])
+                        .. " location=" .. tostring(e["l"]) .. " err=" .. tostring(err))
+                end
+            end
+        end
+    end
+    if #removed > 0 or #added > 0 then z:resetModel() end
     print(LOG .. "stripped zid=" .. tostring(zid) .. " removed=" .. #removed
+        .. " added=" .. #added
         .. " keptWorn=" .. tostring(rec.nWorn) .. " keptAtt=" .. tostring(rec.nAtt)
-        .. (#removed > 0 and (" items=" .. table.concat(removed, ",")) or ""))
+        .. (#removed > 0 and (" items=" .. table.concat(removed, ",")) or "")
+        .. (#added > 0 and (" addedItems=" .. table.concat(added, ",")) or ""))
 end
 
 Events.OnTick.Add(function()

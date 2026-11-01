@@ -38,8 +38,34 @@ local function checkApi(z)
     print(LOG .. "wasFakeDead() callable=" .. tostring(_api))
 end
 
+-- 클라가 옷 ID 로 못 입히는 옷(부활 아웃핏에 없는 바닐라 옷)을 그대로 덧입힐 수 있게 겉모습 값을 같이 보낸다.
+-- 색: 아이템 고유색(isCustomColor) > ItemVisual 착색. 클라는 ImmutableColor.decode("0xRRGGBB") 로 되살린다.
+local HEX = "0123456789ABCDEF"
+local function hex2(n)
+    n = math.floor((tonumber(n) or 0) + 0.5)
+    if n < 0 then n = 0 elseif n > 255 then n = 255 end
+    local hi, lo = math.floor(n / 16), n - math.floor(n / 16) * 16
+    return string.sub(HEX, hi + 1, hi + 1) .. string.sub(HEX, lo + 1, lo + 1)
+end
+
+local function visualOf(it, v, name)
+    local e = { ["n"] = name, ["t"] = it:getFullType() }
+    local r, g, b
+    if it:isCustomColor() then
+        r, g, b = it:getR() * 255, it:getG() * 255, it:getB() * 255
+    else
+        local c = v:getTint()
+        if c then r, g, b = c:getRedInt(), c:getGreenInt(), c:getBlueInt() end
+    end
+    if r then e["c"] = "0x" .. hex2(r) .. hex2(g) .. hex2(b) end
+    e["h"] = v:getHue()
+    e["bt"] = v:getBaseTexture()
+    e["tc"] = v:getTextureChoice()
+    return e
+end
+
 local function collect(z)
-    local worn, att = {}, {}
+    local worn, att, vis, attl = {}, {}, {}, {}
     if z:isUsingWornItems() then
         local wi = z:getWornItems()
         if wi then
@@ -47,7 +73,10 @@ local function collect(z)
                 local it = wi:getItemByIndex(i)
                 local v = it and it:getVisual()
                 local name = v and v:getClothingItemName()
-                if name then worn[#worn + 1] = name end
+                if name then
+                    worn[#worn + 1] = name
+                    vis[#vis + 1] = visualOf(it, v, name)
+                end
             end
         end
     else
@@ -61,14 +90,19 @@ local function collect(z)
             end
         end
     end
+    -- 부착물: 종류 목록(att, 클라가 다른 것을 뺄 때) + 위치·종류(attl, 클라가 빠진 것을 붙일 때)
     local ai = z:getAttachedItems()
     if ai then
         for i = 0, ai:size() - 1 do
-            local it = ai:getItemByIndex(i)
-            if it then att[#att + 1] = it:getFullType() end
+            local a = ai:get(i)
+            local it = a and a:getItem()
+            if it then
+                att[#att + 1] = it:getFullType()
+                attl[#attl + 1] = { ["t"] = it:getFullType(), ["l"] = a:getLocation() }
+            end
         end
     end
-    return worn, att
+    return worn, att, vis, attl
 end
 
 -- 다시 만들어진 부활 특좀: 부활 아웃핏에 없는 옷(엔진이 붙인 무작위 속옷)을 서버에서 벗긴다.
@@ -92,7 +126,8 @@ local function stripRisenExtras(z)
 end
 
 local function payload(zid, rec)
-    return { ["zid"] = zid, ["pid"] = rec.pid, ["worn"] = rec.worn, ["att"] = rec.att }
+    return { ["zid"] = zid, ["pid"] = rec.pid, ["worn"] = rec.worn, ["att"] = rec.att, ["vis"] = rec.vis,
+        ["attl"] = rec.attl }
 end
 
 local function scan()
@@ -120,8 +155,8 @@ local function scan()
                         print(LOG .. "reloaded risen mutant zid=" .. tostring(zid) .. " slot="
                             .. tostring(PongDuMutantId.slotOfPid(z:getPersistentOutfitID())) .. " extrasRemoved=" .. n)
                     end
-                    local worn, att = collect(z)
-                    rec = { z = z, pid = z:getPersistentOutfitID(), worn = worn, att = att }
+                    local worn, att, vis, attl = collect(z)
+                    rec = { z = z, pid = z:getPersistentOutfitID(), worn = worn, att = att, vis = vis, attl = attl }
                     _sent[zid] = rec
                     seen[zid] = true
                     sendServerCommand(MODULE, "RisenWorn", payload(zid, rec))
