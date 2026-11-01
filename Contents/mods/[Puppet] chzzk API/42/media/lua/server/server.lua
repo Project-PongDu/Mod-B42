@@ -499,7 +499,7 @@ local function pickSniperTarget(job)
     local best, bd, bm = nil, nil, -1
     for i = 0, zl:size() - 1 do
         local z = zl:get(i)
-        if z and not z:isDead() and not job.shotZids[fsZKey(z)] then
+        if z and not z:isDead() and not job.shotZids[fsZKey(z)] and not PongDuZombieId.IsGrappleCorpse(z) then
             local dx, dy = z:getX() - cx, z:getY() - cy
             local d2 = dx * dx + dy * dy
             if d2 <= r2 then
@@ -539,7 +539,7 @@ local function collectPierced(job, mainKey, tx, ty)
 
     for i = 0, zl:size() - 1 do
         local z = zl:get(i)
-        if z and not z:isDead() then
+        if z and not z:isDead() and not PongDuZombieId.IsGrappleCorpse(z) then
             local zid = z:getOnlineID()
             local zk  = fsZKey(z)
             -- 주 표적과 이미 사살된 놈은 제외. 맞고 살아남은 놈은 shotZids에

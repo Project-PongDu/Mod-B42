@@ -1879,7 +1879,7 @@ local HELI_CLEAR_EXTRA_RADIUS = 20
 local HELI_RADIO_MIN_MS       = 3000   -- 시작 직후 무전 금지(도착 연출)
 
 local function heliTargetValid(z, cx, cy, r2)
-    if not z or z:isDead() then return false end
+    if not z or z:isDead() or PongDuZombieId.IsGrappleCorpse(z) then return false end
     local dx, dy = z:getX() - cx, z:getY() - cy
     return dx * dx + dy * dy <= r2
 end
@@ -1895,7 +1895,7 @@ local function heliScan(cx, cy, r)
     local pool, n, near = {}, 0, false
     for i = 0, zl:size() - 1 do
         local z = zl:get(i)
-        if z and not z:isDead() then
+        if z and not z:isDead() and not PongDuZombieId.IsGrappleCorpse(z) then
             local dx, dy = z:getX() - cx, z:getY() - cy
             local d2 = dx * dx + dy * dy
             -- 우호 히트맨(공수부대원)은 표적도, 교전 유지 신호도 아니다 (r <= re)
@@ -2062,7 +2062,8 @@ local function dronePickTarget(d, cx, cy, now)
     local bA, dA, bL, dL, bN, dN, bD, dD
     for i = 0, zl:size() - 1 do
         local z = zl:get(i)
-        if z and not z:isDead() then
+        -- 끌고 있는 시체(잡기용 임시 좀비)는 표적이 아니다. 쏘면 시체가 손에서 떨어진다.
+        if z and not z:isDead() and not PongDuZombieId.IsGrappleCorpse(z) then
             local dx, dy = z:getX() - cx, z:getY() - cy
             local d2 = dx * dx + dy * dy
             -- 우호 히트맨(공수부대원)은 쏘지 않는다

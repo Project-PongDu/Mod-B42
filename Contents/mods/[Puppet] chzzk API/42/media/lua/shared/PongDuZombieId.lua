@@ -68,3 +68,13 @@ function PongDuZombieId.IsRemote(zombie)
     if not zombie or not isClient() then return false end
     return zombie:isRemoteZombie()
 end
+
+--- True for the temporary zombie a corpse becomes while a player drags it.
+--- B42 IsoDeadBody.reanimateZombieForGrapple sets reanimatedForGrappleOnly=true (IsoDeadBody.java:1944)
+--- and the flag is synced to clients (NetworkZombieVariables.IsReanimatedForGrappleOnly).
+--- It sits in the zombie list like a live zombie, so area effects (fire support) must skip it:
+--- killing it just drops the corpse out of the player's hands.
+function PongDuZombieId.IsGrappleCorpse(zombie)
+    -- Called per zombie in fire support scans, so no pcall/closure: the method is public on IsoZombie (B42).
+    return zombie ~= nil and zombie:isReanimatedForGrappleOnly() == true
+end
