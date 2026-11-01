@@ -1,6 +1,5 @@
 local rewardManager = {}
 
-local bandit     = require("features/hitman")
 -- exile / backroom 은 미사용 결정으로 비활성화. features/teleport.lua 와
 -- features/backroom.lua 는 파일 전체가 블록 주석 처리돼 있어 아무것도 반환하지
 -- 않으므로 require 도 함께 막는다. 재활성화 시 두 파일의 주석과 아래 두 줄,
@@ -28,6 +27,24 @@ local fx         = require("utils/fx")
 -- 외부(서버 전용) 애드온 모드가 등록한 기능. 조회는 전부 getEntry()를 거친다.
 local addon      = require("PongDuAddon")
 require "PongDuGrant"
+
+-- 히트맨(산적) NPC 는 B42 빌드에서 빠졌다(features/hitman.lua 없음). featureId 는 런처 매핑이
+-- 깨지지 않게 남겨 두고, 발동하면 로그만 남긴다 (firesupport 의 airborne 과 같은 처리).
+local function banditUnavailable(featureId, sender)
+    print("[PongDu] " .. featureId .. " NOT AVAILABLE in this build (Hitman module excluded) sender="
+        .. tostring(sender or ""))
+end
+
+-- 기능 핸들러 실행. 핸들러에서 오류가 나면 호출한 DonationReceiver 틱이 같이 죽어
+-- 그 대기열 항목이 매 틱 다시 발동(=매 틱 오류)하고 processingEvent 도 안 풀린다.
+-- 여기서 오류를 잡아 로그를 남기고 이번 유닛은 소모된 것으로 끝낸다.
+local function runEntry(entry, featureId, sender)
+    local ok, err = pcall(entry.fn, sender or "")
+    if not ok then
+        print("[PongDu] Reward '" .. tostring(featureId) .. "' handler error: " .. tostring(err))
+        global.processingEvent = false
+    end
+end
 
 -- Spawn zombies, queueing the request if the player is still in a safe zone.
 local function handleZombieSpawn(amount, sprint, sender)
@@ -121,7 +138,7 @@ local rewardHandlers = {
     ["bandit_melee"] = {
         immediate = true,
         fn = function(sender)
-            bandit.a(11, sender)                          -- Bandit
+            banditUnavailable("bandit_melee", sender)
             global.processingEvent = false
         end,
     },
@@ -135,7 +152,7 @@ local rewardHandlers = {
     ["bandit_ranged"] = {
         immediate = true,
         fn = function(sender)
-            bandit.a(15, sender)                          -- Bandit (ranged)
+            banditUnavailable("bandit_ranged", sender)
             global.processingEvent = false
         end,
     },
@@ -501,7 +518,7 @@ function rewardManager.a(featureId, sender, callback)
                 if not zone.a(global.player) then
                     Events.OnTick.Remove(waitAndApply)
                     if entry then
-                        entry.fn(sender or "")
+                        runEntry(entry, featureId, sender)
                     else
                         global.processingEvent = false
                     end
@@ -513,7 +530,7 @@ function rewardManager.a(featureId, sender, callback)
         Events.OnTick.Add(waitAndApply)
     else
         if entry then
-            entry.fn(sender or "")
+            runEntry(entry, featureId, sender)
         else
             global.processingEvent = false
         end

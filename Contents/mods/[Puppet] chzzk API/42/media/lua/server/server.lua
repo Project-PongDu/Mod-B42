@@ -1425,7 +1425,7 @@ DOServer["PongDuRiseUp"]["RiseUp"] = function(player, data)
         if b:isZombie() and not markFakeDead(b) then
             print("[PongDu][RiseUp] setFakeDead BLOCKED @"
                 .. tostring(sq:getX()) .. "," .. tostring(sq:getY())
-                .. " -> 알몸 부활 가능. DisableFakeDead 확인 필요")
+                .. " -> zombie may rise naked, check DisableFakeDead")
         end
         -- 특좀 시체: 부활 아웃핏으로 일으킨다 (PongDuMutantRisenServer.lua 머리 주석).
         -- reanimateNow(다음 갱신에 reanimate) 대신 여기서 바로 reanimate 해야 첫 좀비 패킷이 나가기 전에
