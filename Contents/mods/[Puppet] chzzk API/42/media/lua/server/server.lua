@@ -1427,7 +1427,29 @@ DOServer["PongDuRiseUp"]["RiseUp"] = function(player, data)
                 .. tostring(sq:getX()) .. "," .. tostring(sq:getY())
                 .. " -> 알몸 부활 가능. DisableFakeDead 확인 필요")
         end
-        b:reanimateNow()
+        -- 원래 옷 ID 복원: 끌었던 시체는 옷 ID 가 ReanimatedPlayer 번호로 덮여 있어 그대로 일으키면
+        -- 특좀 정보가 사라진다(PongDuMutantId.recordedPidOf 주석). 기록이 있으면 reanimateNow(다음 갱신에
+        -- reanimate) 대신 여기서 바로 reanimate 하고, 첫 좀비 패킷이 나가기 전에 옷 ID 를 되돌린다
+        -- (클라는 처음 받은 옷 ID 로만 옷을 입힌다). IsoDeadBody.update 도 reanimate() 만 부르므로 같은 경로다.
+        -- fakeDead 경로라 서버는 입은 옷(wornItems)을 쓰고 옷 ID 로 다시 입히지 않는다 -> init=true.
+        local recPid = PongDuMutantId.recordedPidOf and PongDuMutantId.recordedPidOf(b)
+        if recPid then
+            local zed = b:reanimate()
+            if zed and instanceof(zed, "IsoZombie") then
+                local before = zed:getPersistentOutfitID()
+                if before ~= recPid then
+                    zed:setPersistentOutfitID(recPid, true)
+                    print("[PongDu][RiseUp] outfit id restored zid=" .. tostring(zed:getOnlineID())
+                        .. " kind=" .. tostring(PongDuMutantId.kindOfPid(recPid))
+                        .. " before=" .. tostring(before) .. " after=" .. tostring(zed:getPersistentOutfitID()))
+                end
+            else
+                print("[PongDu][RiseUp] reanimate failed @" .. tostring(sq:getX()) .. "," .. tostring(sq:getY())
+                    .. " recordedPid=" .. tostring(recPid) .. " result=" .. tostring(zed))
+            end
+        else
+            b:reanimateNow()
+        end
         raised = raised + 1
         -- 특좀 능력은 클라 적용기가 부활 좀비의 아웃핏으로 다시 붙인다 (재등록·부활 마크 불필요).
         if kind then marked = marked + 1 end

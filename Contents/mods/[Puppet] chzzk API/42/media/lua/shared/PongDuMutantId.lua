@@ -142,15 +142,42 @@ end
 --- 이전 좀비의 아웃핏 이름이 보인다. 옷 ID 는 첫 패킷으로 바로 들어와 이 문제가 없다.
 --- (10/30 실측: 호드매니저로 연달아 부른 배치가 직전 배치의 아웃핏 이름으로 읽혀 약 580마리가
 ---  엉뚱한 특좀으로 초기화됨. Zed_Test·Survivalist02_Late 일반 좀비도 특좀으로 읽힘)
---- 시체는 옷 ID getter 가 없어(IsoDeadBody) 이름으로 본다. 아웃핏 목록을 아직 못 읽었을
---- 때만 이름으로 대신한다.
+--- 시체는 옷 ID getter 가 없어(IsoDeadBody) 죽을 때 modData 에 적어 둔 옷 ID(recordedPidOf)로 보고,
+--- 없으면(이 기능 전에 죽은 시체) 아웃핏 이름으로 본다. 아웃핏 목록을 아직 못 읽었을 때도 이름으로 대신한다.
+--- 좀비는 modData 를 보지 않는다: 시체를 끌 때 엔진이 만드는 ReanimatedPlayer 좀비도 시체 modData 를
+--- 물려받는데, 그 좀비가 특좀으로 읽히면 내려놓을 때 루팅·보상이 다시 지급된다.
 function M.kindOf(obj)
     if not obj then return nil end
     if instanceof(obj, "IsoZombie") then
         local kind = M.kindOfPid(obj:getPersistentOutfitID())
         if kind ~= false then return kind end
+    elseif instanceof(obj, "IsoDeadBody") then
+        local pid = M.recordedPidOf(obj)
+        if pid then
+            local kind = M.kindOfPid(pid)
+            if kind then return kind end
+        end
     end
     return M.kindOfOutfitName(obj:getOutfitName())
+end
+
+-- ── 시체의 원래 옷 ID 기록 ──────────────────────────────────────────────────
+-- 시체를 끌면 엔진이 시체를 ReanimatedPlayer 좀비로 되살렸다가(IsoDeadBody.reanimateZombieForGrapple ->
+-- reanimate 의 fakeDead 아님 경로 -> createPlayerZombieDescriptor) 내려놓을 때 다시 시체로 만든다.
+-- 이때 옷 ID 가 ReanimatedPlayer 번호로 덮여 특좀 정보(아웃핏 번호·후원자 번호)가 사라진다.
+-- (11/01 실측: 끌고 간 특좀 시체 9구를 강령술로 살리니 전부 pid=46858241 kind=nil)
+-- modData 는 좀비 -> 시체(IsoDeadBody 생성자 copyTable), 시체 -> 되살린 좀비(reanimate copyTable)로
+-- 따라가고 시체는 가상화되지 않아 청크 저장에 modData 가 같이 남는다. 그래서 특좀이 죽을 때 옷 ID 를 적는다.
+-- 강령술(server.lua RiseUp)은 이 값으로 되살린 좀비의 옷 ID 를 되돌린다.
+M.PID_KEY = "PongDuMutantPid"
+
+--- 시체(또는 그 시체에서 나온 좀비)의 modData 에 적힌 원래 옷 ID. 없으면 nil
+function M.recordedPidOf(obj)
+    if not obj then return nil end
+    local md = obj:getModData()
+    local v = md and tonumber(md[M.PID_KEY])
+    if not v or v == 0 then return nil end
+    return v
 end
 
 local function modActive(id)
@@ -550,7 +577,22 @@ end
 -- 슬래머는 PongDuSlammerServer 스캔도 넣지만, 같은 이름이면 applyFixedSkin 이 아무것도 안 한다.
 if not isClient() then
     Events.OnZombieDead.Add(function(z)
-        local kind = z and M.kindOf(z)
+        if not z then return end
+        -- 원래 옷 ID 기록: 옷 ID 가 특좀일 때만 적는다. 끌던 ReanimatedPlayer 좀비처럼 옷 ID 가 덮인 좀비는
+        -- 시체에서 물려받은 기존 값을 그대로 둔다(덮어쓰지 않음).
+        local pid = z:getPersistentOutfitID()
+        if M.kindOfPid(pid) then
+            local md = z:getModData()
+            if md[M.PID_KEY] ~= pid then
+                md[M.PID_KEY] = pid
+                M.log("pid recorded on death kind=" .. tostring(M.kindOfPid(pid)) .. " pid=" .. tostring(pid)
+                    .. " zid=" .. tostring(z:getOnlineID()))
+            end
+        elseif M.recordedPidOf(z) then
+            M.log("pid kept on death (outfit id replaced) pid=" .. tostring(pid)
+                .. " recorded=" .. tostring(M.recordedPidOf(z)) .. " zid=" .. tostring(z:getOnlineID()))
+        end
+        local kind = M.kindOf(z)
         if not kind or not M.FIXED_SKIN[kind] then return end
         if M.applyFixedSkin(z, kind) then
             M.log("fixed skin set on death kind=" .. kind .. " skin=" .. tostring(z:getHumanVisual():getSkinTexture()))
