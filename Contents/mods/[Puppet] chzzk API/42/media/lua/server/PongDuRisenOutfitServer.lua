@@ -14,9 +14,12 @@
 -- 목록에 없는 것만 뺀다. 클라·서버 모두 같은 옷 ID 시드(OutfitRNG)로 입히므로 남은 옷의
 -- 종류·색·속옷은 서버와 같고, 클라는 '빼기'만 하면 된다.
 --
--- ── 한계 (의도적으로 그대로 둠) ─────────────────────────────────────────────
--- 부활 좀비가 가상화(주변 플레이어 이탈·서버 재시작)되면 엔진이 옷 ID 로 전체 복장을 다시 입혀
--- 서버·클라 모두 다 입은 상태로 돌아온다. 그때는 이 목록도 지운다(RisenClear).
+-- ── 가상화 ────────────────────────────────────────────────────────────────
+-- 부활 좀비가 가상화(주변 플레이어 이탈·서버 재시작)되면 엔진이 옷 ID 로 다시 입힌다. 이 목록은 지운다(RisenClear).
+--   · 특좀: 옷 ID 가 부활 아웃핏(PongDuMutantRisenServer)이라 같은 모습으로 돌아온다. 엔진이 입힐 때 붙이는
+--     무작위 속옷(UnderwearDefinition)만 아웃핏에 없으므로, 다시 만들어진 부활 특좀은 여기서 서버 옷에서
+--     PongDu_ 장식·몸 메시가 아닌 것을 벗기고 그 목록을 클라에 보낸다(속옷이 다시 루팅되지 않게).
+--   · 일반 좀비: 처음 복장으로 돌아온다(그대로 둠).
 
 if isClient() then return end
 
@@ -37,13 +40,25 @@ end
 
 local function collect(z)
     local worn, att = {}, {}
-    local wi = z:getWornItems()
-    if wi then
-        for i = 0, wi:size() - 1 do
-            local it = wi:getItemByIndex(i)
-            local v = it and it:getVisual()
-            local name = v and v:getClothingItemName()
-            if name then worn[#worn + 1] = name end
+    if z:isUsingWornItems() then
+        local wi = z:getWornItems()
+        if wi then
+            for i = 0, wi:size() - 1 do
+                local it = wi:getItemByIndex(i)
+                local v = it and it:getVisual()
+                local name = v and v:getClothingItemName()
+                if name then worn[#worn + 1] = name end
+            end
+        end
+    else
+        -- 다시 만들어진 좀비: 옷은 itemVisuals 에 있다 (착용 아이템 모드가 아니면 실제 목록을 그대로 돌려준다)
+        local iv = z:getItemVisuals()
+        if iv then
+            for i = 0, iv:size() - 1 do
+                local v = iv:get(i)
+                local name = v and v:getClothingItemName()
+                if name then worn[#worn + 1] = name end
+            end
         end
     end
     local ai = z:getAttachedItems()
@@ -54,6 +69,26 @@ local function collect(z)
         end
     end
     return worn, att
+end
+
+-- 다시 만들어진 부활 특좀: 부활 아웃핏에 없는 옷(엔진이 붙인 무작위 속옷)을 서버에서 벗긴다.
+-- 부활 아웃핏 아이템은 전부 PongDu_ 숨김 의류(몸 메시·장식)다. 지울 때는 객체로 지운다(remove(Object)).
+local function stripRisenExtras(z)
+    -- 서버는 좀비 옷을 늦게 입힐 수 있다(IsoZombie.DoZombieInventory: persistentOutfitInit 이 아니면 죽을 때 입힘).
+    -- 그 전에 벗기면 죽을 때 다시 입혀 속옷이 생기므로 여기서 먼저 입힌다 (init=true 가 되어 다시 안 입힌다).
+    if not z:isPersistentOutfitInit() then
+        z:dressInPersistentOutfitID(z:getPersistentOutfitID())
+    end
+    local iv = z:getItemVisuals()
+    if not iv then return 0 end
+    local drop = {}
+    for i = 0, iv:size() - 1 do
+        local v = iv:get(i)
+        local name = v and v:getClothingItemName()
+        if v and not (name and string.sub(name, 1, 7) == "PongDu_") then drop[#drop + 1] = v end
+    end
+    for _, v in ipairs(drop) do iv:remove(v) end
+    return #drop
 end
 
 local function payload(zid, rec)
@@ -76,7 +111,15 @@ local function scan()
             elseif not z:isReanimatedPlayer() then          -- 좀비화 플레이어는 디스크립터 경로라 대상 아님
                 if _api == nil then checkApi(z) end
                 if not _api then return end
-                if z:wasFakeDead() then
+                local fake = z:wasFakeDead()
+                local risenMutant = PongDuMutantId and PongDuMutantId.isRisenPid
+                    and PongDuMutantId.isRisenPid(z:getPersistentOutfitID())
+                if fake or risenMutant then
+                    if risenMutant and not fake then
+                        local n = stripRisenExtras(z)
+                        print(LOG .. "reloaded risen mutant zid=" .. tostring(zid) .. " slot="
+                            .. tostring(PongDuMutantId.slotOfPid(z:getPersistentOutfitID())) .. " extrasRemoved=" .. n)
+                    end
                     local worn, att = collect(z)
                     rec = { z = z, pid = z:getPersistentOutfitID(), worn = worn, att = att }
                     _sent[zid] = rec

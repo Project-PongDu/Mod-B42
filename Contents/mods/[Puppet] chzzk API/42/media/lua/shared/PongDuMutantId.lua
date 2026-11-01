@@ -68,6 +68,74 @@ for slot, kind in pairs(M.SLOT_KIND) do
     if not (fb and fb.slot == slot) then M.KIND_SLOT[kind] = slot end
 end
 
+-- ── 부활 아웃핏 (강령술로 일어난 특좀) ────────────────────────────────────────
+-- 강령술로 일어난 특좀은 예외 없이 이 아웃핏으로 옷 ID 를 바꾼다(PongDuMutantRisenServer.lua).
+-- 옷 ID 는 가상화(청크 언로드)·서버 재시작·시체 끌기를 모두 통과하는 유일한 정보라서
+-- "이미 한 번 죽은 특좀"과 "아직 남은 장식"을 여기에 담는다. modData·입은 옷·wasFakeDead 는 가상화에서 사라진다.
+--   · 이름 PongDuMutant_R<기본 슬롯>[_<장식 비트>] : 비트 i = COSMETICS[kind][i] 를 아직 입고 있음(1)
+--   · 아이템 = 몸 메시(BODY_ITEMS) + 남은 장식뿐. 바닐라 옷·소지품은 일어날 때 바닥에 떨군다.
+--   · 부활 아웃핏이면 처치 보상은 없다. 장식 루팅은 장식을 입고 죽을 때만 1번(장식이 빠지면 다음 부활 때 그 비트가 0).
+-- 슬롯 이름이 바뀌거나 추가·삭제되면 아웃핏 번호가 밀린다 -> 새 월드에서만 바꾼다 (파일 머리 주석).
+M.RISEN_BASE = {
+    screamer = "R01",
+    brute    = "R02",   -- 기본 02·폴백 07 공용 (둘 다 장식 없음)
+    roach    = "R03",
+    tracer   = "R04",
+    slammer  = "R05",
+    sprinter = "R06",
+}
+-- 종류 -> 숨김 장식 아이템 fullType (순서 = 슬롯 이름의 비트 순서. clothing.xml 생성과 같아야 한다)
+M.COSMETICS = {
+    roach   = { "t3chzzkDonation.PongDuRoachRespirator", "t3chzzkDonation.PongDuRoachVest" },
+    tracer  = { "t3chzzkDonation.PongDuTracerTiedSuit" },
+    slammer = { "t3chzzkDonation.PongDuSlammerGasMask" },
+}
+-- 종류 -> 몸 메시(숨김 의류) fullType. 부활해도 그대로 입는다.
+M.BODY_ITEMS = {
+    roach   = { "t3chzzkDonation.PongDuRoachTorso_M", "t3chzzkDonation.PongDuRoachTorso_F" },
+    slammer = { "t3chzzkDonation.PongDuMuscleUpper_M", "t3chzzkDonation.PongDuSlammerBody_M" },
+}
+M.RISEN_SLOT = {}   -- [부활 슬롯] = 종류
+
+local function bitCombos(n)
+    local out = { "" }
+    for _ = 1, n do
+        local nxt = {}
+        for i = 1, #out do
+            nxt[#nxt + 1] = out[i] .. "0"
+            nxt[#nxt + 1] = out[i] .. "1"
+        end
+        out = nxt
+    end
+    return out
+end
+
+for kind, base in pairs(M.RISEN_BASE) do
+    local cos = M.COSMETICS[kind]
+    if cos and #cos > 0 then
+        local combos = bitCombos(#cos)
+        for i = 1, #combos do
+            local slot = base .. "_" .. combos[i]
+            M.SLOT_KIND[slot] = kind
+            M.RISEN_SLOT[slot] = kind
+        end
+    else
+        M.SLOT_KIND[base] = kind
+        M.RISEN_SLOT[base] = kind
+    end
+end
+
+--- 종류 + 남은 장식(present[i] = COSMETICS[kind][i] 를 입고 있음) -> 부활 슬롯
+function M.risenSlotFor(kind, present)
+    local base = M.RISEN_BASE[kind]
+    if not base then return nil end
+    local cos = M.COSMETICS[kind]
+    if not cos or #cos == 0 then return base end
+    local bits = ""
+    for i = 1, #cos do bits = bits .. ((present and present[i]) and "1" or "0") end
+    return base .. "_" .. bits
+end
+
 -- 성별 고정 (addZombiesInOutfit femaleChance, 0~100). 없으면 50.
 M.FEMALE_CHANCE = {
     screamer = 100,   -- 전신화상 환자 (환자복 + 전신 붕대)
@@ -114,16 +182,46 @@ local function indexKindTable()
     local ok, list = pcall(getAllOutfits, true)
     if not ok or not list or list:size() == 0 then return nil end
     local t, n = {}, 0
+    local slotOf, indexOf = {}, {}
     for i = 0, list:size() - 1 do
-        local kind = M.kindOfOutfitName(list:get(i))
+        local name = list:get(i)
+        local kind = M.kindOfOutfitName(name)
         if kind then
             t[i] = kind
             n = n + 1
+            local slot = string.sub(name, PREFIX_LEN + 1)
+            slotOf[i] = slot
+            indexOf[slot] = i
         end
     end
     M._indexKind = t
+    M._indexSlot = slotOf
+    M._slotIndex = indexOf
     M.log("outfit index table built mutants=" .. n .. " female=" .. list:size())
     return t
+end
+
+--- persistentOutfitID -> 슬롯 이름("03", "R03_10" ...). 특좀이 아니거나 표가 없으면 nil
+function M.slotOfPid(pid)
+    local idx = M.outfitIndexOf(pid)
+    if not idx or not indexKindTable() then return nil end
+    return M._indexSlot[idx]
+end
+
+--- 강령술로 일어난 특좀의 옷 ID 인가 (부활 아웃핏)
+function M.isRisenPid(pid)
+    local slot = M.slotOfPid(pid)
+    return slot ~= nil and M.RISEN_SLOT[slot] ~= nil
+end
+
+--- 슬롯 + 성별 + 변형 번호(후원자 번호) -> 옷 ID. 모자 탈락 비트는 끈다. 표가 없으면 nil
+function M.pidForSlot(slot, female, variant)
+    if not indexKindTable() then return nil end
+    local idx = M._slotIndex[slot]
+    if not idx then return nil end
+    local p = idx * 65536 + (variant or M.NO_DONOR)
+    if female then p = p - 2147483648 end   -- 성별 비트(0x80000000) = 음수
+    return p
 end
 
 --- persistentOutfitID -> 종류 (특좀이 아니면 nil). 표를 못 만들면 false
@@ -256,7 +354,8 @@ local function registerAttachedWeapons()
     end
     for kind, def in pairs(M.ATTACHED_WEAPONS) do
         for slot, k in pairs(M.SLOT_KIND) do
-            if k == kind then
+            -- 부활 아웃핏에는 붙이지 않는다: 원래 진압봉은 시체에서 루팅됐거나 일어날 때 바닥에 떨어졌다.
+            if k == kind and not M.RISEN_SLOT[slot] then
                 local outfit = M.OUTFIT_PREFIX .. slot
                 awd.attachedWeaponCustomOutfit[outfit] = { chance = 100, maxitem = 1, weapons = { def } }
                 M.log("attached weapon registered outfit=" .. outfit .. " kind=" .. kind

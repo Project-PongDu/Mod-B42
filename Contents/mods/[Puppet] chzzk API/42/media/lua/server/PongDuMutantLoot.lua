@@ -11,11 +11,11 @@
 -- REWARD_LOOT 는 장식과 무관한 처치 보상(트레이서 권총, 스크리머 의약품, 로치 공구)이다.
 --
 -- [루팅은 특좀 한 마리당 한 번]
--- 강령술로 일어난 좀비(wasFakeDead)는 DoZombieInventory 를 건너뛰고 시체 인벤토리를 그대로 물려받는다
--- (IsoDeadBody.reanimate). 첫 사망 때 준 루팅·보상 중 안 가져간 것은 이미 인벤토리에 있으므로
--- 다시 죽어도 아무것도 새로 넣지 않는다. 장식 유무로 판정하면 디버그 삭제처럼 장식이 안 빠지는 경로나
--- 루팅하지 않은 시체(장식 + 루팅 아이템이 둘 다 남음)에서 중복 지급되므로 부활 여부로 막는다.
--- 한계: 부활 좀비가 가상화(청크 언로드·서버 재시작)되면 엔진이 새로 입혀 wasFakeDead 가 풀리므로 다시 지급된다.
+-- 처치 보상: 처음 소환된 특좀(기본 아웃핏)이 죽을 때만 준다. 강령술로 일어난 특좀은 옷 ID 가 부활 아웃핏
+--   (PongDuMutantId.isRisenPid)이라 가상화·서버 재시작을 거쳐도 다시 주지 않는다.
+-- 장식 루팅: 장식을 입고 죽을 때 1번. 일어날 때 남은 장식의 짝 루팅 아이템은 지워지고(PongDuMutantRisenServer)
+--   장식은 부활 아웃핏에 남으므로, 그 좀비가 다시 죽을 때 1번 준다. 장식을 가져가면 시체에서 장식이 빠져
+--   다음 부활 아웃핏에서 그 장식이 없다. 같은 인벤토리에 이미 표식 달린 아이템이 있으면 주지 않는다.
 -- 슬래머 방독면은 상체 확대 셰이더가 걸린 장식이라 PongDuSlammerServer.lua 가 같은 방식으로 따로 처리한다.
 --
 -- 호출 순서: IsoZombie.onKilled (서버/SP) -> DoZombieInventory(입은 옷 -> 인벤토리) -> OnZombieDead -> DoDeath.
@@ -38,6 +38,16 @@ local COSMETIC_LOOT = {
         { loot = "Base.Boilersuit_Prisoner",    cosmetic = "t3chzzkDonation.PongDuTracerTiedSuit" },
     },
 }
+
+-- 인벤토리에 표식 달린 루팅 아이템(짝 장식 = cosmetic)이 이미 있는가
+local function hasTaggedLoot(inv, lootType, cosmetic)
+    local items = inv:getItems()
+    for i = 0, items:size() - 1 do
+        local it = items:get(i)
+        if it and it:getFullType() == lootType and it:getModData()[LOOT_TAG] == cosmetic then return true end
+    end
+    return false
+end
 
 -- 강령술(fakeDead 경로) 부활 좀비인지. 확인 못 하면 nil (지급은 그대로 진행).
 local function wasFakeDead(z)
@@ -145,23 +155,28 @@ Events.OnZombieDead.Add(function(z)
         print(LOG .. "loot skipped (no inventory) kind=" .. tostring(kind) .. " zid=" .. zid)
         return
     end
-    if wasFakeDead(z) then
-        print(LOG .. "loot skipped (risen by necromancy, loot once) kind=" .. tostring(kind) .. " zid=" .. zid)
-        return
-    end
-
+    local risen = PongDuMutantId.isRisenPid and PongDuMutantId.isRisenPid(z:getPersistentOutfitID())
     if reward then
-        local ok, err = pcall(reward, z, inv, kind, zid)
-        if not ok then print(LOG .. "reward error kind=" .. tostring(kind) .. " err=" .. tostring(err)) end
+        if risen or wasFakeDead(z) then
+            print(LOG .. "reward skipped (risen by necromancy, loot once) kind=" .. tostring(kind)
+                .. " slot=" .. tostring(PongDuMutantId.slotOfPid and PongDuMutantId.slotOfPid(z:getPersistentOutfitID()))
+                .. " zid=" .. zid)
+        else
+            local ok, err = pcall(reward, z, inv, kind, zid)
+            if not ok then print(LOG .. "reward error kind=" .. tostring(kind) .. " err=" .. tostring(err)) end
+        end
     end
 
     if not list then return end
     for i = 1, #list do
         local e = list[i]
         if not inv:containsType(e.cosmetic) then
-            -- 아웃핏 subItems 로 다른 하위 항목을 골랐다
+            -- 장식을 이미 루팅당했거나(부활 아웃핏에 없음) 아웃핏 subItems 로 다른 하위 항목을 골랐다
             print(LOG .. "loot skipped (cosmetic not worn) kind=" .. tostring(kind) .. " item=" .. e.loot
                 .. " cosmetic=" .. e.cosmetic .. " zid=" .. zid)
+        elseif hasTaggedLoot(inv, e.loot, e.cosmetic) then
+            print(LOG .. "loot skipped (already in inventory) kind=" .. tostring(kind) .. " item=" .. e.loot
+                .. " zid=" .. zid)
         else
             local it = inv:AddItem(e.loot)
             if it then it:getModData()[LOOT_TAG] = e.cosmetic end

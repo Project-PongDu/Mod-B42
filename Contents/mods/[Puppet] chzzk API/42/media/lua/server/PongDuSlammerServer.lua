@@ -566,16 +566,19 @@ Events.OnZombieDead.Add(function(z)
         print(LOG .. "loot skipped (no inventory) zid=" .. tostring(zidOf(z)))
         return
     end
-    -- 루팅은 한 마리당 한 번: 강령술 부활 좀비는 시체 인벤토리를 그대로 물려받으므로
-    -- (wasFakeDead -> DoZombieInventory 생략) 안 가져간 방독면은 이미 들어 있고, 가져갔으면 다시 주지 않는다.
-    local okFd, fd = pcall(function() return z:wasFakeDead() end)
-    if okFd and fd == true then
-        print(LOG .. "loot skipped (risen by necromancy, loot once) zid=" .. tostring(zidOf(z)))
-        return
-    end
+    -- 장식을 입고 죽을 때 1번. 강령술로 일어난 슬래머는 부활 아웃핏에 남은 방독면 장식이 있으면 다시 1번 받는다
+    -- (일어날 때 짝 바닐라 방독면은 지워진다, PongDuMutantRisenServer.lua). 장식을 가져갔으면 장식이 없어 안 준다.
     if not inv:containsType(COSMETIC_MASK) then
         print(LOG .. "loot skipped (cosmetic not worn) zid=" .. tostring(zidOf(z)))
         return
+    end
+    local items = inv:getItems()
+    for i = 0, items:size() - 1 do
+        local it = items:get(i)
+        if it and it:getFullType() == LOOT_MASK and it:getModData()[LOOT_TAG] ~= nil then
+            print(LOG .. "loot skipped (already in inventory) zid=" .. tostring(zidOf(z)))
+            return
+        end
     end
     local mask = inv:AddItem(LOOT_MASK)
     if mask then mask:getModData()[LOOT_TAG] = "mask" end
