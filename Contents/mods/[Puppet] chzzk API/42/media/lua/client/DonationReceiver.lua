@@ -1,6 +1,7 @@
 require("ISUI/ISPanel")
 local config        = require("config")
 local rewardManager = require("rewards/rewardManager")
+local bandit        = require("features/hitman")
 local zombie        = require("features/zombie")
 local zone          = require("utils/zone")
 local global        = require("global")
@@ -906,6 +907,7 @@ local function onTick()
     if uiSettings.anchorX == nil and #panelList > 0 then
         repositionPanels()
     end
+    if bandit then bandit.b() end
     if zombie then zombie.a() end
     pollDonationFile()
     consumeDonationQueue()

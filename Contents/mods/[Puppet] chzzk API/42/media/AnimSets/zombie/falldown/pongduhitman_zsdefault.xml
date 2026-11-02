@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animNode>
+	<m_Name>zsdefault</m_Name>
+	<m_AnimName>Bob_HitDeath_WalkBwdAim</m_AnimName>
+	<m_DeferredBoneName>Bip01</m_DeferredBoneName>
+	<m_deferredBoneAxis>Z</m_deferredBoneAxis>
+	<m_Looped>false</m_Looped>
+	<m_BlendTime>0.20</m_BlendTime>
+	<m_SpeedScale>0.80</m_SpeedScale>
+	<m_SyncTrackingEnabled>false</m_SyncTrackingEnabled>
+	<m_Conditions x_name="69c8b350-4e27-494c-bb46-1402ab130f06">
+		<m_Name>Hitman</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_BoolValue>true</m_BoolValue>
+	</m_Conditions>
+	<m_Conditions x_name="9abd84ea-924c-4036-b0a6-01f0a0c3a430">
+		<m_Name>FromBehind</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_Value>false</m_Value>
+	</m_Conditions>
+	<m_Events x_name="5447f236-874a-4476-9b6d-0cc406014bfd">
+		<m_EventName>FallOnFront</m_EventName>
+		<m_TimePc>0.1</m_TimePc>
+		<m_ParameterValue>false</m_ParameterValue>
+	</m_Events>
+	<m_Events x_name="5317c17e-a175-49cf-9538-0ccb1e39ea36">
+		<m_EventName>PlaySound</m_EventName>
+		<m_TimePc>0.5</m_TimePc>
+		<m_ParameterValue>BodyHitGround</m_ParameterValue>
+	</m_Events>
+</animNode>

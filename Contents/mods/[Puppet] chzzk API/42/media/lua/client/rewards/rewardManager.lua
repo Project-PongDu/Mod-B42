@@ -27,13 +27,8 @@ local fx         = require("utils/fx")
 -- 외부(서버 전용) 애드온 모드가 등록한 기능. 조회는 전부 getEntry()를 거친다.
 local addon      = require("PongDuAddon")
 require "PongDuGrant"
-
--- 히트맨(산적) NPC 는 B42 빌드에서 빠졌다(features/hitman.lua 없음). featureId 는 런처 매핑이
--- 깨지지 않게 남겨 두고, 발동하면 로그만 남긴다 (firesupport 의 airborne 과 같은 처리).
-local function banditUnavailable(featureId, sender)
-    print("[PongDu] " .. featureId .. " NOT AVAILABLE in this build (Hitman module excluded) sender="
-        .. tostring(sender or ""))
-end
+-- 히트맨(산적) NPC: Bandits B42 포크(Hitman*.lua). 웨이브 11 = 근접, 15 = 원거리
+local bandit     = require("features/hitman")
 
 -- 기능 핸들러 실행. 핸들러에서 오류가 나면 호출한 DonationReceiver 틱이 같이 죽어
 -- 그 대기열 항목이 매 틱 다시 발동(=매 틱 오류)하고 processingEvent 도 안 풀린다.
@@ -138,7 +133,7 @@ local rewardHandlers = {
     ["bandit_melee"] = {
         immediate = true,
         fn = function(sender)
-            banditUnavailable("bandit_melee", sender)
+            bandit.a(11, sender)                          -- Hitman (melee)
             global.processingEvent = false
         end,
     },
@@ -152,7 +147,7 @@ local rewardHandlers = {
     ["bandit_ranged"] = {
         immediate = true,
         fn = function(sender)
-            banditUnavailable("bandit_ranged", sender)
+            bandit.a(15, sender)                          -- Hitman (ranged)
             global.processingEvent = false
         end,
     },

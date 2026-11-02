@@ -108,6 +108,11 @@ Events.OnTick.Add(function()
                     present[id] = true
                     if not _cache[id] then
                         local name = _tagged[id] or zed:getModData()["_cs"]
+                        -- 히트맨 후원자 이름표는 뇌(HitmanBrain)에 있다 (좀비 modData 는 가상화 때 사라짐)
+                        if not name and HitmanBrain then
+                            local brain = HitmanBrain.Get(zed)
+                            if brain then name = brain.donorTag end
+                        end
                         if name and name ~= "" then
                             local t = TextDrawObject.new()
                             t:ReadString(UIFont.Small, name, -1)
