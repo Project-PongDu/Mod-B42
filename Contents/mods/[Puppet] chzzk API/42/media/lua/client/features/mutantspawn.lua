@@ -32,7 +32,7 @@ end
 --               (mutant_scream1/2 재생 + 반경 50 월드사운드로 주변 좀비 유인).
 --               플레이어를 표적으로 잡은 채 비명을 지르면 들은 좀비도 그 플레이어를 인지.
 --               CDDA_ZombieFunction.Scream 이식.
---    브루트   : HP 3, 스프린터, 괴력(Strength=1), 넉다운 면역(keepstand),
+--    브루트   : 스프린터, 넉다운 면역(keepstand),
 --               공격 중 플레이어를 밀쳐냄(attackFromWindowsLunge).
 --               CDDA_ZombieFunction.Push + keepstand 이식.
 --    로치     : HP 1, 크롤 전용 + 크롤 속도 3배. 자체 제작 —
@@ -208,11 +208,10 @@ end
 -- 가드. 변수는 좀비가 스트림 아웃되면 리셋 -> 다시 로드될 때 자동 재초기화.
 local function initMutant(zombie, kind)
     if kind == "brute" then
-        -- 괴력: CDDA_UpdateZombie와 동일하게 샌드박스 스왑 + DoZombieStats.
-        local origStr = getSandboxOptions():getOptionByName("ZombieLore.Strength"):getValue()
-        getSandboxOptions():set("ZombieLore.Strength", 1)   -- 1 = Superhuman
-        zombie:DoZombieStats()
-        getSandboxOptions():set("ZombieLore.Strength", origStr)
+        -- 괴력(ZombieLore.Strength=1 스왑 + DoZombieStats)은 뺐다: B42 DoZombieStats 는
+        -- strength == -1(최초 생성·재사용 리셋 직후)일 때만 근력을 정해 이 시점엔 효과가 없고,
+        -- 근력은 문·창문·바리케이드·차량 공격 피해에만 쓰인다. 대신 시각·청각·인지·기억력만
+        -- 다시 굴리는 부작용이 있었다.
         zombie:setWalkType("sprint" .. tostring(ZombRand(5) + 1))
     elseif kind == "screamer" then
         -- 걸음은 기본값 유지
@@ -237,9 +236,7 @@ local function initMutant(zombie, kind)
         -- 무는 능력은 건드리지 않는다 (원본 PZM_MutantProperties 의 Wrecker 에 noTeeth 없음).
         -- 돌진 중엔 AI 가 무동작 상태로 고정돼 AttackState 가 없으므로 물지 못한다.
     end
-    -- 체력은 분기 뒤에 일괄 적용한다. 브루트는 위에서 DoZombieStats()를 부르는데
-    -- 그 안에서 Toughness 기준으로 setHealth가 다시 걸리므로(IsoZombie.java:3350)
-    -- 반드시 그 뒤여야 한다.
+    -- 체력은 분기 뒤에 일괄 적용한다.
     local hp = mutantHealth(kind)
     if hp then zombie:setHealth(hp) end
     -- 옷 진단: 강령술 부활 특좀이 알몸으로 보이는 문제 추적용.
@@ -270,8 +267,8 @@ end
 -- 좀비 랜덤화 모드들(BLTRandomZombies 등)은 셀 전체를 훑으며 makeInactive
 -- (true/false) 또는 toggleCrawling()으로 DoZombieStats()를 강제 호출한다
 -- (IsoZombie.java 4079 / 3786). DoZombieStats()는 speedType 기준으로 walkType을
--- 무조건 재생성하고(2644) 근력도 샌드박스 값으로 되돌리므로, 퐁듀가 준
--- sprintN 걸음과 브루트 초인근력이 통째로 날아간다. PuppetMutantInit은 애님
+-- 무조건 재생성하므로, 퐁듀가 준
+-- sprintN 걸음이 통째로 날아간다. PuppetMutantInit은 애님
 -- 변수라 이때 그대로 남아 재적용이 안 걸리고, 결과적으로 특좀이 소환 몇 초 뒤
 -- 일반좀비처럼 행동하게 된다.
 --
@@ -484,6 +481,28 @@ local function updateBrute(zombie)
         end
     end
 end
+
+-- 브루트·트레이서 밀치기 넉다운 면역 (CDDA_FuncOnHit 의 keepstand 처리 이식).
+-- updateBrute/updateTracer 의 매 틱 setKnockedDown(false) 만으로는 막히지 않는 경우가 있다:
+-- 밀치기 판정은 플레이어 postupdate 의 AttackCollisionCheck 애님 이벤트에서 즉시 Hit() 으로
+-- 처리되고(CombatManager.attackCollisionCheck), hitConsequences 가 크리티컬이면
+-- knockedDown=true 를 세운다(IsoZombie.java:4297). 같은 프레임에 좀비 postupdate 가 그 뒤에 돌면
+-- OnZombieUpdate 로 지울 틈 없이 상태 전이가 bKnockedDown 을 읽어 넘어진다(목록 순서에 따라 가끔).
+-- OnWeaponHitCharacter 는 hitConsequences 보다 먼저 같은 호출 안에서 발화하므로
+-- (IsoGameCharacter.java:6794) 여기서 공격자의 크리티컬을 끄면 순서와 무관하게 막힌다.
+-- 무기 크리티컬은 그대로 둔다(CDDA 와 같음): 추가 피해·머리 피격 확률까지 사라지기 때문.
+-- 크리티컬은 공격자 플래그라 같은 밀치기에 함께 맞은 다음 좀비에도 꺼진 채 적용된다(영향 작음).
+Events.OnWeaponHitCharacter.Add(function(attacker, target, _weapon, _damage)
+    if not instanceof(target, "IsoZombie") then return end
+    if not (attacker and instanceof(attacker, "IsoPlayer") and attacker:isLocalPlayer()) then return end
+    if not attacker:isDoShove() then return end
+    local kind = PongDuMutantId.kindOf(target)
+    if kind ~= "brute" and kind ~= "tracer" then return end
+    if attacker:isCriticalHit() then
+        attacker:setCriticalHit(false)
+        print("[PuppetMutant] shove crit cancelled kind=" .. tostring(kind) .. " zid=" .. tostring(target:getOnlineID()))
+    end
+end)
 
 -- ── 트레이서: 파쿠르 시스템 ─────────────────────────────────────────────────
 -- 검증된 워크샵 모드 3종을 트레이서 전용으로 게이팅해 이식:
@@ -871,6 +890,8 @@ local function updateTracer(zombie)
     zombie:setVariable("TracerLungeSpeed", 1.08)
 
     -- 밀치기/약한 피격 넉다운 면역 (브루트 keepstand와 동일 기법).
+    -- 맨손 밀치기 크리티컬은 이 매 틱 해제만으론 프레임 순서에 따라 뚫리므로
+    -- OnWeaponHitCharacter 핸들러(브루트 넉다운 면역 블록)가 판정 전에 크리티컬을 끈다.
     -- 엔진이 넉다운을 강한 피격과 구분하는 별도 플래그를 안 두므로
     -- 전체 넉다운 면역이 된다.
     zombie:setKnockedDown(false)
