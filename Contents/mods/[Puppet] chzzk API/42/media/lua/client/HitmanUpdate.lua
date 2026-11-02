@@ -189,6 +189,10 @@ end
 -- turns a zombie into a hitman
 local function Hitmanize(zombie, brain)
 
+    -- PONGDU: log every (re)hitmanize, needed to trace hitmen lost after reload / restart
+    print("[HITMANS] hitmanize id=" .. tostring(brain.id) .. " zid=" .. tostring(zombie:getOnlineID())
+        .. " at=" .. math.floor(zombie:getX()) .. "," .. math.floor(zombie:getY()) .. "," .. math.floor(zombie:getZ()))
+
     -- load brain
     HitmanBrain.Update(zombie, brain)
 
@@ -239,6 +243,9 @@ end
 
 -- turns hitman into a zombie
 local function Zombify(hitman)
+    -- PONGDU: brain is no longer in the cluster (removed on the server)
+    print("[HITMANS] zombify id=" .. tostring(HitmanUtils.GetZombieID(hitman)) .. " zid=" .. tostring(hitman:getOnlineID())
+        .. " (brain not in cluster)")
     hitman:setNoTeeth(false)
     hitman:setUseless(false)
     hitman:setVariable("Hitman", false)
@@ -2427,9 +2434,19 @@ local function OnZombieDead(hitman)
         hitman:getModData().isDeadHitman = true
 
         if brain then
-            local args = {}
-            args.id = brain.id
-            sendClientCommand(player, 'Hitman_Commands', 'HitmanRemove', args)
+            -- PONGDU: in MP the server removes the brain when the zombie really dies
+            -- (server/HitmanServerLoot.lua). A client OnZombieDead can fire for a zombie the server
+            -- did not kill; sending HitmanRemove from here deleted the brain of a living hitman and
+            -- it walked on as a plain zombie. Now the client only drops its local copy, and the update
+            -- loop re-hitmanizes the zombie if the server still has the brain.
+            if isClient() then
+                print("[HITMANS] client death id=" .. tostring(brain.id) .. " zid=" .. tostring(hitman:getOnlineID())
+                    .. " hp=" .. tostring(hitman:getHealth()))
+            else
+                local args = {}
+                args.id = brain.id
+                sendClientCommand(player, 'Hitman_Commands', 'HitmanRemove', args)
+            end
             HitmanBrain.Remove(hitman)
         end
 
