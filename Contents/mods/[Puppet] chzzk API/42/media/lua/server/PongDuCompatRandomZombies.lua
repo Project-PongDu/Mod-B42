@@ -34,8 +34,6 @@ PongDuCompat = PongDuCompat or {}
 --   전용 아웃핏  : 뮤턴트(screamer/brute/roach/tracer/slammer) + 스프린터
 --                   (PongDuMutant_<슬롯>, shared/PongDuMutantId.lua. 소환·좀비 레인·부활 공통)
 --   isSprinter    : 예전 makeSprinter 경로 마커 (남은 개체 호환)
---   hitmanBrain   : 히트맨 NPC (좀비 객체를 NPC로 쓰므로 체력/크롤 개입 시 파손)
---   Hitman 변수   : 브레인 부착 전/후 과도 구간 방어
 -- 영구 소유(개체 정체성 자체가 퐁듀 것). 블러드문처럼 "한시적으로 스탯만
 -- 빌려 쓰는" 마커는 여기 포함하지 않는다 -- 블러드문이 매 스윕 재변환 대상을
 -- 고를 때 이 함수를 쓰기 때문에, 자기 마커까지 여기서 걸리면 한 번 변환된
@@ -47,7 +45,6 @@ function PongDuCompat.isSpecialZombie(zombie)
     local md = zombie:getModData()
     if md then
         if md["isSprinter"] then return true end
-        if md["hitmanBrain"] then return true end
     end
     return false
 end

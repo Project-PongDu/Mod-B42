@@ -8,7 +8,7 @@ local timerText = require("utils/timerText")
 local FS_TIMER_GROUP = "fire_support"
 
 -- ═══════════════════════════════════════════════════════════════════════════
---  화력 지원 (fire_support): 저격 / 드론 / 헬기 / 공수 중 1종 랜덤 발동.
+--  화력 지원 (fire_support): 저격 / 드론 / 헬기 중 1종 랜덤 발동.
 --
 --  미사일 폭격(bombard)과 달리 "환경 무피해" 지원 계열. 지형/차량/시체 아이템을
 --  건드리지 않고 반경 내 좀비만 처치한다. 시청자가 부담 없이 도움을 줄 수 있는
@@ -17,10 +17,7 @@ local FS_TIMER_GROUP = "fire_support"
 --    저격 (sniper)     : 즉시 1회. 반경 넓음 / 킬 수 적음.
 --    드론 (drone)      : 지속(짧음). 반경 좁음 / 짧은 간격.
 --    헬기 (helicopter) : 지속(김). 반경 넓음 / 로터음 루프 + 기관총.
---    공수 (airborne)   : 헬기가 3초간 고공 통과하며 공수부대원(우호 히트맨) 1명 투하.
---                        대원은 영구 체류하며 호위 대상 주변을 배회, 위협을 사격한다.
---                        (server.lua 공수부대 절, features/airborne.lua,
---                         ZombiePrograms/ZPAirborne.lua)
+--    공수 (airborne)   : 미구현 스텁 (샌드박스 PongDu_Dev). 룰렛에 들어가지 않는다.
 --
 --  ── 구현 시 지켜야 할 제약 (합의된 설계) ──────────────────────────────────
 --  1. 좀비 킬은 반드시 해당 좀비의 소유 클라이언트에서 실행할 것.
@@ -944,9 +941,6 @@ end
 local HELI_FLY_ALT = 8.0   -- 물리 y 고도. iso 층수 환산 = y/2.46 (BaseVehicle.java:1456),
                            -- 8.0 ≈ 3.25층. 초기값 3.0(BH 조종 상한)은 1.2층이라 너무 낮았다.
 local HELI_YAW_OFF = 0     -- fbx 전방축 보정(도). 기수 방향이 틀어져 보이면 여기로 교정.
--- 공수부대 수송 헬기(passive 인스턴스) 고도. 화력지원 헬기의 3배.
--- 기본 줌에선 화면 위로 벗어나는 높이라 주로 그림자와 로터음으로 체감된다.
-local HELI_AIRBORNE_ALT = HELI_FLY_ALT * 3
 
 -- ── 실차량 미도착/유실 복구 ────────────────────────────────────────────────
 -- [증상] 로터음·예광탄·타이머는 정상인데 기체와 그림자만 안 보인다.
@@ -1062,10 +1056,7 @@ end
 local function heliPilotTick(h)
     local v = findHeliVehicle(h)
     if not v then
-        -- passive(공수 수송) 헬기는 3초짜리라 재스폰 요청 없이 로터음만 낸다.
-        -- HeliRespawn 은 서버가 플레이어 기준으로 화력지원 job 을 찾으므로
-        -- 보내면 엉뚱한 헬기를 재스폰시킨다.
-        if not h.passive then heliLostTick(h) end
+        heliLostTick(h)
         return
     end
     if h.lostAt then
@@ -1081,7 +1072,7 @@ local function heliPilotTick(h)
         h.yawSet = true
         heliSetYaw(h, v)
     end
-    local ok, err = pcall(function() heliMoveTo(v, wx, wy, h.alt) end)
+    local ok, err = pcall(function() heliMoveTo(v, wx, wy) end)
     if not ok and not h.moveErr then
         h.moveErr = true
         print("[PongDu] fire_support/heli: move FAILED own=" .. tostring(h.own)
@@ -1300,12 +1291,6 @@ local function heliUpsert(args)
     -- 실차량 연동: 서버가 스폰한 VehicleID와 물리 권한 대상(pilot).
     -- SP에선 양쪽 onlineID가 모두 -1이라 자동으로 파일럿이 된다.
     if args.vid then h.vid = tonumber(args.vid) end
-    -- passive: 공수부대 수송 헬기. 사격/타이머 없음(own 키가 onlineID 범위 밖이라
-    -- 사격 틱/타이머 게이트(own == me)에 자동으로 안 걸린다), 고도만 다르다.
-    if tonumber(args.passive) == 1 then
-        h.passive = true
-        h.alt = HELI_AIRBORNE_ALT
-    end
     local me = myOnlineID()
     h.amPilot = (me ~= nil) and (args.pilot ~= nil)
         and (tonumber(args.pilot) == me)
