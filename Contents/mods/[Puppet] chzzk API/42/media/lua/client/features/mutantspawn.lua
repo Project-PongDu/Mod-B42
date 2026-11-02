@@ -206,28 +206,62 @@ end
 -- ── 1회 초기화 (클라별) ───────────────────────────────────────────────────────
 -- 스탯류는 매 틱 재적용하면 안 되는 것들이라 PuppetMutantInit 애님 변수로
 -- 가드. 변수는 좀비가 스트림 아웃되면 리셋 -> 다시 로드될 때 자동 재초기화.
+-- 뛰는 종류는 setWalkType("sprintN") 이 아니라 바닐라 doSprinter() 로 만든다.
+-- B42 setWalkType 은 걸음 이름만 바꾸고 speedType 은 그대로 둬서, 엔진은 이 좀비를 뛰는 좀비로
+-- 보지 않았다(뛰는 좀비 울음·물기 소리, running 플래그, 덮치기 중 이동 처리 누락 —
+-- IsoZombie.getVoiceSoundName / getZombieLungeSpeed / moveUnmodded 가 speedType == 1 을 본다).
+-- doSprinter 는 speedType=1 + sprint1~5 걸음을 함께 정하고, 이후 다른 모드가 DoZombieStats 를
+-- 불러도 speedType 을 따라 뛰는 걸음이 대부분 유지된다(doZombieSpeedInternal).
+--
+-- speedType 1 이면 바닐라가 추격 중 가끔 스스로 걸려 넘어지게 한다(IsoZombie.updateZombieTripping
+-- -> BumpType "trippingFromSprint" -> bumped 상태 sprinterTripping 노드 Bob_RunStumble -> getup).
+-- 브루트·트레이서는 PuppetNoTrip 애님 변수로 그 노드를 퐁듀 노드
+-- (AnimSets/zombie/bumped/PongDuNoTrip.xml)로 바꿔 넘어지지 않게 한다. 넘어짐 판정은
+-- OnZombieUpdate 뒤(같은 update 의 3471줄)에 걸려 Lua 로 지우는 방식은 항상 늦으므로 애님 노드
+-- 선택으로 막는다. 노드 선택은 매 프레임 변수 값으로 결정돼 타이밍 경쟁이 없다.
+-- 뛰좀(sprinter)은 바닐라 뛰는 좀비와 같게 넘어짐을 그대로 둔다.
+local NO_TRIP_KIND = { brute = true, tracer = true }
+
+-- 검증 로그: 넘어짐 판정이 걸린 뒤 PongDuNoTrip 노드가 돌았는지(=bumped 상태 중 넘어지지 않음)
+-- 확인용. 판정 1회당 한 번만 찍는다. 넘어졌다면 이 로그 뒤에 getup 이 보이고 onFloor=true 가 찍힌다.
+local _tripSeen = {}
+local function logTripOnce(zombie, kind)
+    local k = zkey(zombie)
+    if zombie:getVariableString("BumpType") == "trippingFromSprint" then
+        if not _tripSeen[k] then
+            _tripSeen[k] = true
+            print("[PuppetMutant] sprint trip suppressed kind=" .. tostring(kind)
+                .. " zid=" .. tostring(zombie:getOnlineID())
+                .. " noTripVar=" .. tostring(zombie:getVariableBoolean("PuppetNoTrip"))
+                .. " onFloor=" .. tostring(zombie:isOnFloor()))
+        end
+    elseif _tripSeen[k] then
+        _tripSeen[k] = nil
+    end
+end
+
 local function initMutant(zombie, kind)
+    zombie:setVariable("PuppetNoTrip", NO_TRIP_KIND[kind] == true)
     if kind == "brute" then
         -- 괴력(ZombieLore.Strength=1 스왑 + DoZombieStats)은 뺐다: B42 DoZombieStats 는
         -- strength == -1(최초 생성·재사용 리셋 직후)일 때만 근력을 정해 이 시점엔 효과가 없고,
         -- 근력은 문·창문·바리케이드·차량 공격 피해에만 쓰인다. 대신 시각·청각·인지·기억력만
         -- 다시 굴리는 부작용이 있었다.
-        zombie:setWalkType("sprint" .. tostring(ZombRand(5) + 1))
+        zombie:doSprinter()
     elseif kind == "screamer" then
         -- 걸음은 기본값 유지
     elseif kind == "roach" then
         zombie:setVariable("PuppetRoach", true)
     elseif kind == "sprinter" then
-        -- 부활한 뛰좀 재적용 경로 (원 스폰은 서버 makeSprinter가 처리)
-        zombie:setWalkType("sprint" .. tostring(ZombRand(5) + 1))
+        -- 부활한 뛰좀 재적용 경로 (원 스폰은 서버 spawnZombies 가 처리)
+        zombie:doSprinter()
     elseif kind == "tracer" then
-        -- 트레이서: 스프린터 워크타입.
-        -- ※3차 정정: DoZombieSpeeds()도 무효 - 이 함수가 만지는
-        -- def.AnimFrameIncrease는 구세대 2D 스프라이트 프레임 전진에만 읽히는
-        -- 레거시 필드로(B41 3D 좀비 이동은 advanced animator의 루트모션이 전담),
-        -- 이속에 아무 영향이 없다. 실제 이속 조절은 locomotion 애님 노드의
-        -- m_SpeedScale 오버라이드로만 가능(TR locomotion 노드, 별도 작업).
-        zombie:setWalkType("sprint" .. tostring(ZombRand(5) + 1))
+        -- 트레이서: 뛰는 좀비.
+        -- 이속은 DoZombieSpeeds()/speedMod 로 못 바꾼다 - 이 함수들이 만지는
+        -- def.animFrameIncrease 는 구세대 2D 스프라이트 프레임 전진에만 읽히는 레거시 필드이고
+        -- (3D 좀비 이동은 advanced animator 의 루트모션이 전담, B41·B42 같음),
+        -- 실제 이속 조절은 locomotion 애님 노드의 m_SpeedScale 오버라이드로만 가능(TR locomotion 노드).
+        zombie:doSprinter()
     elseif kind == "slammer" then
         -- 슬래머: 빠른 걸음 고정 (speedType 2, walkType "1"~"5", IsoZombie.doFastShambler).
         -- speedType 을 2 로 박아 두므로 이후 DoZombieStats 도 같은 속도로 다시 만든다.
@@ -259,14 +293,16 @@ local function initMutant(zombie, kind)
         .. " dressed=" .. tostring(zombie:isPersistentOutfitInit())
         .. " wornMode=" .. tostring(wornMode)
         .. " rp=" .. tostring(zombie:isReanimatedPlayer())
-        .. " noTeeth=" .. tostring(zombie:isNoTeeth()))
+        .. " noTeeth=" .. tostring(zombie:isNoTeeth())
+        .. " walk=" .. tostring(zombie:getWalkType()) .. " speedType=" .. tostring(zombie:getSpeedType())
+        .. " noTrip=" .. tostring(NO_TRIP_KIND[kind] == true))
     zombie:setVariable("PuppetMutantInit", true)
 end
 
 -- ── 외부 모드 스탯 덮어쓰기 감시 ─────────────────────────────────────────────
 -- 좀비 랜덤화 모드들(BLTRandomZombies 등)은 셀 전체를 훑으며 makeInactive
 -- (true/false) 또는 toggleCrawling()으로 DoZombieStats()를 강제 호출한다
--- (IsoZombie.java 4079 / 3786). DoZombieStats()는 speedType 기준으로 walkType을
+-- (B42: IsoZombie.makeInactive / toggleCrawling). DoZombieStats()는 speedType 기준으로 walkType을
 -- 무조건 재생성하므로, 퐁듀가 준
 -- sprintN 걸음이 통째로 날아간다. PuppetMutantInit은 애님
 -- 변수라 이때 그대로 남아 재적용이 안 걸리고, 결과적으로 특좀이 소환 몇 초 뒤
@@ -302,6 +338,9 @@ local function guardStats(zombie, kind)
         local wt = zombie:getVariableString("zombiewalktype")
         if not (wt and string.sub(wt, 1, 6) == "sprint") then
             reason = "walkType=" .. tostring(wt)
+        elseif zombie:getSpeedType() ~= 1 then
+            -- 걸음은 뛰는데 speedType 이 풀림 (setWalkType 만 하는 외부 모드)
+            reason = "speedType=" .. tostring(zombie:getSpeedType())
         end
     elseif FAST_KIND[kind] then
         local wt = zombie:getVariableString("zombiewalktype")
@@ -1063,6 +1102,7 @@ local function applyMutant(zombie)
     end
     logDressOnce(zombie, kind, md)
     applyFixedSkin(zombie, kind, md)
+    if NO_TRIP_KIND[kind] then logTripOnce(zombie, kind) end
     if kind == "screamer" then
         updateScreamer(zombie)
     elseif kind == "brute" then
@@ -1077,8 +1117,14 @@ Events.OnZombieUpdate.Add(applyMutant)
 
 -- 죽을 때 로컬 캐시만 정리한다. 시체·강령술 부활의 특좀 유지는 아웃핏이 담당한다.
 Events.OnZombieDead.Add(function(zombie)
+    -- 넘어짐 방지 변수는 애님 변수라 죽은 좀비 객체가 재사용될 때 남지 않게 지운다
+    -- (강령술 부활 특좀은 initMutant 가 다시 세운다).
+    if zombie:getVariableBoolean("PuppetNoTrip") then
+        zombie:setVariable("PuppetNoTrip", false)
+    end
     local k = zkey(zombie)
     _nextScream[k] = nil
+    _tripSeen[k] = nil
     _hpSnap[k] = nil                 -- 이름표(_showTags)는 renderTags 가 사망 시 스스로 지운다
 end)
 

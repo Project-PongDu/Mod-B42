@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 브루트·트레이서 추격 중 넘어짐 방지 (client/features/mutantspawn.lua NO_TRIP_KIND).
+     뛰는 좀비(speedType 1)는 추격 중 가끔 BumpType=trippingFromSprint 로 bumped 상태에 들어가
+     바닐라 sprinterTripping(_RAG) 노드(Bob_RunStumble, 끝에 SprinterTripped=TRUE -> getup)로 넘어진다.
+     PuppetNoTrip 이 켜진 좀비는 조건 우선순위로 이 노드가 대신 걸린다: 넘어지는 클립·FallOnFront·
+     SprinterTripped 없이 뛰는 클립으로 이어 붙이고, 시작하자마자 BumpAnimFinished 를 세워
+     bumped 상태를 바로 빠져나가게 한다(to_walktoward / to_lunge / to_idle, *-network 포함).
+     넘어짐 판정(IsoZombie.updateZombieTripping)은 OnZombieUpdate 뒤에 걸려 Lua 로는 못 막으므로
+     노드 선택으로 막는다. PuppetNoTrip 은 각 클라가 initMutant 에서 세우므로 비소유 클라도 같은 노드를 고른다. -->
+<animNode>
+	<m_Name>PongDuNoTrip</m_Name>
+	<m_ConditionPriority>100</m_ConditionPriority>
+	<m_AnimName>Zombie_Sprint</m_AnimName>
+	<m_Looped>false</m_Looped>
+	<m_BlendTime>0.15</m_BlendTime>
+	<m_SpeedScale>0.80</m_SpeedScale>
+	<m_Conditions>
+		<m_Name>BumpType</m_Name>
+		<m_Type>STRING</m_Type>
+		<m_StringValue>trippingFromSprint</m_StringValue>
+	</m_Conditions>
+	<m_Conditions>
+		<m_Name>PuppetNoTrip</m_Name>
+		<m_Type>BOOL</m_Type>
+		<m_BoolValue>true</m_BoolValue>
+	</m_Conditions>
+	<m_Events>
+		<m_EventName>SetVariable</m_EventName>
+		<m_Time>Start</m_Time>
+		<m_ParameterValue>BumpAnimFinished=true</m_ParameterValue>
+	</m_Events>
+</animNode>
