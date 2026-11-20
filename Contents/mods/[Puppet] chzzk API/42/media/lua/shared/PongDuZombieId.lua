@@ -78,3 +78,21 @@ function PongDuZombieId.IsGrappleCorpse(zombie)
     -- Called per zombie in fire support scans, so no pcall/closure: the method is public on IsoZombie (B42).
     return zombie ~= nil and zombie:isReanimatedForGrappleOnly() == true
 end
+
+--- True while a zombie-rain zombie is still in the air (parachute descent).
+--- Clients set the "PongDuRainFall" anim variable while it falls (features/zombierain.lua FALL_ANIM_VAR);
+--- the server has no air squares, so there the falling zombie has no current square.
+--- Killing it in the air makes a corpse without a square: the server's death packet then throws
+--- (DeadCharacterPacket.set NPE, 42.22.2) and the death is never sent to other clients.
+--- Fire support must skip it until it lands.
+local airborneLogged = false
+function PongDuZombieId.IsAirborne(zombie)
+    if zombie == nil then return false end
+    local air = zombie:getVariableBoolean("PongDuRainFall") == true or zombie:getCurrentSquare() == nil
+    if air and not airborneLogged then
+        airborneLogged = true
+        print("[PongDu][ZombieId] fire support skips airborne zombies (first seen x=" .. tostring(math.floor(zombie:getX()))
+            .. " y=" .. tostring(math.floor(zombie:getY())) .. " z=" .. tostring(zombie:getZ()) .. ")")
+    end
+    return air
+end
