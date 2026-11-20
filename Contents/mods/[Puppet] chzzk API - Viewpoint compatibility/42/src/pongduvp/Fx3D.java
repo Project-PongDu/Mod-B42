@@ -28,6 +28,12 @@ import static org.lwjgl.opengl.GL33.*;
  * Viewpoint has no public Java API; every member is looked up by reflection once and a failure switches this
  * class off with one log line (the game keeps running, the Lua side just sees no PongDuVP_JavaFrame updates).
  *
+ * Terrain relief (0.2.2): Viewpoint (11-16 build) raises the ground by a height field, relative to the ground under
+ * the camera (viewpoint.render.FarRelief$Lift.scene(x, y), held in SceneData.relief, the same lift
+ * viewpoint.game.WorldToScreen adds). Characters, vehicles and the ground follow it, so puffs and tracer ends get the
+ * lift of their own tile too: without it the gas sat at flat-ground height, buried under higher ground (run 11-20:
+ * no gas visible on a riverbank slope) and tracers hit above zombies standing on lower ground.
+ *
  * Times are System.currentTimeMillis(), the same clock as Lua's getTimestampMs(), so clouds created while
  * the isometric view was on (capture does not run then) still age correctly.
  */
@@ -62,6 +68,7 @@ public final class Fx3D {
         long t0, dur, spread, fade;
         float[] puffs;                                        // per puff: ox, oy, height/size ratio, size, delay, seed
         int count;
+        boolean liftLogged;
     }
 
     private record Tracer(double ox, double oy, double ou, double dx, double dy, double du, double dist,
@@ -99,6 +106,38 @@ public final class Fx3D {
 
     private static Object get(Object o, String n) throws Exception { return field(o.getClass(), n).get(o); }
     private static float num(Object o, String n) throws Exception { return ((Number) get(o, n)).floatValue(); }
+
+    // ── terrain relief (optional: older Viewpoint builds have no SceneData.relief) ─────────────
+    private static boolean reliefChecked, reliefMissing;
+
+    /** this frame's FarRelief$Lift, or null (relief off, or a Viewpoint build without it) */
+    private static Object lift(Object scene) {
+        if (reliefMissing || scene == null) return null;
+        try {
+            Object l = get(scene, "relief");
+            if (!reliefChecked) {
+                reliefChecked = true;
+                System.out.println(TAG + "terrain relief lookup ok (SceneData.relief " + (l == null ? "null now" : "present") + ")");
+            }
+            return l;
+        } catch (Throwable e) {
+            reliefMissing = true;
+            System.out.println(TAG + "terrain relief not found, drawing on flat ground: " + e);
+            return null;
+        }
+    }
+
+    /** render-height lift of world tile (x, y): FarRelief$Lift.scene, 0 without relief */
+    private static float liftAt(Object lift, double x, double y) {
+        if (lift == null) return 0f;
+        try {
+            float v = ((Number) method(lift.getClass(), "scene", double.class, double.class).invoke(lift, x, y)).floatValue();
+            return Float.isFinite(v) ? v : 0f;
+        } catch (Throwable e) {
+            if (!reliefMissing) { reliefMissing = true; System.out.println(TAG + "terrain relief call failed, drawing on flat ground: " + e); }
+            return 0f;
+        }
+    }
 
     private static Method method(Class<?> c, String n, Class<?>... p) throws Exception {
         String key = c.getName() + "/" + n + Arrays.toString(p);
@@ -282,6 +321,7 @@ public final class Fx3D {
             float cx = num(frame, "camX"), cy = num(frame, "camY"), cz = num(frame, "camZ");
             float camU = cz * LEVEL;
             float light = ambientLight();
+            Object lift = lift(scene);
             List<Item> puffs = new ArrayList<>();
             List<Item> glows = new ArrayList<>();
             float[] veil = new float[4];
@@ -298,7 +338,13 @@ public final class Fx3D {
                 // cloud's own puffs so the view inside is a haze, while from outside it stays a solid mass.
                 double hd = Math.hypot(cx - c.x, cy - c.y);
                 float edge = c.r * spreadOut;
-                float inside = (hd < edge && camU - c.baseU < c.top) ? clamp((float) (edge - hd) / VEIL_EDGE, 0f, 1f) : 0f;
+                float liftC = liftAt(lift, c.x, c.y);
+                if (!c.liftLogged) {
+                    c.liftLogged = true;
+                    System.out.println(TAG + String.format("gas cloud lift at %.0f,%.0f centre=%.2f (camera ground = 0, relief %s)",
+                        c.x, c.y, liftC, lift == null ? "off" : "on"));
+                }
+                float inside = (hd < edge && camU - c.baseU - liftC < c.top) ? clamp((float) (edge - hd) / VEIL_EDGE, 0f, 1f) : 0f;
                 float thin = 1f - INSIDE_THIN * inside;
                 for (int i = 0, o = 0; i < c.count; i++, o += 6) {
                     float k = clamp((age - c.puffs[o + 4]) / (float) GROW_MS, 0f, 1f);
@@ -308,9 +354,10 @@ public final class Fx3D {
                     if (a < 0.01f) continue;
                     float size = c.puffs[o + 3] * (0.45f + 0.55f * ease) * (1f + 0.15f * lifeFrac);
                     double wx = c.x + c.puffs[o] * spreadOut, wy = c.y + c.puffs[o + 1] * spreadOut;
-                    float px = (float) -(wx - cx), py = c.baseU + size * c.puffs[o + 2] + rise - camU, pz = (float) -(wy - cy);
+                    float lp = liftAt(lift, wx, wy);
+                    float px = (float) -(wx - cx), py = c.baseU + lp + size * c.puffs[o + 2] + rise - camU, pz = (float) -(wy - cy);
                     float dist = px * px + py * py + pz * pz;
-                    puffs.add(new Item(M_PUFF, px, py, pz, 0, c.baseU - camU, 0, size, c.cr, c.cg, c.cb, a, c.puffs[o + 5], dist));
+                    puffs.add(new Item(M_PUFF, px, py, pz, 0, c.baseU + lp - camU, 0, size, c.cr, c.cg, c.cb, a, c.puffs[o + 5], dist));
                 }
                 // camera inside the cloud: light tint of the whole view in its colour
                 float grown = clamp(age / (float) (c.spread + GROW_MS), 0f, 1f);
@@ -324,24 +371,29 @@ public final class Fx3D {
             for (Tracer t : tracers) {
                 double nose = Math.max(0, now - t.t0) / 1000.0 * TR_SPEED;
                 double tail = Math.max(0, nose - TR_STREAK), head = Math.min(nose, t.dist);
+                // lift of the shooter's tile and of the target's tile, blended along the line
+                float liftO = liftAt(lift, t.ox, t.oy);
+                float liftT = liftAt(lift, t.ox + t.dx * t.dist, t.oy + t.dy * t.dist);
+                float lTail = (float) (liftO + (liftT - liftO) * (tail / t.dist));
+                float lHead = (float) (liftO + (liftT - liftO) * (head / t.dist));
                 if (head > tail) {
                     glows.add(new Item(M_TRACER,
-                        (float) -(t.ox + t.dx * tail - cx), (float) (t.ou + t.du * tail - camU), (float) -(t.oy + t.dy * tail - cy),
-                        (float) -(t.ox + t.dx * head - cx), (float) (t.ou + t.du * head - camU), (float) -(t.oy + t.dy * head - cy),
+                        (float) -(t.ox + t.dx * tail - cx), (float) (t.ou + t.du * tail + lTail - camU), (float) -(t.oy + t.dy * tail - cy),
+                        (float) -(t.ox + t.dx * head - cx), (float) (t.ou + t.du * head + lHead - camU), (float) -(t.oy + t.dy * head - cy),
                         TR_WIDTH, 1f, 0.86f, 0.5f, t.alpha, 0f, 0f));
                 }
                 long since = now - t.t0;
                 if (t.flash && since < FLASH_MS) {
                     float k = 1f - since / (float) FLASH_MS;
                     glows.add(new Item(M_FLASH,
-                        (float) -(t.ox - cx), (float) (t.ou - camU), (float) -(t.oy - cy), 0, 0, 0,
+                        (float) -(t.ox - cx), (float) (t.ou + liftO - camU), (float) -(t.oy - cy), 0, 0, 0,
                         FLASH_SIZE * (0.6f + 0.4f * k), 1f, 0.8f, 0.4f, k * t.alpha / 0.9f, 0f, 0f));
                 }
                 double hitAt = t.dist / TR_SPEED * 1000.0;
                 if (since >= hitAt && since < hitAt + HIT_MS) {
                     float k = 1f - (float) ((since - hitAt) / HIT_MS);
                     double ex = t.ox + t.dx * t.dist, ey = t.oy + t.dy * t.dist, eu = t.ou + t.du * t.dist;
-                    glows.add(new Item(M_FLASH, (float) -(ex - cx), (float) (eu - camU), (float) -(ey - cy), 0, 0, 0,
+                    glows.add(new Item(M_FLASH, (float) -(ex - cx), (float) (eu + liftT - camU), (float) -(ey - cy), 0, 0, 0,
                         HIT_SIZE, 1f, 0.75f, 0.4f, k * 0.8f * t.alpha / 0.9f, 0f, 0f));
                 }
             }
